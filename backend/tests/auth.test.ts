@@ -1,5 +1,8 @@
+// Importação da biblioteca de testes HTTP
 import request from 'supertest';
+// Importação da aplicação Express (extensão .js obrigatória com moduleResolution: nodenext)
 import { app } from '../src/app.js';
+// Importação do cliente Prisma para operações no banco
 import { prisma } from '../src/utils/prismaClient.js';
 
 describe('Auth - /auth', () => {
