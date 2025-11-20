@@ -1,43 +1,72 @@
-# Miscellaneous
-*.class
-*.log
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.buildlog/
-.history
-.svn/
-migrate_working_dir/
-
-# IntelliJ related
+# ----------------------------------------------------------
+# GERAL & IDEs (VS Code, IntelliJ, Mac, Windows)
+# ----------------------------------------------------------
+.idea/
+.vscode/
 *.iml
 *.ipr
 *.iws
-.idea/
+*.swp
+.DS_Store
+Thumbs.db
+.history/
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
-# Flutter/Dart/Pub related
-**/doc/api/
-**/ios/Flutter/.last_build_id
+# ----------------------------------------------------------
+# FLUTTER / DART (Essencial)
+# ----------------------------------------------------------
 .dart_tool/
 .flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
-/build/
+build/
+doc/api/
 
-# Symbolication related
-app.*.symbols
+# ----------------------------------------------------------
+# ANDROID (Frontend) - Configurações Críticas
+# ----------------------------------------------------------
+# Ignorar configurações locais (NUNCA suba isso)
+**/android/local.properties
+**/android/key.properties
+**/android/.gradle
+**/android/captures/
+**/android/app/release/*.keystore
 
-# Obfuscation related
-app.*.map.json
+# Manter os arquivos do Gradle Wrapper (NECESSÁRIO subir)
+!**/android/gradlew
+!**/android/gradlew.bat
+!**/android/gradle/wrapper/gradle-wrapper.jar
 
-# Android Studio will place build artifacts here
-/android/app/debug
-/android/app/profile
-/android/app/release
+# ----------------------------------------------------------
+# IOS (Frontend)
+# ----------------------------------------------------------
+**/ios/Flutter/.last_build_id
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/flutter_assets/
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/.generated/
+**/ios/Pods/
+
+# ----------------------------------------------------------
+# ARQUIVOS GERADOS (Plugins do Flutter)
+# ----------------------------------------------------------
+**/GeneratedPluginRegistrant.h
+**/GeneratedPluginRegistrant.m
+**/GeneratedPluginRegistrant.java
+
+# ----------------------------------------------------------
+# BACKEND / NODE.JS (Segurança extra solicitada)
+# Caso tenha arquivos de backend ou scripts na raiz
+# ----------------------------------------------------------
+node_modules/
+dist/
+coverage/
+.env
+.env.test
+.env.production
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
