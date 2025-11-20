@@ -1,0 +1,76 @@
+# -----------------------------------------
+# Arquivos a serem ignorados pelo Git
+# -----------------------------------------
+
+# Node modules
+node_modules/
+
+# -----------------------------------------
+# ARQUIVOS DE IDE E SISTEMA
+# -----------------------------------------
+.idea/
+.vscode/
+*.iml
+*.swp
+.DS_Store
+
+
+# Ignore environment files
+.env
+.env.local
+.env.*.local
+
+# Ignore build outputs
+/dist
+/build
+/out
+
+# Ignore logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# -----------------------------------------
+# FLUTTER (Geral)
+# -----------------------------------------
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+build/
+
+# -----------------------------------------
+# ANDROID - O QUE IGNORAR (Segurança e Local)
+# -----------------------------------------
+**/android/local.properties
+**/android/key.properties
+**/android/.gradle
+**/android/captures/
+**/android/app/release/*.keystore
+
+# -----------------------------------------
+# ANDROID - O QUE MANTER (Importante!)
+# O '!' diz ao git: "Não ignore isso, eu preciso desses arquivos"
+# -----------------------------------------
+!**/android/gradlew
+!**/android/gradlew.bat
+!**/android/gradle/wrapper/gradle-wrapper.jar
+
+# -----------------------------------------
+# IOS & ARQUIVOS GERADOS (Generated)
+# -----------------------------------------
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/.generated/
+**/ios/Flutter/flutter_assets/
+**/ios/ServiceDefinitions.json
+**/ios/Runner/GeneratedPluginRegistrant.*
+
+# Arquivos gerados de plugins (aparecem no Android e iOS)
+**/GeneratedPluginRegistrant.h
+**/GeneratedPluginRegistrant.m
+**/GeneratedPluginRegistrant.java
