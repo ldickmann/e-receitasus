@@ -1,4 +1,3 @@
-// Arquivo: lib/screens/login_screen.dart
 import 'package:flutter/material.dart';
 
 class LoginScreen extends StatelessWidget {
@@ -20,7 +19,7 @@ class LoginScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('App E-ReceitaSUS'),
-        backgroundColor: Colors.blueAccent,
+        // backgroundColor: Colors.blueAccent,
       ),
       body: Center(
         child: SingleChildScrollView(
@@ -30,15 +29,16 @@ class LoginScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               // Título (Aplica UX/Usabilidade Inclusiva)
-              const Text(
+              Text(
                 'Acesso do Paciente / Administrador',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                     fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Colors.blueAccent),
+                    color: Theme.of(context).colorScheme.primary),
               ),
-              const SizedBox(height: 30),
+
+              const SizedBox(height: 25),
 
               // Campo de Email
               const TextField(
@@ -65,13 +65,13 @@ class LoginScreen extends StatelessWidget {
               // Botão de Login
               ElevatedButton(
                 onPressed: () => _handleLogin(context), // Callback
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  padding: const EdgeInsets.symmetric(vertical: 15),
-                ),
+                // style: ElevatedButton.styleFrom(
+                //  backgroundColor: Colors.blue,
+                //  padding: const EdgeInsets.symmetric(vertical: 15),
+                // ),
                 child: const Text(
                   'Entrar',
-                  style: TextStyle(fontSize: 18, color: Colors.white),
+                  style: TextStyle(fontSize: 18),
                 ),
               ),
               const SizedBox(height: 10),
