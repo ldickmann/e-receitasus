@@ -6,12 +6,12 @@ class LoginScreen extends StatelessWidget {
   // Callbacks
   void _handleLogin(BuildContext context) {
     // A Lógica de autenticação e navegação será implementada com Provider
-    print('Ação de Login/Autenticação solicitada (UI Pura)');
+    print('Ação de Login/Autenticação solicitada');
   }
 
   void _handleRegister(BuildContext context) {
     // A Lógica de registro e navegação será implementada
-    print('Ação de Registro solicitada (UI Pura)');
+    print('Ação de Registro solicitada');
   }
 
   @override
