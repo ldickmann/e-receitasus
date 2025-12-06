@@ -44,4 +44,15 @@ describe('Prescription Flow - /prescriptions', () => {
     expect(res.body).toHaveProperty('id');
     expect(res.body.medicine).toBe('Losartana 50mg');
   });
+
+  it('deve listar as receitas do usuário (GET /prescriptions) e retornar 200', async () => {
+    // AÇÃO: Tenta buscar as receitas
+    const res = await request(app)
+      .get('/prescriptions')
+      .set('Authorization', `Bearer ${authToken}`); // Usa o mesmo token do teste anterior
+
+    // VERIFICAÇÃO (Vai falhar pois a rota GET ainda não foi implementada)
+    expect(res.status).toBe(200);
+    expect(Array.isArray(res.body)).toBe(true);
+  });
 });
