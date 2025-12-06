@@ -5,6 +5,7 @@ import dotenv from 'dotenv';
 
 // Importações locais (extensão .js obrigatória com moduleResolution: nodenext)
 import authRoutes from './routes/auth.routes.js';
+import prescriptionRoutes from './routes/prescription.routes.js';
 
 // Carrega variáveis de ambiente do arquivo .env
 dotenv.config();
@@ -20,9 +21,11 @@ app.use(express.json());
 
 // Rotas de autenticação
 app.use('/auth', authRoutes);
+// Rotas de prescrições
+app.use('/prescriptions', prescriptionRoutes);
 
 // Endpoint de health check para monitoramento
-app.get('/health', (_, res) => res.json({ 
+app.get('/health', (_, res) => res.json({
   status: 'ok',
   timestamp: new Date().toISOString()
 }));
