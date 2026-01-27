@@ -2,27 +2,50 @@ class UserModel {
   final String id;
   final String name;
   final String email;
-  final String
-      token; // O token JWT que será usado para requisições (Requisito de Segurança)
+  final String? crm;
+  final String? specialty;
+  final String? token;
+  final DateTime? tokenExpiry;
 
   UserModel({
     required this.id,
     required this.name,
     required this.email,
-    required this.token,
+    this.crm,
+    this.specialty,
+    this.token,
+    this.tokenExpiry,
   });
 
   // Factory constructor para criar um UserModel a partir de um mapa JSON (resposta da API)
   factory UserModel.fromJson(Map<String, dynamic> json) {
-    // Nota: Os campos 'id' e 'name' são adicionados para fins de modelo, assumindo que a API os retornará após o login/cadastro.
     return UserModel(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      email: json['email'] as String,
-      token: json['token'] as String,
+      id: json['id'] ?? '',
+      name: json['name'] ?? '',
+      email: json['email'] ?? '',
+      crm: json['crm'],
+      specialty: json['specialty'],
+      token: json['token'],
+      tokenExpiry: json['tokenExpiry'] != null
+          ? DateTime.parse(json['tokenExpiry'])
+          : null,
     );
   }
 
-  // Adicionar um método de conveniência para verificar se o usuário está logado
-  bool get isAuthenticated => token.isNotEmpty;
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'name': name,
+      'email': email,
+      'crm': crm,
+      'specialty': specialty,
+      'token': token,
+      'tokenExpiry': tokenExpiry?.toIso8601String(),
+    };
+  }
+
+  bool get isTokenValid {
+    if (token == null || tokenExpiry == null) return false;
+    return DateTime.now().isBefore(tokenExpiry!);
+  }
 }
