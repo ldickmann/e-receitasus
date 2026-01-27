@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'history_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -17,6 +18,14 @@ class HomeScreen extends StatelessWidget {
   void _handleTrack() {
     // A Lógica de rastreamento será implementada posteriormente
     print('Ação de Rastrear Receita');
+  }
+
+  // Metodo para navegar para a tela de histórico
+  void _handleHistory(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (context) => const HistoryScreen()),
+    );
   }
 
   @override
@@ -83,9 +92,20 @@ class HomeScreen extends StatelessWidget {
             const SizedBox(height: 30),
 
             // Módulo 3: Histórico (Visualização de Dados)
-            const Text('Seu Histórico de Receitas',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-            const Divider(),
+            const Text(
+              'Histórico',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+
+            OutlinedButton.icon(
+              onPressed: () => _handleHistory(context),
+              icon: const Icon(Icons.history),
+              label: const Text('Ver Histórico Completo'),
+              style: OutlinedButton.styleFrom(
+                padding: const EdgeInsets.symmetric(vertical: 15),
+              ),
+            ),
 
             // Placeholder para a Lista de Histórico
             const Center(
