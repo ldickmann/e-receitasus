@@ -19,12 +19,13 @@ Thumbs.db
 build/
 .packages
 pubspec.lock
+**/.metadata
 
 # Cobertura de testes
 coverage/
 
 # -----------------------------------------
-# ANDROID - O QUE IGNORAR (Segurança e Local)
+# ANDROID
 # -----------------------------------------
 **/android/local.properties
 **/android/key.properties
@@ -34,16 +35,7 @@ coverage/
 **/android/app/debug/*.keystore
 **/android/.idea/
 **/android/*.iml
-**/android/gradle/
-!**/android/gradle/wrapper/
-
-# -----------------------------------------
-# ANDROID - O QUE MANTER (Importante!)
-# -----------------------------------------
-!**/android/gradlew
-!**/android/gradlew.bat
-!**/android/gradle/wrapper/gradle-wrapper.jar
-!**/android/gradle/wrapper/gradle-wrapper.properties
+**/android/build/
 
 # -----------------------------------------
 # IOS & ARQUIVOS GERADOS
@@ -70,14 +62,7 @@ coverage/
 **/ios/**/.vagrant/
 **/ios/**/DerivedData/
 **/ios/**/Icon?
-**/ios/**/Pods/
-**/ios/**/.symlinks/
-**/ios/**/profile
 **/ios/**/xcuserdata
-**/ios/.generated/
-**/ios/Flutter/flutter_export_environment.sh
-**/ios/Flutter/App.framework
-**/ios/Flutter/Flutter.framework
 
 # -----------------------------------------
 # MACOS
@@ -117,7 +102,7 @@ coverage/
 **/web/flutter_service_worker.js
 
 # -----------------------------------------
-# ARQUIVOS GERADOS DE PLUGINS (Multiplataforma)
+# ARQUIVOS GERADOS DE PLUGINS
 # -----------------------------------------
 **/GeneratedPluginRegistrant.h
 **/GeneratedPluginRegistrant.m
