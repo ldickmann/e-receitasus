@@ -1,95 +1,230 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
 import '../services/auth_service.dart';
 
+/// Provider responsável pelo gerenciamento de estado de autenticação
+///
+/// Implementa ChangeNotifier para notificar widgets dependentes sobre
+/// mudanças no estado de autenticação. Segue o padrão Provider do Flutter.
 class AuthProvider with ChangeNotifier {
-  // Inicializamos o storage seguro (Requisito de Segurança)
-  final _storage = const FlutterSecureStorage();
+  // ========== DEPENDÊNCIAS E ESTADO ==========
+
+  /// Armazenamento seguro para dados sensíveis (tokens)
+  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+
+  /// Serviço de autenticação injetado
   final IAuthService _authService;
+
+  /// Usuário atualmente autenticado (null se não autenticado)
   UserModel? _user;
+
+  /// Indica se uma operação assíncrona está em andamento
   bool _isLoading = false;
+
+  /// Mensagem de erro da última operação
   String? _errorMessage;
 
-  // Injeção do serviço de autenticação
+  // ========== CONSTRUTOR ==========
+
+  /// Construtor com injeção de dependência do serviço de autenticação
+  ///
+  /// [_authService] - Implementação do serviço de autenticação
   AuthProvider(this._authService);
 
+  // ========== GETTERS PÚBLICOS ==========
+
+  /// Retorna o usuário autenticado ou null
   UserModel? get user => _user;
 
+  /// Indica se há uma operação em andamento (loading state)
   bool get isLoading => _isLoading;
 
+  /// Retorna a mensagem de erro da última operação
   String? get errorMessage => _errorMessage;
 
-  // ---------------------------------------------------
-  // Lógica de Autenticação
-  // ---------------------------------------------------
+  /// Verifica se há um usuário autenticado com token válido
+  bool get isAuthenticated => _user != null && _user!.isTokenValid;
 
-  Future<void> login(String email, String password) async {
+  // ========== INICIALIZAÇÃO ==========
+
+  /// Inicializa o provider verificando sessão existente
+  ///
+  /// Chamado na inicialização do app para verificar se há
+  /// um usuário com sessão ativa salva localmente.
+  Future<void> initAuth() async {
     _setLoading(true);
-    _errorMessage = null;
 
     try {
-      final token = await _authService.login(email, password);
+      // Busca dados do usuário salvos
+      final prefs = await SharedPreferences.getInstance();
+      final userData = prefs.getString('user_data');
 
-      // Assumindo que a API retorna dados completos em outro endpoint após o login
-      // Para fins de MVP, criamos um modelo básico com o token
-      _user = UserModel(
-        id: '1', // Assumindo ID fixo ou obtido do token
-        name: email, // Usando email como nome no MVP
-        email: email,
-        token: token,
-      );
+      if (userData != null) {
+        // Reconstrói o modelo de usuário
+        final userMap = json.decode(userData) as Map<String, dynamic>;
+        _user = UserModel.fromJson(userMap);
 
-      // Armazenamento seguro do token
-      await _storage.write(key: 'jwt_token', value: token);
-
-      notifyListeners(); // Avisa a UI que o estado mudou
-    } catch (e) {
-      _user = null;
-      _errorMessage = e.toString().contains('401')
-          ? 'Credenciais inválidas.'
-          : 'Erro ao tentar fazer login.';
-    } finally {
-      _setLoading(false);
-    }
-  }
-
-  // ---------------------------------------------------
-  // Lógica de Registro (Implementação rápida)
-  // ---------------------------------------------------
-
-  Future<void> register(String name, String email, String password) async {
-    _setLoading(true);
-    _errorMessage = null;
-
-    try {
-      final success = await _authService.register(name, email, password);
-      if (success) {
-        // Se o registro for bem-sucedido, tente fazer login automaticamente
-        await login(email, password);
+        // Verifica validade do token
+        if (!_user!.isTokenValid) {
+          // Token expirado - realiza logout
+          await logout();
+        }
       }
     } catch (e) {
-      _user = null;
-      _errorMessage = e.toString().contains('409')
-          ? 'Usuário já existe.'
-          : 'Falha ao registrar.';
+      _errorMessage = 'Erro ao carregar sessão: ${e.toString()}';
+      debugPrint('Erro ao inicializar auth: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  // ---------------------------------------------------
-  // Utilitários e Logout
-  // ---------------------------------------------------
+  // ========== AUTENTICAÇÃO ==========
 
+  /// Realiza login do usuário no sistema
+  ///
+  /// [email] - E-mail cadastrado do usuário
+  /// [password] - Senha do usuário
+  ///
+  /// Retorna `true` se login bem-sucedido, `false` caso contrário
+  Future<bool> login(String email, String password) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      // Chama serviço de autenticação
+      _user = await _authService.login(email, password);
+
+      // Salva dados localmente
+      await _saveUserData();
+      await _saveTokenSecurely(_user!.token!);
+
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _errorMessage = _parseErrorMessage(e);
+      _user = null;
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Registra novo usuário no sistema
+  ///
+  /// [name] - Nome completo do profissional
+  /// [email] - E-mail para cadastro
+  /// [password] - Senha (mínimo 8 caracteres)
+  ///
+  /// Retorna `true` se registro bem-sucedido, `false` caso contrário
+  Future<bool> register(String name, String email, String password) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      // Chama serviço de registro
+      _user = await _authService.register(name, email, password);
+
+      // Salva dados localmente
+      await _saveUserData();
+      await _saveTokenSecurely(_user!.token!);
+
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _errorMessage = _parseErrorMessage(e);
+      _user = null;
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Realiza logout do usuário
+  ///
+  /// Remove todos os dados salvos localmente e limpa o estado
   Future<void> logout() async {
-    _user = null;
-    await _storage.delete(key: 'jwt_token');
+    try {
+      // Remove dados não-sensíveis
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('user_data');
+
+      // Remove token do armazenamento seguro
+      await _secureStorage.delete(key: 'jwt_token');
+
+      // Limpa estado
+      _user = null;
+      _clearError();
+
+      notifyListeners();
+    } catch (e) {
+      debugPrint('Erro ao fazer logout: $e');
+    }
+  }
+
+  // ========== MÉTODOS PRIVADOS ==========
+
+  /// Salva dados do usuário no SharedPreferences
+  ///
+  /// Persiste dados não-sensíveis para restauração de sessão
+  Future<void> _saveUserData() async {
+    if (_user != null) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('user_data', json.encode(_user!.toJson()));
+      } catch (e) {
+        debugPrint('Erro ao salvar dados do usuário: $e');
+      }
+    }
+  }
+
+  /// Salva token JWT no armazenamento seguro
+  ///
+  /// [token] - Token JWT a ser armazenado de forma segura
+  Future<void> _saveTokenSecurely(String token) async {
+    try {
+      await _secureStorage.write(key: 'jwt_token', value: token);
+    } catch (e) {
+      debugPrint('Erro ao salvar token: $e');
+    }
+  }
+
+  /// Atualiza estado de loading e notifica listeners
+  void _setLoading(bool value) {
+    _isLoading = value;
     notifyListeners();
   }
 
-  void _setLoading(bool value) {
-    _isLoading = value;
+  /// Limpa mensagem de erro
+  void _clearError() {
+    _errorMessage = null;
+  }
+
+  /// Formata mensagens de erro para exibição ao usuário
+  ///
+  /// [error] - Exceção capturada
+  /// Retorna mensagem amigável ao usuário
+  String _parseErrorMessage(Object error) {
+    final errorString = error.toString();
+
+    if (errorString.contains('Credenciais inválidas')) {
+      return 'E-mail ou senha incorretos';
+    } else if (errorString.contains('E-mail já cadastrado')) {
+      return 'Este e-mail já está cadastrado';
+    } else if (errorString.contains('conexão')) {
+      return 'Sem conexão com a internet';
+    } else if (errorString.contains('timeout')) {
+      return 'Tempo de conexão esgotado';
+    } else {
+      return 'Ocorreu um erro. Tente novamente.';
+    }
+  }
+
+  /// Limpa mensagem de erro manualmente
+  ///
+  /// Útil para limpar erros após exibição ao usuário
+  void clearError() {
+    _clearError();
     notifyListeners();
   }
 }
