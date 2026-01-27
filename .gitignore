@@ -1,11 +1,4 @@
 # -----------------------------------------
-# Arquivos a serem ignorados pelo Git
-# -----------------------------------------
-
-# Node modules
-node_modules/
-
-# -----------------------------------------
 # ARQUIVOS DE IDE E SISTEMA
 # -----------------------------------------
 .idea/
@@ -13,25 +6,7 @@ node_modules/
 *.iml
 *.swp
 .DS_Store
-
-
-# Ignore environment files
-.env
-.env.local
-.env.*.local
-
-# Ignore build outputs
-/dist
-/build
-/out
-
-# Ignore logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
+Thumbs.db
 
 # -----------------------------------------
 # FLUTTER (Geral)
@@ -42,26 +17,36 @@ pnpm-debug.log*
 .pub-cache/
 .pub/
 build/
+.packages
+pubspec.lock
+
+# Cobertura de testes
+coverage/
 
 # -----------------------------------------
 # ANDROID - O QUE IGNORAR (Segurança e Local)
 # -----------------------------------------
 **/android/local.properties
 **/android/key.properties
-**/android/.gradle
+**/android/.gradle/
 **/android/captures/
 **/android/app/release/*.keystore
+**/android/app/debug/*.keystore
+**/android/.idea/
+**/android/*.iml
+**/android/gradle/
+!**/android/gradle/wrapper/
 
 # -----------------------------------------
 # ANDROID - O QUE MANTER (Importante!)
-# O '!' diz ao git: "Não ignore isso, eu preciso desses arquivos"
 # -----------------------------------------
 !**/android/gradlew
 !**/android/gradlew.bat
 !**/android/gradle/wrapper/gradle-wrapper.jar
+!**/android/gradle/wrapper/gradle-wrapper.properties
 
 # -----------------------------------------
-# IOS & ARQUIVOS GERADOS (Generated)
+# IOS & ARQUIVOS GERADOS
 # -----------------------------------------
 **/ios/Flutter/Generated.xcconfig
 **/ios/Flutter/flutter_export_environment.sh
@@ -69,8 +54,99 @@ build/
 **/ios/Flutter/flutter_assets/
 **/ios/ServiceDefinitions.json
 **/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/Pods/
+**/ios/.symlinks/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/**/*.mode1v3
+**/ios/**/*.mode2v3
+**/ios/**/*.moved-aside
+**/ios/**/*.pbxuser
+**/ios/**/*.perspectivev3
+**/ios/**/*sync/
+**/ios/**/.sconsign.dblite
+**/ios/**/.tags*
+**/ios/**/.vagrant/
+**/ios/**/DerivedData/
+**/ios/**/Icon?
+**/ios/**/Pods/
+**/ios/**/.symlinks/
+**/ios/**/profile
+**/ios/**/xcuserdata
+**/ios/.generated/
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
 
-# Arquivos gerados de plugins (aparecem no Android e iOS)
+# -----------------------------------------
+# MACOS
+# -----------------------------------------
+**/macos/Flutter/ephemeral/
+**/macos/Flutter/Flutter-Generated.xcconfig
+**/macos/Flutter/GeneratedPluginRegistrant.swift
+**/macos/Pods/
+**/macos/xcuserdata/
+**/macos/**/*.mode1v3
+**/macos/**/*.mode2v3
+**/macos/**/*.moved-aside
+**/macos/**/*.pbxuser
+**/macos/**/*.perspectivev3
+
+# -----------------------------------------
+# WINDOWS
+# -----------------------------------------
+**/windows/flutter/ephemeral/
+**/windows/flutter/generated_plugin_registrant.cc
+**/windows/flutter/generated_plugin_registrant.h
+**/windows/flutter/generated_plugins.cmake
+**/windows/**/.plugin_symlinks/
+
+# -----------------------------------------
+# LINUX
+# -----------------------------------------
+**/linux/flutter/ephemeral/
+**/linux/flutter/generated_plugin_registrant.cc
+**/linux/flutter/generated_plugin_registrant.h
+**/linux/flutter/generated_plugins.cmake
+**/linux/**/.plugin_symlinks/
+
+# -----------------------------------------
+# WEB
+# -----------------------------------------
+**/web/flutter_service_worker.js
+
+# -----------------------------------------
+# ARQUIVOS GERADOS DE PLUGINS (Multiplataforma)
+# -----------------------------------------
 **/GeneratedPluginRegistrant.h
 **/GeneratedPluginRegistrant.m
 **/GeneratedPluginRegistrant.java
+**/GeneratedPluginRegistrant.swift
+**/generated_plugin_registrant.cc
+**/generated_plugin_registrant.h
+**/generated_plugins.cmake
+
+# -----------------------------------------
+# NODE MODULES & AMBIENTE
+# -----------------------------------------
+node_modules/
+.env
+.env.local
+.env.*.local
+
+# -----------------------------------------
+# LOGS
+# -----------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# -----------------------------------------
+# BUILD OUTPUTS
+# -----------------------------------------
+/dist
+/out
