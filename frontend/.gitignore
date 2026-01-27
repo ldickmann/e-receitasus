@@ -1,0 +1,27 @@
+# Flutter/Dart
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+build/
+
+# IDEs
+.idea/
+.vscode/
+*.iml
+*.xcworkspace
+*.xcodeproj/
+
+# macOS
+.DS_Store
+macos/Runner/Assets.xcassets/
+macos/Runner/*.xcscheme
+
+# iOS
+ios/Runner/Assets.xcassets/
+ios/Runner/*.xcscheme
+ios/.symlinks/
+
+# Android
+android/.gradle/
+android/local.properties
