@@ -12,6 +12,8 @@ model User {
   name      String
   email     String   @unique
   password  String
+  crm String?
+  specialty String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import authRoutes from './routes/auth.routes.js';
 import prescriptionRoutes from './routes/prescription.routes.js';
 import historyRoutes from './routes/history.routes.js';
+import userRoutes from './routes/user.routes.js';
 
 // Carrega variáveis de ambiente do arquivo .env
 dotenv.config();
@@ -26,6 +27,8 @@ app.use('/auth', authRoutes);
 app.use('/prescriptions', prescriptionRoutes);
 // Rotas de histórico
 app.use('/history', historyRoutes);
+// Rotas de usuários
+app.use('/user', userRoutes);
 
 // Endpoint de health check para monitoramento
 app.get('/health', (_, res) => res.json({
