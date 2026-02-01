@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -10,7 +12,6 @@ class RegisterScreen extends StatefulWidget {
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
   final _nameController = TextEditingController();
-  final _cpfController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
@@ -18,28 +19,47 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void dispose() {
     _nameController.dispose();
-    _cpfController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
     super.dispose();
   }
 
-  void _handleRegister(BuildContext context) {
-    if (_formKey.currentState!.validate()) {
-      // A Lógica de registro será implementada com Provider
-      print('Ação de Registro solicitada');
-      print('Nome: ${_nameController.text}');
-      print('CPF: ${_cpfController.text}');
-      print('Email: ${_emailController.text}');
+  Future<void> _handleRegister() async {
+    if (!_formKey.currentState!.validate()) return;
 
-      // Retornar para a tela de login após cadastro
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    final success = await authProvider.register(
+      _nameController.text.trim(),
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cadastro realizado com sucesso!'),
+          backgroundColor: Colors.green,
+        ),
+      );
       Navigator.pop(context);
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage ?? 'Erro ao cadastrar'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cadastro'),
@@ -53,7 +73,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                // Título
                 Text(
                   'Criar Nova Conta',
                   textAlign: TextAlign.center,
@@ -77,27 +96,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   validator: (value) {
                     if (value == null || value.isEmpty) {
                       return 'Por favor, informe seu nome';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 15),
-
-                // Campo de CPF
-                TextFormField(
-                  controller: _cpfController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'CPF',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.badge),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor, informe seu CPF';
-                    }
-                    if (value.length < 11) {
-                      return 'CPF inválido';
                     }
                     return null;
                   },
@@ -138,8 +136,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Por favor, informe sua senha';
                     }
-                    if (value.length < 6) {
-                      return 'A senha deve ter no mínimo 6 caracteres';
+                    if (value.length < 8) {
+                      return 'A senha deve ter no mínimo 8 caracteres';
                     }
                     return null;
                   },
@@ -167,14 +165,16 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // Botão de Cadastrar
-                ElevatedButton(
-                  onPressed: () => _handleRegister(context),
-                  child: const Text(
-                    'Cadastrar',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                ),
+                // Botão de Cadastrar com Loading
+                authProvider.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton(
+                        onPressed: _handleRegister,
+                        child: const Text(
+                          'Cadastrar',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                      ),
                 const SizedBox(height: 10),
 
                 // Botão de Voltar

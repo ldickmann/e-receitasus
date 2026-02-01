@@ -1,26 +1,27 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import 'history_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  // Callbacks
-  void _handleLogout() {
-    // A Lógica de Logout real será implementada com Provider
-    print('Ação de Logout');
+  Future<void> _handleLogout(BuildContext context) async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    await authProvider.logout();
+
+    if (!context.mounted) return;
+    Navigator.pushReplacementNamed(context, '/login');
   }
 
   void _handleSolicitation() {
-    // A Lógica de solicitação de receita será implementada posteriormente
     print('Ação de Solicitar Receita');
   }
 
   void _handleTrack() {
-    // A Lógica de rastreamento será implementada posteriormente
     print('Ação de Rastrear Receita');
   }
 
-  // Metodo para navegar para a tela de histórico
   void _handleHistory(BuildContext context) {
     Navigator.push(
       context,
@@ -30,6 +31,9 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+    final userName = authProvider.user?.name ?? 'Usuário';
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('E-ReceitaSUS - Área do Paciente'),
@@ -37,7 +41,7 @@ class HomeScreen extends StatelessWidget {
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
-            onPressed: _handleLogout, // Callback
+            onPressed: () => _handleLogout(context),
           ),
         ],
       ),
@@ -46,32 +50,39 @@ class HomeScreen extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
-            // Card de Status/Boas-Vindas
-            const Card(
+            // Card de Boas-Vindas
+            Card(
               elevation: 4,
               child: Padding(
-                padding: EdgeInsets.all(20.0),
+                padding: const EdgeInsets.all(20.0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Bem-vindo(a), Paciente SUS!',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold)),
-                    SizedBox(height: 8),
                     Text(
-                        'Use a opção abaixo para solicitar ou rastrear sua receita.'),
+                      'Bem-vindo(a), $userName!',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Use a opção abaixo para solicitar ou rastrear sua receita.',
+                    ),
                   ],
                 ),
               ),
             ),
             const SizedBox(height: 20),
 
-            // Módulo 1: Solicitação Remota (Requisito Principal)
+            // Módulo 1: Solicitação Remota
             ElevatedButton.icon(
-              onPressed: _handleSolicitation, // Callback
+              onPressed: _handleSolicitation,
               icon: const Icon(Icons.medical_services_outlined, size: 24),
-              label: const Text('Solicitar Revalidação de Receita',
-                  style: TextStyle(fontSize: 16)),
+              label: const Text(
+                'Solicitar Revalidação de Receita',
+                style: TextStyle(fontSize: 16),
+              ),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.green,
                 foregroundColor: Colors.white,
@@ -80,9 +91,9 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 10),
 
-            // Módulo 2: Rastreabilidade (Requisito Secundário)
+            // Módulo 2: Rastreabilidade
             OutlinedButton.icon(
-              onPressed: _handleTrack, // Callback
+              onPressed: _handleTrack,
               icon: const Icon(Icons.track_changes),
               label: const Text('Rastrear Status do Pedido'),
               style: OutlinedButton.styleFrom(
@@ -91,7 +102,7 @@ class HomeScreen extends StatelessWidget {
             ),
             const SizedBox(height: 30),
 
-            // Módulo 3: Histórico (Visualização de Dados)
+            // Módulo 3: Histórico
             const Text(
               'Histórico',
               style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
@@ -107,13 +118,14 @@ class HomeScreen extends StatelessWidget {
               ),
             ),
 
-            // Placeholder para a Lista de Histórico
+            // Placeholder
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(30.0),
                 child: Text(
-                    'Nenhum histórico encontrado. Solicite sua primeira receita!',
-                    textAlign: TextAlign.center),
+                  'Nenhum histórico encontrado. Solicite sua primeira receita!',
+                  textAlign: TextAlign.center,
+                ),
               ),
             ),
           ],
