@@ -7,7 +7,8 @@ const router = Router();
 // Rota protegida para obter perfil do usuário
 router.get('/me', authenticateToken, async (req, res) => {
   try {
-    // Validação: userId deve existir após passar pelo middleware
+    console.log('userId recebido do middleware:', req.userId);
+
     if (!req.userId) {
       return res.status(401).json({ message: 'ID do usuário não encontrado no token' });
     }
@@ -17,9 +18,7 @@ router.get('/me', authenticateToken, async (req, res) => {
       select: { 
         id: true, 
         name: true, 
-        email: true, 
-        crm: true, 
-        specialty: true 
+        email: true
       },
     });
 
@@ -30,7 +29,10 @@ router.get('/me', authenticateToken, async (req, res) => {
     return res.status(200).json(user);
   } catch (error) {
     console.error('Erro ao buscar usuário:', error);
-    return res.status(500).json({ message: 'Erro ao buscar usuário' });
+    
+    return res.status(500).json({ 
+      message: 'Erro ao buscar usuário'
+    });
   }
 });
 
