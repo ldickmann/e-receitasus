@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
+import '../models/professional_type.dart';
 import '../services/auth_service.dart';
 
 /// Provider responsável pelo gerenciamento de estado de autenticação
@@ -136,6 +137,47 @@ class AuthProvider with ChangeNotifier {
 
       // ⚠️ NÃO salva token porque o backend não retorna token no registro
       // Apenas salva os dados do usuário temporariamente
+      await _saveUserData();
+
+      // Limpa o usuário porque ele ainda não está autenticado
+      _user = null;
+
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _errorMessage = _parseErrorMessage(e);
+      _user = null;
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Registra novo usuário com informações profissionais completas
+  Future<bool> registerWithProfessionalInfo({
+    required String name,
+    required String email,
+    required String password,
+    required ProfessionalType professionalType,
+    String? professionalId,
+    String? professionalState,
+    String? specialty,
+  }) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      // Chama serviço de registro com informações profissionais
+      _user = await _authService.registerWithProfessionalInfo(
+        name: name,
+        email: email,
+        password: password,
+        professionalType: professionalType,
+        professionalId: professionalId,
+        professionalState: professionalState,
+        specialty: specialty,
+      );
+
+      // ⚠️ NÃO salva token porque o backend não retorna token no registro
       await _saveUserData();
 
       // Limpa o usuário porque ele ainda não está autenticado

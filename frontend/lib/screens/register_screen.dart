@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../models/professional_type.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -15,6 +16,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _professionalIdController = TextEditingController();
+  final _specialtyController = TextEditingController();
+
+  ProfessionalType _selectedProfessionalType = ProfessionalType.administrativo;
 
   @override
   void dispose() {
@@ -22,6 +27,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _professionalIdController.dispose();
+    _specialtyController.dispose();
     super.dispose();
   }
 
@@ -30,10 +37,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    final success = await authProvider.register(
-      _nameController.text.trim(),
-      _emailController.text.trim(),
-      _passwordController.text,
+    // Extrai número e estado do registro profissional se fornecido
+    String? professionalId;
+    String? professionalState;
+
+    if (_professionalIdController.text.isNotEmpty) {
+      professionalId = _selectedProfessionalType
+          .extractNumber(_professionalIdController.text);
+      professionalState = _selectedProfessionalType
+          .extractState(_professionalIdController.text);
+    }
+
+    final success = await authProvider.registerWithProfessionalInfo(
+      name: _nameController.text.trim(),
+      email: _emailController.text.trim(),
+      password: _passwordController.text,
+      professionalType: _selectedProfessionalType,
+      professionalId: professionalId,
+      professionalState: professionalState,
+      specialty: _specialtyController.text.trim().isNotEmpty
+          ? _specialtyController.text.trim()
+          : null,
     );
 
     if (!mounted) return;
@@ -41,8 +65,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     if (success) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Cadastro realizado com sucesso!'),
+          content: Text(
+              'Cadastro realizado com sucesso! Faça login para continuar.'),
           backgroundColor: Colors.green,
+          duration: Duration(seconds: 3),
         ),
       );
       Navigator.pop(context);
@@ -122,6 +148,101 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 15),
+
+                // Dropdown de Tipo de Profissional
+                DropdownButtonFormField<ProfessionalType>(
+                  value: _selectedProfessionalType,
+                  decoration: const InputDecoration(
+                    labelText: 'Tipo de Profissional',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.work),
+                    helperText: 'Selecione sua categoria profissional',
+                  ),
+                  items: ProfessionalType.values.map((type) {
+                    return DropdownMenuItem(
+                      value: type,
+                      child: Text(type.displayName),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    setState(() {
+                      _selectedProfessionalType = value!;
+                      _professionalIdController.clear();
+                    });
+                  },
+                  validator: (value) {
+                    if (value == null) {
+                      return 'Por favor, selecione o tipo de profissional';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 15),
+
+                // Campo de Registro Profissional (condicional)
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  child: _selectedProfessionalType.requiresCouncil ||
+                          _selectedProfessionalType == ProfessionalType.outros
+                      ? Column(
+                          children: [
+                            TextFormField(
+                              controller: _professionalIdController,
+                              keyboardType: TextInputType.text,
+                              textCapitalization: TextCapitalization.characters,
+                              decoration: InputDecoration(
+                                labelText:
+                                    _selectedProfessionalType.registrationLabel,
+                                hintText:
+                                    _selectedProfessionalType.registrationHint,
+                                border: const OutlineInputBorder(),
+                                prefixIcon: const Icon(Icons.badge),
+                                helperText:
+                                    _selectedProfessionalType.requiresCouncil
+                                        ? 'Obrigatório para prescrever receitas'
+                                        : 'Opcional',
+                              ),
+                              validator: (value) {
+                                if (_selectedProfessionalType.requiresCouncil) {
+                                  return _selectedProfessionalType
+                                      .validateRegistration(value);
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 15),
+                          ],
+                        )
+                      : const SizedBox.shrink(),
+                ),
+
+                // Campo de Especialidade (condicional para médicos e outros)
+                AnimatedSize(
+                  duration: const Duration(milliseconds: 300),
+                  child: _selectedProfessionalType == ProfessionalType.medico ||
+                          _selectedProfessionalType ==
+                              ProfessionalType.dentista ||
+                          _selectedProfessionalType ==
+                              ProfessionalType.psicologo
+                      ? Column(
+                          children: [
+                            TextFormField(
+                              controller: _specialtyController,
+                              keyboardType: TextInputType.text,
+                              textCapitalization: TextCapitalization.words,
+                              decoration: const InputDecoration(
+                                labelText: 'Especialidade',
+                                hintText: 'Ex: Clínico Geral, Pediatria',
+                                border: OutlineInputBorder(),
+                                prefixIcon: Icon(Icons.medical_services),
+                                helperText: 'Opcional',
+                              ),
+                            ),
+                            const SizedBox(height: 15),
+                          ],
+                        )
+                      : const SizedBox.shrink(),
+                ),
 
                 // Campo de Senha
                 TextFormField(

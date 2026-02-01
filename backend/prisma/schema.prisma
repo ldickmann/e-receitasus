@@ -7,15 +7,30 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum ProfessionalType {
+  MEDICO          // Médico - CRM
+  ENFERMEIRO      // Enfermeiro - COREN
+  FARMACEUTICO    // Farmacêutico - CRF
+  PSICOLOGO       // Psicólogo - CRP
+  NUTRICIONISTA   // Nutricionista - CRN
+  FISIOTERAPEUTA  // Fisioterapeuta - CREFITO
+  DENTISTA        // Dentista - CRO
+  ASSISTENTE_SOCIAL // Assistente Social - CRESS
+  ADMINISTRATIVO  // Profissional administrativo (sem conselho)
+  OUTROS          // Outros profissionais
+}
+
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  email     String   @unique
-  password  String
-  crm String?
-  specialty String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                  String            @id @default(uuid())
+  name                String
+  email               String            @unique
+  password            String
+  professionalType    ProfessionalType  @default(ADMINISTRATIVO)
+  professionalId      String?           // CRM, COREN, CRF, etc. ou matrícula
+  professionalState   String?           // UF do conselho (ex: SP, RJ)
+  specialty           String?           // Especialidade (para médicos e outros)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
 }
 
 model Prescription {

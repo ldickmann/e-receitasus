@@ -4,6 +4,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import '../models/user_model.dart';
+import '../models/professional_type.dart';
 
 // ============================================================================
 // INTERFACE DO SERVIÇO DE AUTENTICAÇÃO
@@ -46,6 +47,17 @@ abstract class IAuthService {
   /// **Exceções:**
   /// - [Exception] com mensagem descritiva em caso de falha
   Future<UserModel> register(String name, String email, String password);
+
+  /// Registra um novo usuário com informações profissionais completas.
+  Future<UserModel> registerWithProfessionalInfo({
+    required String name,
+    required String email,
+    required String password,
+    required ProfessionalType professionalType,
+    String? professionalId,
+    String? professionalState,
+    String? specialty,
+  });
 
   /// Encerra a sessão do usuário atual.
   ///
@@ -217,12 +229,15 @@ class AuthService implements IAuthService {
         print('💾 [LOGIN] Token salvo com sucesso');
 
         // Retorna modelo do usuário autenticado
+        final user = UserModel.fromJson(data['user'] ?? {});
         return UserModel(
-          id: data['user']?['id'] ?? '',
-          name: data['user']?['name'] ?? '',
-          email: data['user']?['email'] ?? '',
-          crm: data['user']?['crm'],
-          specialty: data['user']?['specialty'],
+          id: user.id,
+          name: user.name,
+          email: user.email,
+          professionalType: user.professionalType,
+          professionalId: user.professionalId,
+          professionalState: user.professionalState,
+          specialty: user.specialty,
           token: token,
           tokenExpiry: DateTime.now().add(const Duration(days: 7)),
         );
@@ -255,6 +270,24 @@ class AuthService implements IAuthService {
 
   @override
   Future<UserModel> register(String name, String email, String password) async {
+    return registerWithProfessionalInfo(
+      name: name,
+      email: email,
+      password: password,
+      professionalType: ProfessionalType.administrativo,
+    );
+  }
+
+  @override
+  Future<UserModel> registerWithProfessionalInfo({
+    required String name,
+    required String email,
+    required String password,
+    required ProfessionalType professionalType,
+    String? professionalId,
+    String? professionalState,
+    String? specialty,
+  }) async {
     try {
       // -----------------------------------------------------------------------
       // 1. VALIDAÇÃO DE ENTRADA
@@ -276,6 +309,7 @@ class AuthService implements IAuthService {
 
       // Log de debug
       print('🔵 [REGISTER] Enviando requisição para: $_baseUrl/register');
+      print('🔵 [REGISTER] Tipo profissional: ${professionalType.value}');
 
       // -----------------------------------------------------------------------
       // 2. REQUISIÇÃO HTTP
@@ -289,6 +323,10 @@ class AuthService implements IAuthService {
               'name': name,
               'email': email,
               'password': password,
+              'professionalType': professionalType.value,
+              'professionalId': professionalId,
+              'professionalState': professionalState,
+              'specialty': specialty,
             }),
           )
           .timeout(
@@ -310,14 +348,7 @@ class AuthService implements IAuthService {
 
         // ⚠️ IMPORTANTE: O backend NÃO retorna token no registro,
         // apenas os dados do usuário criado. O usuário precisa fazer login após.
-        return UserModel(
-          id: data['id'] ?? '',
-          name: data['name'] ?? '',
-          email: data['email'] ?? '',
-          crm: data['crm'],
-          specialty: data['specialty'],
-          // Não há token no registro
-        );
+        return UserModel.fromJson(data);
       } else if (response.statusCode == 409 || response.statusCode == 400) {
         // E-mail duplicado ou validação falhou
         final data = jsonDecode(response.body);
