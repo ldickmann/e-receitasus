@@ -1,8 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import '../models/user_model.dart';
+import '../models/professional_type.dart';
 import '../services/auth_service.dart';
 
 /// Provider responsável pelo gerenciamento de estado de autenticação
@@ -12,8 +14,11 @@ import '../services/auth_service.dart';
 class AuthProvider with ChangeNotifier {
   // ========== DEPENDÊNCIAS E ESTADO ==========
 
-  /// Armazenamento seguro para dados sensíveis (tokens)
-  final FlutterSecureStorage _secureStorage = const FlutterSecureStorage();
+  /// Armazenamento seguro para dados sensíveis (tokens) - apenas mobile
+  final FlutterSecureStorage? _secureStorage;
+
+  /// SharedPreferences para web (inicializado sob demanda)
+  SharedPreferences? _prefsForToken;
 
   /// Serviço de autenticação injetado
   final IAuthService _authService;
@@ -32,7 +37,8 @@ class AuthProvider with ChangeNotifier {
   /// Construtor com injeção de dependência do serviço de autenticação
   ///
   /// [_authService] - Implementação do serviço de autenticação
-  AuthProvider(this._authService);
+  AuthProvider(this._authService)
+      : _secureStorage = kIsWeb ? null : const FlutterSecureStorage();
 
   // ========== GETTERS PÚBLICOS ==========
 
@@ -118,6 +124,9 @@ class AuthProvider with ChangeNotifier {
   /// [password] - Senha (mínimo 8 caracteres)
   ///
   /// Retorna `true` se registro bem-sucedido, `false` caso contrário
+  ///
+  /// **IMPORTANTE:** O backend não retorna token no registro.
+  /// O usuário deve fazer login após o cadastro.
   Future<bool> register(String name, String email, String password) async {
     _setLoading(true);
     _clearError();
@@ -126,9 +135,53 @@ class AuthProvider with ChangeNotifier {
       // Chama serviço de registro
       _user = await _authService.register(name, email, password);
 
-      // Salva dados localmente
+      // ⚠️ NÃO salva token porque o backend não retorna token no registro
+      // Apenas salva os dados do usuário temporariamente
       await _saveUserData();
-      await _saveTokenSecurely(_user!.token!);
+
+      // Limpa o usuário porque ele ainda não está autenticado
+      _user = null;
+
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _errorMessage = _parseErrorMessage(e);
+      _user = null;
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Registra novo usuário com informações profissionais completas
+  Future<bool> registerWithProfessionalInfo({
+    required String name,
+    required String email,
+    required String password,
+    required ProfessionalType professionalType,
+    String? professionalId,
+    String? professionalState,
+    String? specialty,
+  }) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      // Chama serviço de registro com informações profissionais
+      _user = await _authService.registerWithProfessionalInfo(
+        name: name,
+        email: email,
+        password: password,
+        professionalType: professionalType,
+        professionalId: professionalId,
+        professionalState: professionalState,
+        specialty: specialty,
+      );
+
+      // ⚠️ NÃO salva token porque o backend não retorna token no registro
+      await _saveUserData();
+
+      // Limpa o usuário porque ele ainda não está autenticado
+      _user = null;
 
       _setLoading(false);
       return true;
@@ -150,7 +203,7 @@ class AuthProvider with ChangeNotifier {
       await prefs.remove('user_data');
 
       // Remove token do armazenamento seguro
-      await _secureStorage.delete(key: 'jwt_token');
+      await _deleteTokenSecurely();
 
       // Limpa estado
       _user = null;
@@ -183,9 +236,32 @@ class AuthProvider with ChangeNotifier {
   /// [token] - Token JWT a ser armazenado de forma segura
   Future<void> _saveTokenSecurely(String token) async {
     try {
-      await _secureStorage.write(key: 'jwt_token', value: token);
+      if (kIsWeb) {
+        // Web: usa SharedPreferences
+        _prefsForToken ??= await SharedPreferences.getInstance();
+        await _prefsForToken!.setString('jwt_token', token);
+      } else {
+        // Mobile: usa FlutterSecureStorage
+        await _secureStorage!.write(key: 'jwt_token', value: token);
+      }
     } catch (e) {
       debugPrint('Erro ao salvar token: $e');
+    }
+  }
+
+  /// Remove token JWT do armazenamento seguro
+  Future<void> _deleteTokenSecurely() async {
+    try {
+      if (kIsWeb) {
+        // Web: usa SharedPreferences
+        _prefsForToken ??= await SharedPreferences.getInstance();
+        await _prefsForToken!.remove('jwt_token');
+      } else {
+        // Mobile: usa FlutterSecureStorage
+        await _secureStorage!.delete(key: 'jwt_token');
+      }
+    } catch (e) {
+      debugPrint('Erro ao remover token: $e');
     }
   }
 

@@ -4,12 +4,32 @@ import { signToken } from '../utils/jwt.util.js';
 
 const SALT_ROUNDS = 10;
 
-export const registerUser = async ({ name, email, password }: { name: string; email: string; password: string }) => {
+interface RegisterUserPayload {
+  name: string;
+  email: string;
+  password: string;
+  professionalType?: string;
+  professionalId?: string;
+  professionalState?: string;
+  specialty?: string;
+}
+
+export const registerUser = async (payload: RegisterUserPayload) => {
+  const { name, email, password, professionalType, professionalId, professionalState, specialty } = payload;
+  
   const existing = await findUserByEmail(email);
   if (existing) throw new Error('Email already in use');
 
   const hash = await bcrypt.hash(password, SALT_ROUNDS);
-  const user = await createUser({ name, email, password: hash });
+  const user = await createUser({ 
+    name, 
+    email, 
+    password: hash,
+    professionalType: professionalType || 'ADMINISTRATIVO',
+    professionalId,
+    professionalState,
+    specialty,
+  });
 
   // remove senha antes de retornar
   // @ts-ignore

@@ -15,7 +15,6 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen>
     with SingleTickerProviderStateMixin {
-
   /// Controller para animação de fade
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -39,8 +38,10 @@ class _SplashScreenState extends State<SplashScreen>
 
     _animationController.forward();
 
-    // Inicia verificação de autenticação
-    _checkAuthentication();
+    // ✅ CORREÇÃO: Usar addPostFrameCallback para executar após o build
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkAuthentication();
+    });
   }
 
   /// Verifica estado de autenticação e redireciona

@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import '../providers/auth_provider.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -20,19 +22,30 @@ class _LoginScreenState extends State<LoginScreen> {
     super.dispose();
   }
 
-  void _handleLogin() {
-    // Bypass para desenvolvimento - REMOVER EM PRODUÇÃO
-    if (_emailController.text == 'teste@sus.gov.br' &&
-        _passwordController.text == '123456') {
-      Navigator.pushReplacementNamed(context, '/home');
-      return;
-    }
+  Future<void> _handleLogin() async {
+    if (!_formKey.currentState!.validate()) return;
 
-    // Validação do formulário
-    if (_formKey.currentState!.validate()) {
-      print('Login solicitado');
-      print('Email: ${_emailController.text}');
-      // Sua lógica de autenticação real aqui
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // Chama login real
+    final success = await authProvider.login(
+      _emailController.text.trim(),
+      _passwordController.text,
+    );
+
+    if (!mounted) return;
+
+    if (success) {
+      // Navega para home
+      Navigator.pushReplacementNamed(context, '/home');
+    } else {
+      // Exibe erro
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage ?? 'Erro ao fazer login'),
+          backgroundColor: Colors.red,
+        ),
+      );
     }
   }
 
@@ -45,6 +58,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final authProvider = Provider.of<AuthProvider>(context);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('App E-ReceitaSUS'),
@@ -69,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // Campo de Email (agora com controller)
+                // Campo de Email
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
@@ -82,12 +97,15 @@ class _LoginScreenState extends State<LoginScreen> {
                     if (value == null || value.isEmpty) {
                       return 'Por favor, informe seu e-mail';
                     }
+                    if (!value.contains('@')) {
+                      return 'E-mail inválido';
+                    }
                     return null;
                   },
                 ),
                 const SizedBox(height: 15),
 
-                // Campo de Senha (agora com controller)
+                // Campo de Senha
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
@@ -105,14 +123,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // Botão de Login
-                ElevatedButton(
-                  onPressed: _handleLogin,
-                  child: const Text(
-                    'Entrar',
-                    style: TextStyle(fontSize: 18),
-                  ),
-                ),
+                // Botão de Login com Loading
+                authProvider.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton(
+                        onPressed: _handleLogin,
+                        child: const Text(
+                          'Entrar',
+                          style: TextStyle(fontSize: 18),
+                        ),
+                      ),
                 const SizedBox(height: 10),
 
                 // Botão de Cadastro
