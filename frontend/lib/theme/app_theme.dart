@@ -93,14 +93,17 @@ class AppTheme {
         scrolledUnderElevation: 4,
         shadowColor: AppColors.shadow.withOpacity(0.2),
         centerTitle: true,
-        systemOverlayStyle: SystemUiOverlayStyle.light, // Ícones da status bar brancos
-        titleTextStyle: AppTextStyles.titleLarge?.copyWith(color: AppColors.onPrimary),
+        systemOverlayStyle:
+            SystemUiOverlayStyle.light, // Ícones da status bar brancos
+        titleTextStyle:
+            AppTextStyles.titleLarge?.copyWith(color: AppColors.onPrimary),
       ),
 
       cardTheme: CardTheme(
         elevation: 1,
         color: AppColors.surface,
-        surfaceTintColor: Colors.transparent, // Impede que o card seja "tingido" pela cor primária
+        surfaceTintColor: Colors
+            .transparent, // Impede que o card seja "tingido" pela cor primária
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
           side: BorderSide(color: AppColors.outline.withOpacity(0.5)),
@@ -120,7 +123,8 @@ class AppTheme {
           foregroundColor: AppColors.onPrimary,
           textStyle: AppTextStyles.labelLarge,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
           elevation: 2,
         ),
       ),
@@ -131,14 +135,16 @@ class AppTheme {
           side: const BorderSide(color: AppColors.primary, width: 1.5),
           textStyle: AppTextStyles.labelLarge,
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
         ),
       ),
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surfaceVariant.withOpacity(0.4),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,
@@ -155,9 +161,12 @@ class AppTheme {
           borderRadius: BorderRadius.circular(12),
           borderSide: const BorderSide(color: AppColors.error, width: 1.5),
         ),
-        labelStyle: AppTextStyles.bodyMedium?.copyWith(color: AppColors.onSurfaceVariant),
-        floatingLabelStyle: AppTextStyles.bodyMedium?.copyWith(color: AppColors.primary),
-        hintStyle: AppTextStyles.bodyMedium?.copyWith(color: AppColors.onSurfaceVariant),
+        labelStyle: AppTextStyles.bodyMedium
+            ?.copyWith(color: AppColors.onSurfaceVariant),
+        floatingLabelStyle:
+            AppTextStyles.bodyMedium?.copyWith(color: AppColors.primary),
+        hintStyle: AppTextStyles.bodyMedium
+            ?.copyWith(color: AppColors.onSurfaceVariant),
       ),
     );
   }
