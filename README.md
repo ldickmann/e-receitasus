@@ -1,3 +1,5 @@
+[![Board Status](https://dev.azure.com/ldickmann/3875d22d-5c39-4cf3-bbc5-5aacc10584e0/47b8c04f-5b27-4e76-a77c-6c34aac29f88/_apis/work/boardbadge/41a4671e-43f5-4f82-afb2-b33d033a329b)](https://dev.azure.com/ldickmann/3875d22d-5c39-4cf3-bbc5-5aacc10584e0/_boards/board/t/47b8c04f-5b27-4e76-a77c-6c34aac29f88/Backlog%20items/)
+
 # 📱 E-ReceitaSUS
 
 > Sistema completo de gestão e digitalização de prescrições médicas com autenticação segura, histórico de receitas e rastreamento em tempo real.
