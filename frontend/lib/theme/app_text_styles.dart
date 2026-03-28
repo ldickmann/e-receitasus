@@ -35,7 +35,7 @@ class AppTextStyles {
 
   /// Display Large - 57sp
   /// Uso: Telas de boas-vindas, splash screens
-  static const TextStyle? displayLarge = TextStyle(
+  static const TextStyle displayLarge = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 57,
     fontWeight: FontWeight.w400,
@@ -46,7 +46,7 @@ class AppTextStyles {
 
   /// Display Medium - 45sp
   /// Uso: Títulos de destaque em páginas especiais
-  static const TextStyle? displayMedium = TextStyle(
+  static const TextStyle displayMedium = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 45,
     fontWeight: FontWeight.w400,
@@ -57,7 +57,7 @@ class AppTextStyles {
 
   /// Display Small - 36sp
   /// Uso: Títulos grandes de seções importantes
-  static const TextStyle? displaySmall = TextStyle(
+  static const TextStyle displaySmall = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 36,
     fontWeight: FontWeight.w400,
@@ -72,7 +72,7 @@ class AppTextStyles {
 
   /// Headline Large - 32sp
   /// Uso: Títulos principais de telas
-  static const TextStyle? headlineLarge = TextStyle(
+  static const TextStyle headlineLarge = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 32,
     fontWeight: FontWeight.w600,
@@ -83,7 +83,7 @@ class AppTextStyles {
 
   /// Headline Medium - 28sp
   /// Uso: Títulos de seções importantes dentro de telas
-  static const TextStyle? headlineMedium = TextStyle(
+  static const TextStyle headlineMedium = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 28,
     fontWeight: FontWeight.w600,
@@ -94,7 +94,7 @@ class AppTextStyles {
 
   /// Headline Small - 24sp
   /// Uso: Subtítulos de seções
-  static const TextStyle? headlineSmall = TextStyle(
+  static const TextStyle headlineSmall = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 24,
     fontWeight: FontWeight.w600,
@@ -109,7 +109,7 @@ class AppTextStyles {
 
   /// Title Large - 22sp
   /// Uso: AppBar, Títulos de Dialogs
-  static const TextStyle? titleLarge = TextStyle(
+  static const TextStyle titleLarge = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 22,
     fontWeight: FontWeight.w500,
@@ -120,7 +120,7 @@ class AppTextStyles {
 
   /// Title Medium - 16sp
   /// Uso: Títulos de Cards, ListTiles destacados
-  static const TextStyle? titleMedium = TextStyle(
+  static const TextStyle titleMedium = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 16,
     fontWeight: FontWeight.w500,
@@ -131,7 +131,7 @@ class AppTextStyles {
 
   /// Title Small - 14sp
   /// Uso: Títulos menores, subtítulos de cards
-  static const TextStyle? titleSmall = TextStyle(
+  static const TextStyle titleSmall = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 14,
     fontWeight: FontWeight.w500,
@@ -146,7 +146,7 @@ class AppTextStyles {
 
   /// Body Large - 16sp
   /// Uso: Texto principal de conteúdo, parágrafos importantes
-  static const TextStyle? bodyLarge = TextStyle(
+  static const TextStyle bodyLarge = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 16,
     fontWeight: FontWeight.w400,
@@ -157,7 +157,7 @@ class AppTextStyles {
 
   /// Body Medium - 14sp (Padrão)
   /// Uso: Texto de conteúdo geral, mais comum
-  static const TextStyle? bodyMedium = TextStyle(
+  static const TextStyle bodyMedium = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 14,
     fontWeight: FontWeight.w400,
@@ -168,7 +168,7 @@ class AppTextStyles {
 
   /// Body Small - 12sp
   /// Uso: Textos secundários, notas de rodapé
-  static const TextStyle? bodySmall = TextStyle(
+  static const TextStyle bodySmall = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 12,
     fontWeight: FontWeight.w400,
@@ -183,7 +183,7 @@ class AppTextStyles {
 
   /// Label Large - 14sp
   /// Uso: Botões grandes (ElevatedButton, OutlinedButton)
-  static const TextStyle? labelLarge = TextStyle(
+  static const TextStyle labelLarge = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 14,
     fontWeight: FontWeight.w500,
@@ -194,7 +194,7 @@ class AppTextStyles {
 
   /// Label Medium - 12sp
   /// Uso: Botões médios, chips, badges
-  static const TextStyle? labelMedium = TextStyle(
+  static const TextStyle labelMedium = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 12,
     fontWeight: FontWeight.w500,
@@ -205,7 +205,7 @@ class AppTextStyles {
 
   /// Label Small - 11sp
   /// Uso: Labels de campos, tooltips
-  static const TextStyle? labelSmall = TextStyle(
+  static const TextStyle labelSmall = TextStyle(
     fontFamily: _fontFamily,
     fontSize: 11,
     fontWeight: FontWeight.w500,
