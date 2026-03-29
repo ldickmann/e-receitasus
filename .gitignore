@@ -135,3 +135,4 @@ pnpm-debug.log*
 # -----------------------------------------
 /dist
 /out
+.github/appmod/assessment/reports/report-1770713257289/report.json
