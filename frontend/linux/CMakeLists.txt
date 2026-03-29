@@ -51,6 +51,23 @@ set(FLUTTER_MANAGED_DIR "${CMAKE_CURRENT_SOURCE_DIR}/flutter")
 add_subdirectory(${FLUTTER_MANAGED_DIR})
 
 # System-level dependencies.
+# Este CMakeLists é específico para Linux.
+if(WIN32)
+  message(FATAL_ERROR
+    "Build Linux detectado em ambiente Windows. "
+    "Use WSL/Ubuntu (ou um ambiente Linux) e instale pkg-config.")
+endif()
+
+# Garante descoberta explícita do executável pkg-config.
+find_program(PKG_CONFIG_EXECUTABLE NAMES pkg-config pkgconf)
+
+if(NOT PKG_CONFIG_EXECUTABLE)
+  message(FATAL_ERROR
+    "pkg-config não encontrado. Instale no Linux com:\n"
+    "  sudo apt update && sudo apt install -y pkg-config")
+endif()
+
+set(PKG_CONFIG_EXECUTABLE "${PKG_CONFIG_EXECUTABLE}" CACHE FILEPATH "Path to pkg-config")
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(GTK REQUIRED IMPORTED_TARGET gtk+-3.0)
 

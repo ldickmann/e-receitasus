@@ -4,7 +4,27 @@ cmake_minimum_required(VERSION 3.10)
 set(EPHEMERAL_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ephemeral")
 
 # Configuration provided via flutter tool.
-include(${EPHEMERAL_DIR}/generated_config.cmake)
+set(GENERATED_CONFIG "${EPHEMERAL_DIR}/generated_config.cmake")
+if(EXISTS "${GENERATED_CONFIG}")
+  include("${GENERATED_CONFIG}")
+elseif(CMAKE_HOST_SYSTEM_NAME STREQUAL "Linux")
+  message(FATAL_ERROR
+    "Missing ${GENERATED_CONFIG}. Run 'flutter pub get' and 'flutter build linux' from the frontend directory."
+  )
+else()
+  message(STATUS
+    "Skipping Linux Flutter generated config on non-Linux host (${CMAKE_HOST_SYSTEM_NAME})."
+  )
+
+  # Provide minimal placeholders so IDE/CMake indexing can continue.
+  add_library(flutter INTERFACE)
+  add_custom_target(flutter_assemble)
+  set(FLUTTER_LIBRARY "${EPHEMERAL_DIR}/libflutter_linux_gtk.so" PARENT_SCOPE)
+  set(FLUTTER_ICU_DATA_FILE "${EPHEMERAL_DIR}/icudtl.dat" PARENT_SCOPE)
+  set(PROJECT_BUILD_DIR "${PROJECT_DIR}/build/" PARENT_SCOPE)
+  set(AOT_LIBRARY "${PROJECT_DIR}/build/lib/libapp.so" PARENT_SCOPE)
+  return()
+endif()
 
 # TODO: Move the rest of this into files in ephemeral. See
 # https://github.com/flutter/flutter/issues/57146.
