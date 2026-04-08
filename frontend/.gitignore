@@ -25,3 +25,4 @@ ios/.symlinks/
 # Android
 android/.gradle/
 android/local.properties
+/.github/
