@@ -1,17 +1,17 @@
 // ==========================================
-// CONFIGURAÇÃO DO BANCO DE DADOS
+// CONFIGURAÇÃO DO BANCO DE DADOS (SUPABASE)
 // ==========================================
-// Define qual banco de dados será usado (PostgreSQL)
-// A URL de conexão vem da variável de ambiente DATABASE_URL
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  // URL para o modo de transação (Porta 6543) - Usada pela aplicação
+  url       = env("DATABASE_URL")
+  // URL para o modo de sessão (Porta 5432) - Usada para Migrations/Introspection
+  directUrl = env("DIRECT_URL")
 }
 
 // ==========================================
 // GERADOR DO CLIENTE PRISMA
 // ==========================================
-// Gera o código TypeScript para interagir com o banco
 generator client {
   provider = "prisma-client-js"
 }
@@ -20,176 +20,68 @@ generator client {
 // ENUMS (TIPOS ENUMERADOS)
 // ==========================================
 
-/// Tipos de profissionais que podem usar o sistema
-/// Cada tipo tem seu conselho profissional correspondente
 enum ProfessionalType {
-  MEDICO          // Médico - CRM (Conselho Regional de Medicina)
-  ENFERMEIRO      // Enfermeiro - COREN (Conselho Regional de Enfermagem)
-  FARMACEUTICO    // Farmacêutico - CRF (Conselho Regional de Farmácia)
-  PSICOLOGO       // Psicólogo - CRP (Conselho Regional de Psicologia)
-  NUTRICIONISTA   // Nutricionista - CRN (Conselho Regional de Nutrição)
-  FISIOTERAPEUTA  // Fisioterapeuta - CREFITO (Conselho Regional de Fisioterapia)
-  DENTISTA        // Dentista - CRO (Conselho Regional de Odontologia)
-  ASSISTENTE_SOCIAL // Assistente Social - CRESS (Conselho Regional de Serviço Social)
-  ADMINISTRATIVO  // Profissional administrativo (sem conselho profissional)
-  OUTROS          // Outros profissionais de saúde
+  MEDICO
+  ENFERMEIRO
+  FARMACEUTICO
+  PSICOLOGO
+  NUTRICIONISTA
+  FISIOTERAPEUTA
+  DENTISTA
+  ASSISTENTE_SOCIAL
+  ADMINISTRATIVO
+  OUTROS
 }
 
-/// Status da receita médica
-/// Controla o ciclo de vida de uma prescrição
 enum PrescriptionStatus {
-  ACTIVE      // Receita ativa e válida para uso
-  EXPIRED     // Receita vencida (expirou o prazo de validade)
-  CANCELLED   // Receita cancelada pelo médico ou sistema
+  ACTIVE
+  EXPIRED
+  CANCELLED
 }
 
 // ==========================================
 // MODELS (TABELAS DO BANCO DE DADOS)
 // ==========================================
 
-/// Modelo de Usuário
-/// Representa todos os usuários do sistema (profissionais de saúde)
 model User {
-  // --- CAMPOS OBRIGATÓRIOS ---
+  id                 String           @id @default(uuid())
+  name               String
+  email              String           @unique
+  password           String
   
-  /// ID único do usuário (gerado automaticamente como UUID)
-  id                  String            @id @default(uuid())
+  professionalType   ProfessionalType @default(ADMINISTRATIVO)
+  professionalId     String?          // CRM, COREN, etc.
+  professionalState  String?          // UF do conselho
+  specialty          String?
   
-  /// Nome completo do usuário
-  name                String
-  
-  /// E-mail único para login (usado para autenticação)
-  email               String            @unique
-  
-  /// Senha criptografada (hash bcrypt)
-  password            String
-  
-  // --- CAMPOS PROFISSIONAIS ---
-  
-  /// Tipo de profissional (médico, enfermeiro, etc.)
-  /// Padrão: ADMINISTRATIVO
-  professionalType    ProfessionalType  @default(ADMINISTRATIVO)
-  
-  /// Número do registro profissional
-  /// Exemplos: CRM 12345, COREN 98765, matrícula administrativa
-  /// Opcional (null) para profissionais administrativos
-  professionalId      String?
-  
-  /// UF do conselho profissional
-  /// Exemplos: "SP", "RJ", "MG"
-  /// Opcional (null) se não houver conselho
-  professionalState   String?
-  
-  /// Especialidade do profissional
-  /// Exemplos: "Cardiologia", "Pediatria", "Clínica Geral"
-  /// Opcional (null)
-  specialty           String?
-  
-  // --- TIMESTAMPS ---
-  
-  /// Data de criação do registro
-  createdAt           DateTime          @default(now())
-  
-  /// Data da última atualização
-  updatedAt           DateTime          @updatedAt
-  
-  // --- RELAÇÕES ---
-  
-  /// Receitas prescritas por este usuário (se for médico)
-  prescriptionsCreated Prescription[]   @relation("PrescribedBy")
-  
-  /// Receitas do paciente (receitas que o usuário recebeu)
-  prescriptionsReceived Prescription[]  @relation("PatientPrescriptions")
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+
+  // Relações
+  prescriptionsCreated  Prescription[] @relation("PrescribedBy")
+  prescriptionsReceived Prescription[] @relation("PatientPrescriptions")
 }
 
-/// Modelo de Prescrição/Receita Médica
-/// Representa uma receita médica emitida para um paciente
 model Prescription {
-  // --- CAMPOS OBRIGATÓRIOS ---
-  
-  /// ID único da receita (gerado automaticamente como UUID)
-  id          String              @id @default(uuid())
-  
-  /// Nome do medicamento prescrito
-  /// Exemplo: "Losartana 50mg", "Dipirona 500mg"
+  id          String             @id @default(uuid())
   medicine    String
-  
-  // --- CAMPOS OPCIONAIS ---
-  
-  /// Instruções de uso e posologia
-  /// Exemplo: "Tomar 1 comprimido pela manhã, em jejum"
   description String?
-  
-  /// Nome do médico que prescreveu (para exibição)
-  /// Exemplo: "Dr. Carlos Mendes - CRM 12345/SP"
-  doctorName  String?
-  
-  // --- STATUS DA RECEITA ---
-  
-  /// Status atual da receita (ACTIVE, EXPIRED, CANCELLED)
-  /// Padrão: ACTIVE (ativa ao ser criada)
-  status      PrescriptionStatus  @default(ACTIVE)
-  
-  // --- CHAVES ESTRANGEIRAS (RELACIONAMENTOS) ---
-  
-  /// ID do paciente que recebeu a receita
-  /// Referência para User.id
+  doctorName  String?            // Nome formatado para exibição rápida
+  status      PrescriptionStatus @default(ACTIVE)
+
+  // Chaves Estrangeiras
   patientId   String
-  
-  /// ID do médico que prescreveu (opcional)
-  /// Referência para User.id
   doctorId    String?
-  
-  // --- TIMESTAMPS ---
-  
-  /// Data de criação da receita
-  createdAt   DateTime            @default(now())
-  
-  /// Data da última atualização
-  updatedAt   DateTime            @updatedAt
-  
-  // --- RELAÇÕES ---
-  
-  /// Relacionamento: Paciente que recebe a receita
-  /// Um paciente pode ter várias receitas (onDelete Cascade)
-  patient     User                @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Cascade)
-  
-  /// Relacionamento: Médico que prescreveu (opcional)
-  /// Um médico pode criar várias receitas (onDelete SetNull)
-  doctor      User?               @relation("PrescribedBy", fields: [doctorId], references: [id], onDelete: SetNull)
-  
-  // --- ÍNDICES PARA PERFORMANCE ---
-  
-  @@index([patientId]) // Índice para buscar receitas por paciente rapidamente
-  @@index([status])    // Índice para filtrar por status
-  @@index([createdAt]) // Índice para ordenação por data
+
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  // Relações (Integridade Referencial)
+  patient     User               @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Cascade)
+  doctor      User?              @relation("PrescribedBy", fields: [doctorId], references: [id], onDelete: SetNull)
+
+  // Índices para performance em consultas de larga escala
+  @@index([patientId])
+  @@index([status])
+  @@index([createdAt])
 }
-
-// ==========================================
-// EXPLICAÇÕES IMPORTANTES
-// ==========================================
-// RELAÇÕES:
-// 1. User -> Prescription (PatientPrescriptions): Um usuário (paciente) pode ter VÁRIAS receitas. Uma receita pertence a UM paciente. Tipo: One-to-Many (1:N)
-// 2. User -> Prescription (PrescribedBy): Um usuário (médico) pode criar VÁRIAS receitas. Uma receita é criada por UM médico (opcional). Tipo: One-to-Many (1:N)
-//
-// ON DELETE:
-// - Cascade: Se o paciente for deletado, suas receitas também são deletadas
-// - SetNull: Se o médico for deletado, o campo doctorId vira null (mantém a receita)
-//
-// ÍNDICES:
-// - @@index([patientId]): Acelera busca de receitas por paciente
-// - @@index([status]): Acelera filtro por status (ACTIVE, EXPIRED)
-// - @@index([createdAt]): Acelera ordenação por data de criação
-//
-// TIPOS NULLABLE (?):
-// - String?: Campo opcional, pode ser null
-// - Usado para campos que nem sempre têm valor
-
-// ==========================================
-// COMANDOS ÚTEIS
-// ==========================================
-// Para aplicar este schema ao banco de dados:
-// 1. npx prisma migrate dev --name add_prescription_patient_relation (Cria a migration e aplica as mudanças)
-// 2. npx prisma generate (Gera o código TypeScript atualizado)
-// 3. npx prisma studio (Abre interface visual para ver os dados)
-// 4. npx prisma db seed (Popula o banco com dados de teste, se configurado)
