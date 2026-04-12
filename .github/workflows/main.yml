@@ -2,7 +2,8 @@ name: E-ReceitaSUS CI/CD
 
 on:
   push:
-    branches: [develop]
+    # Adicionado a branch de automação para validar o pipeline antes do merge
+    branches: [develop, feat/ci-cd-automation-AB84]
   pull_request:
     branches: [develop]
 
@@ -15,22 +16,26 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Passo 1: Setup do Node.js (necessário para instalar o CLI via NPM)
+      # Passo 1: Setup do Node.js
+      # Atualizado para v22 para evitar erros de compatibilidade com pacotes novos
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "22"
 
       # IMPLEMENTAÇÃO DA TASK 85: Instalação do Supabase CLI
-      - name: Install Supabase CLI
-        run: npm install -g supabase
+      # Usando a Action oficial que evita o erro de "global module is not supported"
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: "latest"
 
       # VALIDAÇÃO DA TASK 85: Verificar versão instalada
       - name: Verify Supabase Installation
         run: supabase --version
 
-      # PREPARAÇÃO PARA DEPLOY: Exemplo de comando que usará o Token
-      # O Token deve estar configurado nos Secrets do GitHub como SUPABASE_ACCESS_TOKEN
+      # PREPARAÇÃO PARA DEPLOY: Teste de comunicação com o projeto
+      # Certifique-se de que o Secret SUPABASE_ACCESS_TOKEN está configurado no GitHub
       - name: Check Supabase Status
         run: supabase status
         env:
