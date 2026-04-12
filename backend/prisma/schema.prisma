@@ -1,12 +1,8 @@
 // ==========================================
-// CONFIGURAÇÃO DO BANCO DE DADOS (SUPABASE)
+// CONFIGURACAO DO BANCO DE DADOS (SUPABASE)
 // ==========================================
 datasource db {
-  provider  = "postgresql"
-  // URL para o modo de transação (Porta 6543) - Usada pela aplicação
-  url       = env("DATABASE_URL")
-  // URL para o modo de sessão (Porta 5432) - Usada para Migrations/Introspection
-  directUrl = env("DIRECT_URL")
+  provider = "postgresql"
 }
 
 // ==========================================
@@ -44,43 +40,40 @@ enum PrescriptionStatus {
 // ==========================================
 
 model User {
-  id                 String           @id @default(uuid())
-  name               String
-  email              String           @unique
+  id                     String           @id @default(uuid())
+  name                   String
+  email                  String           @unique
+  professionalType       ProfessionalType @default(ADMINISTRATIVO)
+  professionalId         String?          // CRM, COREN, etc.
+  professionalState      String?          // UF do conselho
+  specialty              String?
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
 
-  
-  professionalType   ProfessionalType @default(ADMINISTRATIVO)
-  professionalId     String?          // CRM, COREN, etc.
-  professionalState  String?          // UF do conselho
-  specialty          String?
-  
-  createdAt          DateTime         @default(now())
-  updatedAt          DateTime         @updatedAt
-
-  // Relações
-  prescriptionsCreated  Prescription[] @relation("PrescribedBy")
-  prescriptionsReceived Prescription[] @relation("PatientPrescriptions")
+  // Relacoes
+  prescriptionsCreated   Prescription[]   @relation("PrescribedBy")
+  prescriptionsReceived  Prescription[]   @relation("PatientPrescriptions")
 }
 
 model Prescription {
   id          String             @id @default(uuid())
   medicine    String
   description String?
-  doctorName  String?            // Nome formatado para exibição rápida
+  doctorName  String?            // Nome formatado para exibicao rapida
   status      PrescriptionStatus @default(ACTIVE)
 
-  // Chaves Estrangeiras
+  // Chaves estrangeiras
   patientId   String
   doctorId    String?
 
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
-  // Relações (Integridade Referencial)
+  // Relacoes (integridade referencial)
   patient     User               @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Cascade)
   doctor      User?              @relation("PrescribedBy", fields: [doctorId], references: [id], onDelete: SetNull)
 
-  // Índices para performance em consultas de larga escala
+  // Indices para performance em consultas
   @@index([patientId])
   @@index([status])
   @@index([createdAt])
