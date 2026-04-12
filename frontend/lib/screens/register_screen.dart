@@ -12,47 +12,139 @@ class RegisterScreen extends StatefulWidget {
 
 class _RegisterScreenState extends State<RegisterScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameController = TextEditingController();
+
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
   final _emailController = TextEditingController();
-  final _passwordController = TextEditingController();
-  final _confirmPasswordController = TextEditingController();
   final _professionalIdController = TextEditingController();
   final _specialtyController = TextEditingController();
+  final _birthDateController = TextEditingController();
+  final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
 
-  ProfessionalType _selectedProfessionalType = ProfessionalType.administrativo;
+  ProfessionalType? _selectedProfessionalType;
+  DateTime? _selectedBirthDate;
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
     _emailController.dispose();
-    _passwordController.dispose();
-    _confirmPasswordController.dispose();
     _professionalIdController.dispose();
     _specialtyController.dispose();
+    _birthDateController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
     super.dispose();
+  }
+
+  Future<void> _pickBirthDate() async {
+    final now = DateTime.now();
+    final initialDate = DateTime(now.year - 18, now.month, now.day);
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedBirthDate ?? initialDate,
+      firstDate: DateTime(1900),
+      lastDate: now,
+      helpText: 'Selecione a data de nascimento',
+      fieldHintText: 'DD/MM/AAAA',
+    );
+
+    if (picked == null) return;
+
+    setState(() {
+      _selectedBirthDate = DateTime(picked.year, picked.month, picked.day);
+      _birthDateController.text = _formatDate(_selectedBirthDate!);
+    });
+  }
+
+  String _formatDate(DateTime date) {
+    final dd = date.day.toString().padLeft(2, '0');
+    final mm = date.month.toString().padLeft(2, '0');
+    final yyyy = date.year.toString().padLeft(4, '0');
+    return '$dd/$mm/$yyyy';
+  }
+
+  int _calculateAge(DateTime birthDate) {
+    final now = DateTime.now();
+    int age = now.year - birthDate.year;
+    final hadBirthdayThisYear = now.month > birthDate.month ||
+        (now.month == birthDate.month && now.day >= birthDate.day);
+
+    if (!hadBirthdayThisYear) {
+      age -= 1;
+    }
+
+    return age;
+  }
+
+  String? _validateName(String? value, String label) {
+    final input = value?.trim() ?? '';
+    final regex = RegExp(r"^[A-Za-zÀ-ÖØ-öø-ÿ' -]{2,}$");
+
+    if (input.isEmpty) return 'Informe $label';
+    if (!regex.hasMatch(input)) {
+      return '$label invalido. Use apenas letras, espaco, apostrofo e hifen.';
+    }
+    return null;
+  }
+
+  String? _validateEmail(String? value) {
+    final input = value?.trim() ?? '';
+    final regex = RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$');
+
+    if (input.isEmpty) return 'Informe o e-mail';
+    if (!regex.hasMatch(input)) return 'E-mail invalido';
+    return null;
+  }
+
+  String? _validateBirthDate() {
+    if (_selectedBirthDate == null) {
+      return 'Informe a data de nascimento';
+    }
+
+    final age = _calculateAge(_selectedBirthDate!);
+    if (age < 18) {
+      return 'Cadastro permitido apenas para maiores de 18 anos';
+    }
+
+    return null;
+  }
+
+  String? _validatePassword(String? value) {
+    final input = value ?? '';
+    final regex =
+        RegExp(r'^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[^A-Za-z0-9]).{8,}$');
+
+    if (input.isEmpty) return 'Informe a senha';
+    if (!regex.hasMatch(input)) {
+      return 'Senha deve ter 8+ caracteres com maiuscula, minuscula, numero e simbolo';
+    }
+    return null;
   }
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
 
+    final professionalType = _selectedProfessionalType;
+    final birthDate = _selectedBirthDate;
+
+    if (professionalType == null || birthDate == null) return;
+
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    // Extrai número e estado do registro profissional se fornecido
-    String? professionalId;
-    String? professionalState;
-
-    if (_professionalIdController.text.isNotEmpty) {
-      professionalId = _selectedProfessionalType
-          .extractNumber(_professionalIdController.text);
-      professionalState = _selectedProfessionalType
-          .extractState(_professionalIdController.text);
-    }
+    final professionalIdRaw = _professionalIdController.text.trim();
+    final professionalId = professionalType.extractNumber(professionalIdRaw);
+    final professionalState = professionalType.extractState(professionalIdRaw);
 
     final success = await authProvider.registerWithProfessionalInfo(
-      name: _nameController.text.trim(),
-      email: _emailController.text.trim(),
+      firstName: _firstNameController.text.trim(),
+      lastName: _lastNameController.text.trim(),
+      email: _emailController.text.trim().toLowerCase(),
+      birthDate: birthDate,
       password: _passwordController.text,
-      professionalType: _selectedProfessionalType,
+      professionalType: professionalType,
       professionalId: professionalId,
       professionalState: professionalState,
       specialty: _specialtyController.text.trim().isNotEmpty
@@ -66,7 +158,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
-              'Cadastro realizado com sucesso! Faça login para continuar.'),
+              'Cadastro realizado com sucesso! Faca login para continuar.'),
           backgroundColor: Colors.green,
           duration: Duration(seconds: 3),
         ),
@@ -92,13 +184,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
       ),
       body: Center(
         child: SingleChildScrollView(
-          padding: const EdgeInsets.all(32.0),
+          padding: const EdgeInsets.all(24),
           child: Form(
             key: _formKey,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
+              children: [
                 Text(
                   'Criar Nova Conta',
                   textAlign: TextAlign.center,
@@ -108,117 +199,112 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     color: Theme.of(context).colorScheme.primary,
                   ),
                 ),
-                const SizedBox(height: 25),
-
-                // Campo de Nome
+                const SizedBox(height: 24),
                 TextFormField(
-                  controller: _nameController,
+                  controller: _firstNameController,
                   keyboardType: TextInputType.name,
+                  textCapitalization: TextCapitalization.words,
                   decoration: const InputDecoration(
-                    labelText: 'Nome Completo',
+                    labelText: 'Primeiro Nome',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.person_outline),
+                  ),
+                  validator: (value) => _validateName(value, 'o primeiro nome'),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _lastNameController,
+                  keyboardType: TextInputType.name,
+                  textCapitalization: TextCapitalization.words,
+                  decoration: const InputDecoration(
+                    labelText: 'Sobrenome',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.person),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor, informe seu nome';
-                    }
-                    return null;
-                  },
+                  validator: (value) => _validateName(value, 'o sobrenome'),
                 ),
-                const SizedBox(height: 15),
-
-                // Campo de Email
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
                   decoration: const InputDecoration(
-                    labelText: 'E-mail SUS',
+                    labelText: 'E-mail',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.email),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor, informe seu e-mail';
-                    }
-                    if (!value.contains('@')) {
-                      return 'E-mail inválido';
-                    }
-                    return null;
-                  },
+                  validator: _validateEmail,
                 ),
-                const SizedBox(height: 15),
-
-                // Dropdown de Tipo de Profissional
+                const SizedBox(height: 12),
                 DropdownButtonFormField<ProfessionalType>(
                   value: _selectedProfessionalType,
                   decoration: const InputDecoration(
                     labelText: 'Tipo de Profissional',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.work),
-                    helperText: 'Selecione sua categoria profissional',
                   ),
-                  items: ProfessionalType.values.map((type) {
-                    return DropdownMenuItem(
-                      value: type,
-                      child: Text(type.displayName),
-                    );
-                  }).toList(),
+                  items: ProfessionalType.values
+                      .map(
+                        (type) => DropdownMenuItem<ProfessionalType>(
+                          value: type,
+                          child: Text(type.displayName),
+                        ),
+                      )
+                      .toList(),
                   onChanged: (value) {
                     setState(() {
-                      _selectedProfessionalType = value!;
+                      _selectedProfessionalType = value;
                       _professionalIdController.clear();
                     });
                   },
                   validator: (value) {
-                    if (value == null) {
-                      return 'Por favor, selecione o tipo de profissional';
-                    }
+                    if (value == null)
+                      return 'Selecione o tipo de profissional';
                     return null;
                   },
                 ),
-                const SizedBox(height: 15),
-
-                // Campo de Registro Profissional (condicional)
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 300),
-                  child: _selectedProfessionalType.requiresCouncil ||
-                          _selectedProfessionalType == ProfessionalType.outros
-                      ? Column(
-                          children: [
-                            TextFormField(
-                              controller: _professionalIdController,
-                              keyboardType: TextInputType.text,
-                              textCapitalization: TextCapitalization.characters,
-                              decoration: InputDecoration(
-                                labelText:
-                                    _selectedProfessionalType.registrationLabel,
-                                hintText:
-                                    _selectedProfessionalType.registrationHint,
-                                border: const OutlineInputBorder(),
-                                prefixIcon: const Icon(Icons.badge),
-                                helperText:
-                                    _selectedProfessionalType.requiresCouncil
-                                        ? 'Obrigatório para prescrever receitas'
-                                        : 'Opcional',
-                              ),
-                              validator: (value) {
-                                if (_selectedProfessionalType.requiresCouncil) {
-                                  return _selectedProfessionalType
-                                      .validateRegistration(value);
-                                }
-                                return null;
-                              },
-                            ),
-                            const SizedBox(height: 15),
-                          ],
-                        )
-                      : const SizedBox.shrink(),
+                const SizedBox(height: 12),
+                AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 250),
+                  child: _selectedProfessionalType == null
+                      ? const SizedBox.shrink()
+                      : TextFormField(
+                          key: ValueKey<String>(
+                              _selectedProfessionalType!.value),
+                          controller: _professionalIdController,
+                          keyboardType: TextInputType.text,
+                          textCapitalization: TextCapitalization.characters,
+                          decoration: InputDecoration(
+                            labelText:
+                                _selectedProfessionalType!.registrationLabel,
+                            hintText:
+                                _selectedProfessionalType!.registrationHint,
+                            border: const OutlineInputBorder(),
+                            prefixIcon: const Icon(Icons.badge),
+                            helperText: 'Campo obrigatorio',
+                          ),
+                          validator: (value) {
+                            if (_selectedProfessionalType == null) return null;
+                            return _selectedProfessionalType!
+                                .validateRegistration(value);
+                          },
+                        ),
                 ),
-
-                // Campo de Especialidade (condicional para médicos e outros)
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _birthDateController,
+                  readOnly: true,
+                  onTap: _pickBirthDate,
+                  decoration: const InputDecoration(
+                    labelText: 'Data de Nascimento',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.cake_outlined),
+                    suffixIcon: Icon(Icons.calendar_today),
+                  ),
+                  validator: (_) => _validateBirthDate(),
+                ),
+                const SizedBox(height: 12),
                 AnimatedSize(
-                  duration: const Duration(milliseconds: 300),
+                  duration: const Duration(milliseconds: 250),
                   child: _selectedProfessionalType == ProfessionalType.medico ||
                           _selectedProfessionalType ==
                               ProfessionalType.dentista ||
@@ -228,23 +314,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           children: [
                             TextFormField(
                               controller: _specialtyController,
-                              keyboardType: TextInputType.text,
                               textCapitalization: TextCapitalization.words,
                               decoration: const InputDecoration(
                                 labelText: 'Especialidade',
-                                hintText: 'Ex: Clínico Geral, Pediatria',
+                                hintText: 'Ex: Clinica Geral, Pediatria',
                                 border: OutlineInputBorder(),
                                 prefixIcon: Icon(Icons.medical_services),
-                                helperText: 'Opcional',
                               ),
                             ),
-                            const SizedBox(height: 15),
+                            const SizedBox(height: 12),
                           ],
                         )
                       : const SizedBox.shrink(),
                 ),
-
-                // Campo de Senha
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
@@ -253,19 +335,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.lock),
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor, informe sua senha';
-                    }
-                    if (value.length < 8) {
-                      return 'A senha deve ter no mínimo 8 caracteres';
-                    }
-                    return null;
-                  },
+                  validator: _validatePassword,
                 ),
-                const SizedBox(height: 15),
-
-                // Campo de Confirmação de Senha
+                const SizedBox(height: 12),
                 TextFormField(
                   controller: _confirmPasswordController,
                   obscureText: true,
@@ -275,18 +347,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: Icon(Icons.lock_outline),
                   ),
                   validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return 'Por favor, confirme sua senha';
-                    }
-                    if (value != _passwordController.text) {
-                      return 'As senhas não coincidem';
-                    }
+                    if ((value ?? '').isEmpty) return 'Confirme sua senha';
+                    if (value != _passwordController.text)
+                      return 'As senhas nao coincidem';
                     return null;
                   },
                 ),
-                const SizedBox(height: 25),
-
-                // Botão de Cadastrar com Loading
+                const SizedBox(height: 20),
                 authProvider.isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : ElevatedButton(
@@ -296,13 +363,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           style: TextStyle(fontSize: 18),
                         ),
                       ),
-                const SizedBox(height: 10),
-
-                // Botão de Voltar
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Já tem conta? Faça login'),
-                ),
               ],
             ),
           ),

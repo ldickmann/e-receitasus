@@ -1,47 +1,110 @@
-// Importação da biblioteca de testes HTTP
+import { jest } from '@jest/globals';
 import request from 'supertest';
-// Importação da aplicação Express (extensão .js obrigatória com moduleResolution: nodenext)
-import { app } from '../src/app.js';
-// Importação do cliente Prisma para operações no banco
 import { prisma } from '../src/utils/prismaClient.js';
 
-describe('Auth - /auth', () => {
+/**
+ * Mock da funcao jwtVerify do pacote jose.
+ * Isso permite simular tokens validos/invalidos sem depender da chave privada real.
+ */
+const jwtVerifyMock = jest.fn<(token: string, key: unknown) => Promise<{ payload: Record<string, unknown> }>>();
+
+jest.unstable_mockModule('jose', async () => {
+  const actual = await import('jose');
+  return {
+    ...actual,
+    jwtVerify: jwtVerifyMock,
+  };
+});
+
+const { app } = await import('../src/app.js');
+
+/**
+ * Configura mock de token valido para um usuario especifico.
+ *
+ * @param userId ID que sera injetado no payload simulado.
+ */
+function mockValidToken(userId: string): void {
+  jwtVerifyMock.mockResolvedValueOnce({
+    payload: {
+      sub: userId,
+      aud: 'authenticated',
+    },
+  });
+}
+
+describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
   const user = {
-    name: 'Test User',
-    email: 'test@example.com',
-    password: 'Senha123!'
+    id: '11111111-1111-1111-1111-111111111111',
+    name: 'Usuario Teste',
+    email: 'teste@sus.gov.br',
+    professionalType: 'ADMINISTRATIVO' as const,
   };
 
   beforeAll(async () => {
-    await prisma.user.deleteMany(); // limpa o banco antes de iniciar
+    process.env.SUPABASE_URL = 'https://pofzorepizdcefvodwln.supabase.co';
+
+    await prisma.user.deleteMany();
+
+    await prisma.user.create({
+      data: user,
+    });
   });
 
   afterAll(async () => {
     await prisma.$disconnect();
   });
 
-  it('should register a user and return 201', async () => {
-    const res = await request(app).post('/auth/register').send(user);
-
-    expect(res.status).toBe(201);
-    expect(res.body).toHaveProperty('id');
-    expect(res.body.email).toBe(user.email);
+  beforeEach(() => {
+    jwtVerifyMock.mockReset();
   });
 
-  it('should login and return a valid JWT token', async () => {
-    await request(app).post('/auth/register').send({
-      name: 'LoginTeste',
-      email: 'login@example.com',
-      password: 'Senha123!'
+  /**
+   * Deve permitir acesso ao perfil com token valido.
+   */
+  it('deve retornar 200 no GET /user/me com token valido', async () => {
+    mockValidToken(user.id);
+
+    const response = await request(app)
+      .get('/user/me')
+      .set('Authorization', 'Bearer token-valido');
+
+    expect(response.status).toBe(200);
+    expect(response.body.id).toBe(user.id);
+    expect(response.body.email).toBe(user.email);
+  });
+
+  /**
+   * Deve bloquear sem token.
+   */
+  it('deve retornar 401 sem Authorization', async () => {
+    const response = await request(app).get('/user/me');
+
+    expect(response.status).toBe(401);
+    expect(String(response.body.message)).toContain('Token');
+  });
+
+  /**
+   * Deve bloquear token invalido.
+   */
+  it('deve retornar 403 quando assinatura for invalida', async () => {
+    jwtVerifyMock.mockRejectedValueOnce(new Error('invalid signature'));
+
+    const response = await request(app)
+      .get('/user/me')
+      .set('Authorization', 'Bearer token-invalido');
+
+    expect(response.status).toBe(403);
+  });
+
+  /**
+   * Endpoints legados devem permanecer desativados com 410.
+   */
+  it('deve retornar 410 no POST /auth/login', async () => {
+    const response = await request(app).post('/auth/login').send({
+      email: 'qualquer@sus.gov.br',
+      password: 'qualquer-senha',
     });
 
-    const res = await request(app).post('/auth/login').send({
-      email: 'login@example.com',
-      password: 'Senha123!'
-    });
-
-    expect(res.status).toBe(200);
-    expect(res.body).toHaveProperty('token');
-    expect(typeof res.body.token).toBe('string');
+    expect(response.status).toBe(410);
   });
 });

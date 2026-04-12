@@ -30,6 +30,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # Supabase
+  supabase_flutter: ^2.0.0
   # Para requisições HTTP seguras com a API RESTful
   http: ^1.6.0
   # Para gerenciamento de estado

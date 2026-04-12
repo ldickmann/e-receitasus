@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Importação para a nova infraestrutura
 import 'providers/auth_provider.dart';
 import 'services/auth_service.dart';
 import 'screens/splash_screen.dart';
@@ -9,43 +10,50 @@ import 'screens/home_screen.dart';
 import 'screens/history_screen.dart';
 
 /// Ponto de entrada da aplicação E-ReceitaSUS
-void main() {
-  // Inicialização de serviços e configurações podem ser adicionadas aqui
+///
+/// Refatorado para inicializar o Supabase de forma assíncrona,
+/// substituindo a arquitetura anterior baseada em PostgreSQL local.
+void main() async {
+  // 1. Garante que os bindings do Flutter estejam prontos para operações assíncronas
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // 2. Inicializa o Supabase com as credenciais do seu projeto
+  // Esta configuração conecta o app diretamente ao backend-as-a-service na nuvem
+  await Supabase.initialize(
+    url: 'https://shnahlongybxxilworck.supabase.co',
+    anonKey: 'sb_publishable_NMJeKsT7rEJ8-l7vefZcDA_ggy3EKAj',
+  );
+
   runApp(const MyApp());
 }
 
 /// Widget raiz da aplicação
 ///
-/// Configura providers, tema e rotas da aplicação
+/// Configura providers, tema (Material 3) e o sistema de rotas nomeadas
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // Definição das cores principais do tema
+    // Definição da identidade visual do projeto conforme o PRD
     const corVerdePrincipal = Color(0xFF4CAF50);
     const corAzulSecundaria = Color(0xFF1565C0);
 
     return MultiProvider(
-      // Configuração dos providers da aplicação
+      // Configuração centralizada de estado (Provider Pattern)
       providers: [
-        // Provider de autenticação com injeção de dependência
         ChangeNotifierProvider(
           create: (_) => AuthProvider(AuthService()),
         ),
-        // Futuros providers podem ser adicionados aqui
-        // Ex: PrescriptionProvider, HistoryProvider, etc.
+        // Providers adicionais para a Etapa 2 (ex: Prescrições) devem ser inseridos aqui
       ],
       child: MaterialApp(
-        // Configurações gerais do app
         debugShowCheckedModeBanner: false,
         title: 'E-ReceitaSUS',
 
-        // Configuração do tema Material Design 3
+        // Configuração do tema Material Design 3 otimizado para acessibilidade no SUS
         theme: ThemeData(
           useMaterial3: true,
-
-          // Esquema de cores baseado em Material 3
           colorScheme: ColorScheme.fromSeed(
             seedColor: corVerdePrincipal,
             primary: corVerdePrincipal,
@@ -53,7 +61,7 @@ class MyApp extends StatelessWidget {
             brightness: Brightness.light,
           ),
 
-          // Tema da AppBar
+          // Customização de componentes UI
           appBarTheme: const AppBarTheme(
             backgroundColor: corVerdePrincipal,
             foregroundColor: Colors.white,
@@ -61,7 +69,6 @@ class MyApp extends StatelessWidget {
             elevation: 2,
           ),
 
-          // Tema dos botões elevados
           elevatedButtonTheme: ElevatedButtonThemeData(
             style: ElevatedButton.styleFrom(
               backgroundColor: corVerdePrincipal,
@@ -72,7 +79,7 @@ class MyApp extends StatelessWidget {
               ),
             ),
           ),
-          // Tema dos campos de texto
+
           inputDecorationTheme: InputDecorationTheme(
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(8),
@@ -81,7 +88,6 @@ class MyApp extends StatelessWidget {
             fillColor: Colors.grey[100],
           ),
 
-          // Tema dos cards
           cardTheme: CardTheme(
             elevation: 2,
             shape: RoundedRectangleBorder(
@@ -90,10 +96,8 @@ class MyApp extends StatelessWidget {
           ),
         ),
 
-        // Rota inicial (splash screen)
+        // Gerenciamento de navegação
         initialRoute: '/',
-
-        // Definição de rotas nomeadas
         routes: {
           '/': (context) => const SplashScreen(),
           '/login': (context) => const LoginScreen(),
@@ -102,7 +106,7 @@ class MyApp extends StatelessWidget {
           '/history': (context) => const HistoryScreen(),
         },
 
-        // Handler para rotas não encontradas
+        // Fallback de segurança para rotas inexistentes
         onUnknownRoute: (settings) {
           return MaterialPageRoute(
             builder: (context) => Scaffold(
