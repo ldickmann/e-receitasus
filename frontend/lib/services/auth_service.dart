@@ -2,12 +2,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../models/professional_type.dart';
 
-// ============================================================================
-// INTERFACE DO SERVIÇO DE AUTENTICAÇÃO
-// ============================================================================
-
-/// Interface que define o contrato para o serviço de autenticação.
-/// Mantida para garantir a compatibilidade com o AuthProvider existente.
+/// Contrato do servico de autenticacao.
 abstract class IAuthService {
   Future<UserModel> login(String email, String password);
 
@@ -26,51 +21,52 @@ abstract class IAuthService {
   Future<void> logout();
 }
 
-// ============================================================================
-// IMPLEMENTAÇÃO COM SUPABASE (CLOUD-NATIVE)
-// ============================================================================
-
-/// Implementação do serviço de autenticação utilizando a infraestrutura do Supabase.
-/// Substitui a implementação anterior que dependia de API REST local e PgAdmin4.
+/// Implementacao cloud-native com Supabase Auth.
+/// Nao usa API local de login nem armazenamento manual de token.
 class AuthService implements IAuthService {
-  // Instância do cliente Supabase inicializada no main.dart
-  final _supabase = Supabase.instance.client;
+  final SupabaseClient _supabase;
 
+  /// Permite injetar cliente para testes.
+  AuthService({SupabaseClient? supabaseClient})
+      : _supabase = supabaseClient ?? Supabase.instance.client;
+
+  /// Realiza login no Supabase e mapeia para UserModel.
   @override
   Future<UserModel> login(String email, String password) async {
     try {
-      // O Supabase realiza a autenticação e gerencia a persistência do JWT automaticamente
-      final AuthResponse res = await _supabase.auth.signInWithPassword(
+      final AuthResponse response = await _supabase.auth.signInWithPassword(
         email: email,
         password: password,
       );
 
-      final user = res.user;
-      final session = res.session;
+      final User? user = response.user;
+      final Session? session = response.session;
 
-      if (user == null || session == null) {
-        throw Exception('Falha na autenticação: Usuário ou sessão nulos.');
+      if (user == null || session == null || user.email == null) {
+        throw Exception('Falha na autenticacao: usuario ou sessao invalidos.');
       }
 
-      // Mapeia os dados da nuvem para o modelo interno do app
       return UserModel(
         id: user.id,
-        name: user.userMetadata?['name'] ?? 'Usuário SUS',
+        name: _resolveName(user),
         email: user.email!,
         professionalType: _mapStringToProfessionalType(
-            user.userMetadata?['professional_type']),
+          user.userMetadata?['professional_type'] as String?,
+        ),
+        professionalId: user.userMetadata?['professional_id'] as String?,
+        professionalState: user.userMetadata?['professional_state'] as String?,
+        specialty: user.userMetadata?['specialty'] as String?,
         token: session.accessToken,
-        tokenExpiry:
-            DateTime.fromMillisecondsSinceEpoch(session.expiresAt! * 1000),
+        tokenExpiry: _resolveTokenExpiry(session),
       );
     } on AuthException catch (e) {
-      // Erros específicos do Supabase (Ex: credenciais inválidas)
       throw Exception(e.message);
-    } catch (e) {
+    } catch (_) {
       throw Exception('Ocorreu um erro inesperado no login.');
     }
   }
 
+  /// Registra novo usuario no Supabase com metadados profissionais.
   @override
   Future<UserModel> registerWithProfessionalInfo({
     required String name,
@@ -82,11 +78,10 @@ class AuthService implements IAuthService {
     String? specialty,
   }) async {
     try {
-      // Realiza o cadastro no Supabase Auth e armazena metadados adicionais
-      final AuthResponse res = await _supabase.auth.signUp(
+      final AuthResponse response = await _supabase.auth.signUp(
         email: email,
         password: password,
-        data: {
+        data: <String, dynamic>{
           'name': name,
           'professional_type': professionalType.value,
           'professional_id': professionalId,
@@ -95,23 +90,30 @@ class AuthService implements IAuthService {
         },
       );
 
-      if (res.user == null) {
-        throw Exception('Erro ao criar conta.');
+      final User? user = response.user;
+      if (user == null) {
+        throw Exception('Erro ao criar conta no Supabase Auth.');
       }
 
       return UserModel(
-        id: res.user!.id,
+        id: user.id,
         name: name,
         email: email,
+        professionalType: professionalType,
+        professionalId: professionalId,
+        professionalState: professionalState,
+        specialty: specialty,
       );
     } on AuthException catch (e) {
       throw Exception(e.message);
+    } catch (_) {
+      throw Exception('Ocorreu um erro inesperado no cadastro.');
     }
   }
 
+  /// Atalho de cadastro para perfil administrativo.
   @override
   Future<UserModel> register(String name, String email, String password) {
-    // Atalho para registro de usuários administrativos/pacientes
     return registerWithProfessionalInfo(
       name: name,
       email: email,
@@ -120,16 +122,38 @@ class AuthService implements IAuthService {
     );
   }
 
+  /// Encerra a sessao ativa.
   @override
   Future<void> logout() async {
-    // Encerra a sessão na nuvem e limpa os dados locais automaticamente
     await _supabase.auth.signOut();
   }
 
-  // Métodos auxiliares de mapeamento
+  /// Resolve nome para exibicao com fallback.
+  String _resolveName(User user) {
+    final dynamic metadataName = user.userMetadata?['name'];
+
+    if (metadataName is String && metadataName.trim().isNotEmpty) {
+      return metadataName.trim();
+    }
+
+    return 'Usuario SUS';
+  }
+
+  /// Resolve expiracao do token com seguranca para null.
+  DateTime? _resolveTokenExpiry(Session session) {
+    final int? expiresAt = session.expiresAt;
+
+    if (expiresAt == null) {
+      return null;
+    }
+
+    return DateTime.fromMillisecondsSinceEpoch(expiresAt * 1000);
+  }
+
+  /// Converte string para enum de tipo profissional.
   ProfessionalType _mapStringToProfessionalType(String? value) {
     return ProfessionalType.values.firstWhere(
-      (e) => e.value == value,
+      (type) => type.value == value,
       orElse: () => ProfessionalType.administrativo,
     );
   }

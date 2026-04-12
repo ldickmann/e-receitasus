@@ -147,12 +147,15 @@ class AuthProvider with ChangeNotifier {
   /// Traduz erros técnicos em mensagens amigáveis para o cidadão/profissional
   String _parseErrorMessage(Object error) {
     final e = error.toString();
-    if (e.contains('Invalid login credentials'))
+    if (e.contains('Invalid login credentials')) {
       return 'E-mail ou senha incorretos.';
-    if (e.contains('User already registered'))
+    }
+    if (e.contains('User already registered')) {
       return 'Este e-mail já está em uso.';
-    if (e.contains('network'))
+    }
+    if (e.contains('network')) {
       return 'Erro de conexão. Verifique sua internet.';
+    }
     return 'Ocorreu um erro. Tente novamente em instantes.';
   }
 }

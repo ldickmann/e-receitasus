@@ -94,7 +94,7 @@ class AppTheme {
         systemOverlayStyle:
             SystemUiOverlayStyle.light, // Ícones da status bar brancos
         titleTextStyle:
-            AppTextStyles.titleLarge?.copyWith(color: AppColors.onPrimary),
+            AppTextStyles.titleLarge.copyWith(color: AppColors.onPrimary),
       ),
 
       cardTheme: CardTheme(
@@ -160,11 +160,11 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.error, width: 1.5),
         ),
         labelStyle: AppTextStyles.bodyMedium
-            ?.copyWith(color: AppColors.onSurfaceVariant),
+            .copyWith(color: AppColors.onSurfaceVariant),
         floatingLabelStyle:
-            AppTextStyles.bodyMedium?.copyWith(color: AppColors.primary),
+            AppTextStyles.bodyMedium.copyWith(color: AppColors.primary),
         hintStyle: AppTextStyles.bodyMedium
-            ?.copyWith(color: AppColors.onSurfaceVariant),
+            .copyWith(color: AppColors.onSurfaceVariant),
       ),
     );
   }
