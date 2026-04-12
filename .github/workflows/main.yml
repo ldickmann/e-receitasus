@@ -1,0 +1,37 @@
+name: E-ReceitaSUS CI/CD
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+jobs:
+  setup-environment:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Passo 0: Checkout do código
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Passo 1: Setup do Node.js (necessário para instalar o CLI via NPM)
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "18"
+
+      # IMPLEMENTAÇÃO DA TASK 85: Instalação do Supabase CLI
+      - name: Install Supabase CLI
+        run: npm install -g supabase
+
+      # VALIDAÇÃO DA TASK 85: Verificar versão instalada
+      - name: Verify Supabase Installation
+        run: supabase --version
+
+      # PREPARAÇÃO PARA DEPLOY: Exemplo de comando que usará o Token
+      # O Token deve estar configurado nos Secrets do GitHub como SUPABASE_ACCESS_TOKEN
+      - name: Check Supabase Status
+        run: supabase status
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
