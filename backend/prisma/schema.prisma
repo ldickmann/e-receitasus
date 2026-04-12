@@ -1,20 +1,10 @@
-// ==========================================
-// CONFIGURACAO DO BANCO DE DADOS (SUPABASE)
-// ==========================================
 datasource db {
   provider = "postgresql"
 }
 
-// ==========================================
-// GERADOR DO CLIENTE PRISMA
-// ==========================================
 generator client {
   provider = "prisma-client-js"
 }
-
-// ==========================================
-// ENUMS (TIPOS ENUMERADOS)
-// ==========================================
 
 enum ProfessionalType {
   MEDICO
@@ -35,45 +25,43 @@ enum PrescriptionStatus {
   CANCELLED
 }
 
-// ==========================================
-// MODELS (TABELAS DO BANCO DE DADOS)
-// ==========================================
-
 model User {
-  id                     String           @id @default(uuid())
-  name                   String
-  email                  String           @unique
-  professionalType       ProfessionalType @default(ADMINISTRATIVO)
-  professionalId         String?          // CRM, COREN, etc.
-  professionalState      String?          // UF do conselho
-  specialty              String?
-  createdAt              DateTime         @default(now())
-  updatedAt              DateTime         @updatedAt
+  id                    String           @id @default(uuid())
+  firstName             String?
+  lastName              String?
+  name                  String
+  birthDate             DateTime?        @db.Date
+  email                 String           @unique
+  professionalType      ProfessionalType @default(ADMINISTRATIVO)
+  professionalId        String?
+  professionalState     String?
+  specialty             String?
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
 
-  // Relacoes
-  prescriptionsCreated   Prescription[]   @relation("PrescribedBy")
-  prescriptionsReceived  Prescription[]   @relation("PatientPrescriptions")
+  prescriptionsCreated  Prescription[]   @relation("PrescribedBy")
+  prescriptionsReceived Prescription[]   @relation("PatientPrescriptions")
+
+  @@index([professionalType])
+  @@index([createdAt])
 }
 
 model Prescription {
   id          String             @id @default(uuid())
   medicine    String
   description String?
-  doctorName  String?            // Nome formatado para exibicao rapida
+  doctorName  String?
   status      PrescriptionStatus @default(ACTIVE)
 
-  // Chaves estrangeiras
   patientId   String
   doctorId    String?
 
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
-  // Relacoes (integridade referencial)
   patient     User               @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Cascade)
   doctor      User?              @relation("PrescribedBy", fields: [doctorId], references: [id], onDelete: SetNull)
 
-  // Indices para performance em consultas
   @@index([patientId])
   @@index([status])
   @@index([createdAt])

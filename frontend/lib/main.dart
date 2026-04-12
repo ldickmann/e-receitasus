@@ -20,8 +20,8 @@ void main() async {
   // 2. Inicializa o Supabase com as credenciais do seu projeto
   // Esta configuração conecta o app diretamente ao backend-as-a-service na nuvem
   await Supabase.initialize(
-    url: 'https://pofzorepizdcefvodwln.supabase.co',
-    anonKey: 'sb_publishable_OBWe9_GyXsYEeN1kkyxBSw_CPnSj3TD',
+    url: 'https://shnahlongybxxilworck.supabase.co',
+    anonKey: 'sb_publishable_NMJeKsT7rEJ8-l7vefZcDA_ggy3EKAj',
   );
 
   runApp(const MyApp());

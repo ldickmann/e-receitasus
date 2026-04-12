@@ -8,13 +8,6 @@ import {
 
 const router = Router();
 
-/**
- * Handler para retornar perfil publico do usuario autenticado.
- *
- * @param req Requisicao autenticada (com userId injetado pelo middleware).
- * @param res Resposta HTTP.
- * @returns Perfil publico do usuario.
- */
 async function getMeHandler(req: AuthRequest, res: Response): Promise<Response> {
   const userId = typeof req.userId === 'string' ? req.userId.trim() : '';
 
@@ -30,7 +23,10 @@ async function getMeHandler(req: AuthRequest, res: Response): Promise<Response> 
 
     return res.status(200).json({
       id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
       name: user.name,
+      birthDate: user.birthDate,
       email: user.email,
       professionalType: user.professionalType,
       professionalId: user.professionalId,
@@ -56,10 +52,6 @@ async function getMeHandler(req: AuthRequest, res: Response): Promise<Response> 
   }
 }
 
-/**
- * GET /user/me
- * Rota protegida que retorna o perfil do usuario autenticado.
- */
 router.get('/me', authenticateToken, async (req: Request, res: Response) => {
   return getMeHandler(req as AuthRequest, res);
 });

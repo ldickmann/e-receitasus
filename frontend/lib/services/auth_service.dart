@@ -2,15 +2,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../models/professional_type.dart';
 
-/// Contrato do servico de autenticacao.
 abstract class IAuthService {
   Future<UserModel> login(String email, String password);
 
-  Future<UserModel> register(String name, String email, String password);
+  Future<UserModel> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+  });
 
   Future<UserModel> registerWithProfessionalInfo({
-    required String name,
+    required String firstName,
+    required String lastName,
     required String email,
+    required DateTime birthDate,
     required String password,
     required ProfessionalType professionalType,
     String? professionalId,
@@ -21,35 +28,36 @@ abstract class IAuthService {
   Future<void> logout();
 }
 
-/// Implementacao cloud-native com Supabase Auth.
-/// Nao usa API local de login nem armazenamento manual de token.
 class AuthService implements IAuthService {
   final SupabaseClient _supabase;
 
-  /// Permite injetar cliente para testes.
   AuthService({SupabaseClient? supabaseClient})
       : _supabase = supabaseClient ?? Supabase.instance.client;
 
-  /// Realiza login no Supabase e mapeia para UserModel.
   @override
   Future<UserModel> login(String email, String password) async {
     try {
-      final AuthResponse response = await _supabase.auth.signInWithPassword(
-        email: email,
+      final response = await _supabase.auth.signInWithPassword(
+        email: email.trim().toLowerCase(),
         password: password,
       );
 
-      final User? user = response.user;
-      final Session? session = response.session;
+      final user = response.user;
+      final session = response.session;
 
       if (user == null || session == null || user.email == null) {
         throw Exception('Falha na autenticacao: usuario ou sessao invalidos.');
       }
 
+      final firstName = _resolveFirstName(user);
+      final lastName = _resolveLastName(user);
+
       return UserModel(
         id: user.id,
-        name: _resolveName(user),
+        firstName: firstName,
+        lastName: lastName,
         email: user.email!,
+        birthDate: _resolveBirthDate(user),
         professionalType: _mapStringToProfessionalType(
           user.userMetadata?['professional_type'] as String?,
         ),
@@ -66,11 +74,33 @@ class AuthService implements IAuthService {
     }
   }
 
-  /// Registra novo usuario no Supabase com metadados profissionais.
+  @override
+  Future<UserModel> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+  }) {
+    return registerWithProfessionalInfo(
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      birthDate: birthDate,
+      password: password,
+      professionalType: ProfessionalType.administrativo,
+      professionalId: null,
+      professionalState: null,
+      specialty: null,
+    );
+  }
+
   @override
   Future<UserModel> registerWithProfessionalInfo({
-    required String name,
+    required String firstName,
+    required String lastName,
     required String email,
+    required DateTime birthDate,
     required String password,
     required ProfessionalType professionalType,
     String? professionalId,
@@ -78,31 +108,41 @@ class AuthService implements IAuthService {
     String? specialty,
   }) async {
     try {
-      final AuthResponse response = await _supabase.auth.signUp(
-        email: email,
+      final cleanFirstName = firstName.trim();
+      final cleanLastName = lastName.trim();
+      final cleanEmail = email.trim().toLowerCase();
+      final cleanProfessionalId = professionalId?.trim();
+
+      final response = await _supabase.auth.signUp(
+        email: cleanEmail,
         password: password,
         data: <String, dynamic>{
-          'name': name,
+          'name': '$cleanFirstName $cleanLastName'.trim(),
+          'first_name': cleanFirstName,
+          'last_name': cleanLastName,
+          'birth_date': _formatBirthDate(birthDate),
           'professional_type': professionalType.value,
-          'professional_id': professionalId,
-          'professional_state': professionalState,
-          'specialty': specialty,
+          'professional_id': cleanProfessionalId,
+          'professional_state': professionalState?.trim().toUpperCase(),
+          'specialty': specialty?.trim(),
         },
       );
 
-      final User? user = response.user;
+      final user = response.user;
       if (user == null) {
         throw Exception('Erro ao criar conta no Supabase Auth.');
       }
 
       return UserModel(
         id: user.id,
-        name: name,
-        email: email,
+        firstName: cleanFirstName,
+        lastName: cleanLastName,
+        email: cleanEmail,
+        birthDate: birthDate,
         professionalType: professionalType,
-        professionalId: professionalId,
-        professionalState: professionalState,
-        specialty: specialty,
+        professionalId: cleanProfessionalId,
+        professionalState: professionalState?.trim().toUpperCase(),
+        specialty: specialty?.trim(),
       );
     } on AuthException catch (e) {
       throw Exception(e.message);
@@ -111,50 +151,61 @@ class AuthService implements IAuthService {
     }
   }
 
-  /// Atalho de cadastro para perfil administrativo.
-  @override
-  Future<UserModel> register(String name, String email, String password) {
-    return registerWithProfessionalInfo(
-      name: name,
-      email: email,
-      password: password,
-      professionalType: ProfessionalType.administrativo,
-    );
-  }
-
-  /// Encerra a sessao ativa.
   @override
   Future<void> logout() async {
     await _supabase.auth.signOut();
   }
 
-  /// Resolve nome para exibicao com fallback.
-  String _resolveName(User user) {
-    final dynamic metadataName = user.userMetadata?['name'];
+  String _resolveFirstName(User user) {
+    final value = user.userMetadata?['first_name'];
+    if (value is String && value.trim().isNotEmpty) return value.trim();
 
-    if (metadataName is String && metadataName.trim().isNotEmpty) {
-      return metadataName.trim();
+    final legacyName = user.userMetadata?['name'];
+    if (legacyName is String && legacyName.trim().isNotEmpty) {
+      return legacyName.trim().split(RegExp(r'\s+')).first;
     }
 
-    return 'Usuario SUS';
+    return 'Usuario';
   }
 
-  /// Resolve expiracao do token com seguranca para null.
-  DateTime? _resolveTokenExpiry(Session session) {
-    final int? expiresAt = session.expiresAt;
+  String _resolveLastName(User user) {
+    final value = user.userMetadata?['last_name'];
+    if (value is String && value.trim().isNotEmpty) return value.trim();
 
-    if (expiresAt == null) {
-      return null;
+    final legacyName = user.userMetadata?['name'];
+    if (legacyName is String && legacyName.trim().isNotEmpty) {
+      final parts = legacyName.trim().split(RegExp(r'\s+'));
+      if (parts.length > 1) return parts.sublist(1).join(' ');
     }
 
+    return 'SUS';
+  }
+
+  DateTime? _resolveBirthDate(User user) {
+    final value = user.userMetadata?['birth_date'];
+    if (value is String) {
+      return DateTime.tryParse(value);
+    }
+    return null;
+  }
+
+  DateTime? _resolveTokenExpiry(Session session) {
+    final expiresAt = session.expiresAt;
+    if (expiresAt == null) return null;
     return DateTime.fromMillisecondsSinceEpoch(expiresAt * 1000);
   }
 
-  /// Converte string para enum de tipo profissional.
   ProfessionalType _mapStringToProfessionalType(String? value) {
     return ProfessionalType.values.firstWhere(
       (type) => type.value == value,
       orElse: () => ProfessionalType.administrativo,
     );
+  }
+
+  String _formatBirthDate(DateTime birthDate) {
+    final yyyy = birthDate.year.toString().padLeft(4, '0');
+    final mm = birthDate.month.toString().padLeft(2, '0');
+    final dd = birthDate.day.toString().padLeft(2, '0');
+    return '$yyyy-$mm-$dd';
   }
 }

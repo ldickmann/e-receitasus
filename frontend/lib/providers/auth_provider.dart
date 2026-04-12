@@ -4,41 +4,20 @@ import '../models/user_model.dart';
 import '../models/professional_type.dart';
 import '../services/auth_service.dart';
 
-/// Provider responsável pelo gerenciamento de estado de autenticação.
-///
-/// Refatorado para a Etapa 2: A persistência de sessão agora é delegada
-/// integralmente ao SDK do Supabase, eliminando o uso de SecureStorage manual.
 class AuthProvider with ChangeNotifier {
-  // ========== DEPENDÊNCIAS E ESTADO ==========
-
   final IAuthService _authService;
 
-  /// Usuário atualmente autenticado na sessão ativa
   UserModel? _user;
-
   bool _isLoading = false;
   String? _errorMessage;
 
-  // ========== CONSTRUTOR ==========
-
   AuthProvider(this._authService);
 
-  // ========== GETTERS PÚBLICOS ==========
-
   UserModel? get user => _user;
-
   bool get isLoading => _isLoading;
-
   String? get errorMessage => _errorMessage;
-
-  /// Verifica se há um usuário autenticado.
-  /// O Supabase garante a validade do token em background.
   bool get isAuthenticated => _user != null;
 
-  // ========== INICIALIZAÇÃO DA SESSÃO ==========
-
-  /// Verifica se existe uma sessão ativa salva pelo Supabase ao abrir o app.
-  /// Substitui a leitura manual de JSON do SharedPreferences.
   Future<void> initAuth() async {
     _setLoading(true);
 
@@ -46,26 +25,44 @@ class AuthProvider with ChangeNotifier {
       final session = Supabase.instance.client.auth.currentSession;
       final user = Supabase.instance.client.auth.currentUser;
 
-      if (session != null && user != null) {
-        // Reconstrói o modelo a partir dos metadados da nuvem
+      if (session != null && user != null && user.email != null) {
+        final metadata = user.userMetadata ?? <String, dynamic>{};
+
+        final firstName = _safeString(
+          metadata['first_name'],
+          fallback: _splitFirstName(
+              _safeString(metadata['name'], fallback: 'Usuario SUS')),
+        );
+
+        final lastName = _safeString(
+          metadata['last_name'],
+          fallback: _splitLastName(
+              _safeString(metadata['name'], fallback: 'Usuario SUS')),
+        );
+
         _user = UserModel(
           id: user.id,
-          name: user.userMetadata?['name'] ?? 'Usuário SUS',
+          firstName: firstName,
+          lastName: lastName,
           email: user.email!,
+          birthDate: _parseDate(metadata['birth_date']),
+          professionalType:
+              _parseProfessionalType(metadata['professional_type']),
+          professionalId: _nullableString(metadata['professional_id']),
+          professionalState: _nullableString(metadata['professional_state']),
+          specialty: _nullableString(metadata['specialty']),
           token: session.accessToken,
+          tokenExpiry: _parseTokenExpiry(session.expiresAt),
         );
       }
     } catch (e) {
-      _errorMessage = 'Erro ao recuperar sessão: ${e.toString()}';
+      _errorMessage = 'Erro ao recuperar sessao: ${e.toString()}';
       debugPrint('Erro initAuth: $e');
     } finally {
       _setLoading(false);
     }
   }
 
-  // ========== AÇÕES DE AUTENTICAÇÃO ==========
-
-  /// Realiza o login utilizando o novo AuthService (Cloud-Native)
   Future<bool> login(String email, String password) async {
     _setLoading(true);
     _clearError();
@@ -82,10 +79,11 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Registra novo usuário profissional ou paciente
   Future<bool> registerWithProfessionalInfo({
-    required String name,
+    required String firstName,
+    required String lastName,
     required String email,
+    required DateTime birthDate,
     required String password,
     required ProfessionalType professionalType,
     String? professionalId,
@@ -97,8 +95,10 @@ class AuthProvider with ChangeNotifier {
 
     try {
       _user = await _authService.registerWithProfessionalInfo(
-        name: name,
+        firstName: firstName,
+        lastName: lastName,
         email: email,
+        birthDate: birthDate,
         password: password,
         professionalType: professionalType,
         professionalId: professionalId,
@@ -116,7 +116,6 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
-  /// Realiza logout e limpa o estado interno
   Future<void> logout() async {
     try {
       await _authService.logout();
@@ -127,8 +126,6 @@ class AuthProvider with ChangeNotifier {
       debugPrint('Erro no logout: $e');
     }
   }
-
-  // ========== MÉTODOS AUXILIARES (ESTADO) ==========
 
   void _setLoading(bool value) {
     _isLoading = value;
@@ -144,18 +141,75 @@ class AuthProvider with ChangeNotifier {
     notifyListeners();
   }
 
-  /// Traduz erros técnicos em mensagens amigáveis para o cidadão/profissional
   String _parseErrorMessage(Object error) {
+    debugPrint('Supabase/Auth Error log: $error');
+
+    if (error is AuthException) {
+      if (error.message.contains('Database error saving new user')) {
+        return 'Erro interno ao sincronizar cadastro no banco. Verifique trigger SQL no Supabase.';
+      }
+      return error.message;
+    }
+
     final e = error.toString();
+
     if (e.contains('Invalid login credentials')) {
       return 'E-mail ou senha incorretos.';
     }
     if (e.contains('User already registered')) {
-      return 'Este e-mail já está em uso.';
+      return 'Este e-mail ja esta em uso.';
     }
-    if (e.contains('network')) {
-      return 'Erro de conexão. Verifique sua internet.';
+    if (e.contains('weak_password')) {
+      return 'Senha fraca. Use pelo menos 8 caracteres com letras, numero e simbolo.';
     }
+    if (e.contains('network') ||
+        e.contains('SocketException') ||
+        e.contains('Failed to fetch')) {
+      return 'Erro de conexao. Verifique internet, URL do Supabase e CORS.';
+    }
+
     return 'Ocorreu um erro. Tente novamente em instantes.';
+  }
+
+  String _safeString(dynamic value, {required String fallback}) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return fallback;
+  }
+
+  String? _nullableString(dynamic value) {
+    if (value is String && value.trim().isNotEmpty) return value.trim();
+    return null;
+  }
+
+  DateTime? _parseDate(dynamic value) {
+    if (value is String) return DateTime.tryParse(value);
+    if (value is DateTime) return value;
+    return null;
+  }
+
+  DateTime? _parseTokenExpiry(int? expiresAt) {
+    if (expiresAt == null) return null;
+    return DateTime.fromMillisecondsSinceEpoch(expiresAt * 1000);
+  }
+
+  ProfessionalType _parseProfessionalType(dynamic value) {
+    if (value is String && value.trim().isNotEmpty) {
+      return ProfessionalType.fromString(value.trim());
+    }
+    return ProfessionalType.administrativo;
+  }
+
+  String _splitFirstName(String fullName) {
+    final parts =
+        fullName.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.isEmpty) return 'Usuario';
+    return parts.first;
+  }
+
+  String _splitLastName(String fullName) {
+    final parts =
+        fullName.split(RegExp(r'\s+')).where((p) => p.isNotEmpty).toList();
+    if (parts.length <= 1) return 'SUS';
+    return parts.sublist(1).join(' ');
   }
 }
