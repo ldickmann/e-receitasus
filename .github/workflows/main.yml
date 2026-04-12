@@ -1,0 +1,36 @@
+name: E-ReceitaSUS CI/CD
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+jobs:
+  setup-environment:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Usando Node 22 para evitar avisos de compatibilidade
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      # MÉTODO OFICIAL: Instalação limpa do CLI
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: "latest"
+
+      # VALIDAÇÃO DA TASK 85: Isso aqui é o que garante o seu "Done"
+      - name: Verify Supabase Installation
+        run: supabase --version
+
+      # TESTE DE CONEXÃO: Usamos o 'help' para garantir que o CLI responde
+      # Sem tentar buscar um projeto que ainda não foi linkado
+      - name: Check CLI Help
+        run: supabase --help
