@@ -1,39 +1,67 @@
 import { Router } from 'express';
-import { authenticateToken } from '../middlewares/auth.middleware.js';
-import { prisma } from '../utils/prismaClient.js';
+import type { Request, Response } from 'express';
+import { authenticateToken, type AuthRequest } from '../middlewares/auth.middleware.js';
+import {
+  AuthServiceError,
+  getAuthenticatedUserProfile,
+} from '../services/auth.service.js';
 
 const router = Router();
 
-// Rota protegida para obter perfil do usuário
-router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    console.log('userId recebido do middleware:', req.userId);
+/**
+ * Handler para retornar perfil publico do usuario autenticado.
+ *
+ * @param req Requisicao autenticada (com userId injetado pelo middleware).
+ * @param res Resposta HTTP.
+ * @returns Perfil publico do usuario.
+ */
+async function getMeHandler(req: AuthRequest, res: Response): Promise<Response> {
+  const userId = typeof req.userId === 'string' ? req.userId.trim() : '';
 
-    if (!req.userId) {
-      return res.status(401).json({ message: 'ID do usuário não encontrado no token' });
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { id: req.userId },
-      select: { 
-        id: true, 
-        name: true, 
-        email: true
-      },
-    });
-
-    if (!user) {
-      return res.status(404).json({ message: 'Usuário não encontrado' });
-    }
-
-    return res.status(200).json(user);
-  } catch (error) {
-    console.error('Erro ao buscar usuário:', error);
-    
-    return res.status(500).json({ 
-      message: 'Erro ao buscar usuário'
+  if (userId.length === 0) {
+    return res.status(401).json({
+      error: 'Nao autenticado',
+      message: 'ID do usuario nao encontrado no token.',
     });
   }
+
+  try {
+    const user = await getAuthenticatedUserProfile(userId);
+
+    return res.status(200).json({
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      professionalType: user.professionalType,
+      professionalId: user.professionalId,
+      professionalState: user.professionalState,
+      specialty: user.specialty,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+    });
+  } catch (error) {
+    if (error instanceof AuthServiceError) {
+      return res.status(error.statusCode).json({
+        error: 'Falha de autenticacao',
+        message: error.message,
+      });
+    }
+
+    console.error('[UserRoutes] Erro inesperado ao buscar perfil:', error);
+
+    return res.status(500).json({
+      error: 'Erro interno',
+      message: 'Nao foi possivel buscar o perfil do usuario.',
+    });
+  }
+}
+
+/**
+ * GET /user/me
+ * Rota protegida que retorna o perfil do usuario autenticado.
+ */
+router.get('/me', authenticateToken, async (req: Request, res: Response) => {
+  return getMeHandler(req as AuthRequest, res);
 });
 
 export default router;
