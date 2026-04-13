@@ -1,0 +1,119 @@
+# ============================================================
+# PIPELINE CI — E-ReceitaSUS
+# ============================================================
+# Responsabilidade EXCLUSIVA: Integração Contínua (CI)
+# Valida que nenhum commit introduz regressão nos testes
+# antes de um merge na branch 'develop'.
+#
+# DIFERENÇA em relação ao main.yml (CD):
+#   - ci.yml  → roda testes (backend + frontend) em PRs e pushes
+#   - main.yml → sincroniza banco e deploys (apenas em pushes)
+#
+# JOBS executados em paralelo para maior velocidade:
+#   1. test-backend  → instala deps Node.js e roda npm test
+#   2. test-frontend → instala deps Flutter e roda flutter test
+# ============================================================
+name: E-ReceitaSUS CI
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+# ─────────────────────────────────────────────────────────────
+# VARIÁVEIS DE AMBIENTE GLOBAIS
+# Antecipa a migração obrigatória para Node.js 24 nas actions
+# (obrigatória pelo GitHub a partir de junho de 2026).
+# ─────────────────────────────────────────────────────────────
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1: TESTES DO BACKEND (Node.js + Jest)
+  # Responsabilidade: garantir que todos os testes unitários e de
+  # integração do backend passam antes de qualquer merge.
+  #
+  # Comando de teste: npm test
+  # Flag --detectOpenHandles: evita que conexões DB abertas
+  # impeçam o Jest de encerrar corretamente.
+  # NODE_OPTIONS --experimental-vm-modules: obrigatório para Jest
+  # funcionar com projetos que usam ES Modules (type: "module").
+  # ─────────────────────────────────────────────────────────────
+  test-backend:
+    name: Testes Backend (Jest)
+    runs-on: ubuntu-latest
+
+    steps:
+      # Faz o download do código-fonte para o runner
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Node 22 LTS: alinhado com a versão usada em desenvolvimento
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          # Habilita cache do npm para acelerar instalações futuras.
+          # O cache é invalidado automaticamente quando package-lock.json muda.
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      # Instala exatamente as versões do package-lock.json (mais seguro que npm install)
+      - name: Instalar Dependências do Backend
+        run: npm ci
+        working-directory: ./backend
+
+      # Executa a suíte de testes completa.
+      # O pipeline falhará aqui se qualquer teste retornar erro,
+      # impedindo o merge do código problemático.
+      - name: Executar Testes Unitários (npm test)
+        run: npm test
+        working-directory: ./backend
+        env:
+          # NODE_OPTIONS já está configurado no script do package.json,
+          # mas explicitamos aqui para clareza no log do Actions
+          NODE_OPTIONS: "--experimental-vm-modules"
+          # Em CI, os testes não devem tentar conectar ao banco real.
+          # Os testes usam mocks — esta variável evita erros de conexão.
+          DATABASE_URL: "postgresql://mock:mock@localhost:5432/mock"
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: TESTES DO FRONTEND (Flutter + flutter_test)
+  # Responsabilidade: garantir que todos os testes de widget e
+  # unitários do Flutter passam antes de qualquer merge.
+  #
+  # Comando de teste: flutter test
+  # Os testes usam mockito para simular o Supabase,
+  # sem necessidade de conexão real.
+  # ─────────────────────────────────────────────────────────────
+  test-frontend:
+    name: Testes Frontend (Flutter)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Action oficial do Flutter: instala o SDK na versão estável mais recente.
+      # 'stable' garante alinhamento com a versão usada em desenvolvimento.
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "stable"
+          # Cache do Flutter SDK para acelerar execuções futuras
+          cache: true
+
+      # Instala todos os pacotes declarados no pubspec.yaml,
+      # incluindo as dependências de teste (mockito, flutter_test).
+      - name: Instalar Dependências do Frontend
+        run: flutter pub get
+        working-directory: ./frontend
+
+      # Executa todos os arquivos *_test.dart encontrados em test/.
+      # --reporter=expanded: exibe o nome de cada teste individualmente
+      # no log, facilitando a identificação de falhas.
+      - name: Executar Testes Unitários (flutter test)
+        run: flutter test --reporter=expanded
+        working-directory: ./frontend
