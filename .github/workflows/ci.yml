@@ -116,6 +116,7 @@ jobs:
         run: npm test
         working-directory: ./backend
         env:
+          NODE_OPTIONS: "--experimental-vm-modules"
           DATABASE_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
           DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
           SUPABASE_URL: "https://placeholder.supabase.co"

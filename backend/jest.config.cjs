@@ -69,22 +69,21 @@ module.exports = {
    * sem criar contextos V8 isolados por módulo — eliminando o consumo excessivo
    * de memória que causava OOM no CI.
    */
+  extensionsToTreatAsEsm: [".ts"],
+
   transform: {
     "^.+\\.(t|j)sx?$": [
       "@swc/jest",
       {
         jsc: {
-          // Habilita parser TypeScript com suporte a decorators
           parser: {
             syntax: "typescript",
             decorators: true,
           },
-          // Alvo de saída compatível com Node.js 22
           target: "es2020",
         },
-        // Saída em CommonJS — compatível com Jest sem experimental vm modules
         module: {
-          type: "commonjs",
+          type: "es6", // ← era "commonjs", causa raiz do problema
         },
       },
     ],
@@ -120,7 +119,7 @@ module.exports = {
    * Regex negativo: ignora tudo EXCETO os pacotes do Prisma,
    * que precisam ser processados pelo SWC.
    */
-  transformIgnorePatterns: ["node_modules/(?!(\\.prisma|@prisma)/)"],
+  transformIgnorePatterns: ["node_modules/(?!(\\.prisma|@prisma|jose)/)"],
 
   /**
    * Pastas a serem ignoradas completamente pelo Jest

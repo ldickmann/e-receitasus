@@ -3,21 +3,22 @@ import request from 'supertest';
 import { prisma } from '../src/utils/prismaClient.js';
 
 /**
- * jest.mock é hoistado automaticamente antes dos requires.
- * Usa jest.requireActual para preservar o restante do módulo jose intacto.
+ * Mock do módulo jose via jest.unstable_mockModule (padrão ESM).
+ * Deve ser declarado ANTES do dynamic import do app para garantir
+ * que o middleware carregue o mock e não o módulo real.
+ *
+ * jwtVerifyMock é declarado fora do factory para poder ser
+ * referenciado nos helpers e nos beforeEach dos testes.
  */
-jest.mock('jose', () => ({
-  // Retorna placeholder — jwtVerify é completamente mockado nos testes,
-  // portanto o argumento de key nunca é usado de verdade.
+const jwtVerifyMock = jest.fn();
+
+jest.unstable_mockModule('jose', async () => ({
   createRemoteJWKSet: jest.fn(() => ({})),
-  jwtVerify: jest.fn(),
+  jwtVerify: jwtVerifyMock,
 }));
 
-import { app } from '../src/app.js';
-import { jwtVerify } from 'jose';
-
-/** Referência tipada ao mock — aponta para o jest.fn() criado na factory acima. */
-const jwtVerifyMock = jest.mocked(jwtVerify);
+// Dynamic import APÓS o mock para garantir que app.ts já resolve jose mockado
+const { app } = await import('../src/app.js');
 
 /**
  * Configura mock de token valido para um usuario especifico.
@@ -30,7 +31,7 @@ function mockValidToken(userId: string): void {
       sub: userId,
       aud: 'authenticated',
     },
-  } as any);
+  });
 }
 
 describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {

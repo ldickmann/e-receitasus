@@ -4,21 +4,19 @@ import { PrescriptionStatus } from '@prisma/client';
 import { prisma } from '../src/utils/prismaClient.js';
 
 /**
- * jest.mock é hoistado automaticamente antes dos requires.
- * Usa jest.requireActual para preservar o restante do módulo jose intacto.
+ * Mock do módulo jose via jest.unstable_mockModule (padrão ESM).
+ * Deve ser declarado ANTES do dynamic import do app para garantir
+ * que o middleware carregue o mock e não o módulo real.
  */
-jest.mock('jose', () => ({
-  // Retorna placeholder — jwtVerify é completamente mockado nos testes,
-  // portanto o argumento de key nunca é usado de verdade.
+const jwtVerifyMock = jest.fn();
+
+jest.unstable_mockModule('jose', async () => ({
   createRemoteJWKSet: jest.fn(() => ({})),
-  jwtVerify: jest.fn(),
+  jwtVerify: jwtVerifyMock,
 }));
 
-import { app } from '../src/app.js';
-import { jwtVerify } from 'jose';
-
-/** Referência tipada ao mock da validacao JWT. */
-const jwtVerifyMock = jest.mocked(jwtVerify);
+// Dynamic import APÓS o mock para garantir que app.ts já resolve jose mockado
+const { app } = await import('../src/app.js');
 
 describe('Prescription List - GET /prescriptions/my', () => {
   const tokenPaciente = 'token-paciente';
@@ -103,23 +101,11 @@ describe('Prescription List - GET /prescriptions/my', () => {
 
     jwtVerifyMock.mockImplementation(async (token: unknown) => {
       if (token === tokenPaciente) {
-        return {
-          payload: {
-            sub: paciente.id,
-            aud: 'authenticated',
-          },
-        } as any;
+        return { payload: { sub: paciente.id, aud: 'authenticated' } };
       }
-
       if (token === tokenOutroPaciente) {
-        return {
-          payload: {
-            sub: outroPaciente.id,
-            aud: 'authenticated',
-          },
-        } as any;
+        return { payload: { sub: outroPaciente.id, aud: 'authenticated' } };
       }
-
       throw new Error('invalid token');
     });
   });

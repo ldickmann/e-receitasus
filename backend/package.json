@@ -8,9 +8,9 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "jest --detectOpenHandles --runInBand",
-    "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage",
+    "test": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --detectOpenHandles --runInBand",
+    "test:watch": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --watch",
+    "test:coverage": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --coverage",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:studio": "prisma studio"
