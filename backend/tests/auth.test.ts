@@ -2,20 +2,16 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 import { prisma } from '../src/utils/prismaClient.js';
 
-/**
- * Mock da funcao jwtVerify do pacote jose.
- * Isso permite simular tokens validos/invalidos sem depender da chave privada real.
- */
-const jwtVerifyMock = jest.fn<(token: string, key: unknown) => Promise<{ payload: Record<string, unknown> }>>();
+const jwtVerifyMock = jest.fn<
+  (token: unknown, key: unknown, options?: unknown) => Promise<{ payload: { sub: string; aud: string } }>
+>();
 
-jest.unstable_mockModule('jose', async () => {
-  const actual = await import('jose');
-  return {
-    ...actual,
-    jwtVerify: jwtVerifyMock,
-  };
-});
+jest.unstable_mockModule('jose', async () => ({
+  createRemoteJWKSet: jest.fn(() => ({})),
+  jwtVerify: jwtVerifyMock,
+}));
 
+// Dynamic import APÓS o mock para garantir que app.ts já resolve jose mockado
 const { app } = await import('../src/app.js');
 
 /**
@@ -58,9 +54,6 @@ describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
     jwtVerifyMock.mockReset();
   });
 
-  /**
-   * Deve permitir acesso ao perfil com token valido.
-   */
   it('deve retornar 200 no GET /user/me com token valido', async () => {
     mockValidToken(user.id);
 
@@ -73,9 +66,6 @@ describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
     expect(response.body.email).toBe(user.email);
   });
 
-  /**
-   * Deve bloquear sem token.
-   */
   it('deve retornar 401 sem Authorization', async () => {
     const response = await request(app).get('/user/me');
 
@@ -83,9 +73,6 @@ describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
     expect(String(response.body.message)).toContain('Token');
   });
 
-  /**
-   * Deve bloquear token invalido.
-   */
   it('deve retornar 403 quando assinatura for invalida', async () => {
     jwtVerifyMock.mockRejectedValueOnce(new Error('invalid signature'));
 
@@ -96,9 +83,6 @@ describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
     expect(response.status).toBe(403);
   });
 
-  /**
-   * Endpoints legados devem permanecer desativados com 410.
-   */
   it('deve retornar 410 no POST /auth/login', async () => {
     const response = await request(app).post('/auth/login').send({
       email: 'qualquer@sus.gov.br',

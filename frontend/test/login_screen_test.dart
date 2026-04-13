@@ -24,9 +24,11 @@ class FakeAuthService implements IAuthService {
       throw Exception('Invalid login credentials');
     }
 
+    // CORREÇÃO: UserModel agora usa firstName/lastName em vez de name
     return UserModel(
       id: '11111111-1111-1111-1111-111111111111',
-      name: 'Usuário de Teste',
+      firstName: 'Usuário',
+      lastName: 'de Teste',
       email: email,
       professionalType: ProfessionalType.administrativo,
       token: 'token-teste',
@@ -35,21 +37,35 @@ class FakeAuthService implements IAuthService {
   }
 
   /// Simulação simples para manter contrato completo.
+  /// IAuthService.register agora usa parâmetros nomeados
+  /// com firstName, lastName e birthDate obrigatórios.
   @override
-  Future<UserModel> register(String name, String email, String password) async {
+  Future<UserModel> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+  }) async {
     return UserModel(
       id: '22222222-2222-2222-2222-222222222222',
-      name: name,
+      firstName: firstName,
+      lastName: lastName,
       email: email,
+      birthDate: birthDate,
       professionalType: ProfessionalType.administrativo,
     );
   }
 
   /// Simulação simples para manter contrato completo.
+  /// IAuthService.registerWithProfessionalInfo agora inclui
+  /// firstName, lastName e birthDate como parâmetros obrigatórios.
   @override
   Future<UserModel> registerWithProfessionalInfo({
-    required String name,
+    required String firstName,
+    required String lastName,
     required String email,
+    required DateTime birthDate,
     required String password,
     required ProfessionalType professionalType,
     String? professionalId,
@@ -58,8 +74,10 @@ class FakeAuthService implements IAuthService {
   }) async {
     return UserModel(
       id: '33333333-3333-3333-3333-333333333333',
-      name: name,
+      firstName: firstName,
+      lastName: lastName,
       email: email,
+      birthDate: birthDate,
       professionalType: professionalType,
       professionalId: professionalId,
       professionalState: professionalState,

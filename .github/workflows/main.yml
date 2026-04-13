@@ -1,20 +1,53 @@
 # ============================================================
-# PIPELINE CI/CD — E-ReceitaSUS
+# PIPELINE CD — E-ReceitaSUS
 # ============================================================
-# Disparado automaticamente a cada push ou pull_request
-# na branch 'develop'.
+# Disparado automaticamente após a conclusão bem-sucedida
+# do pipeline de CI ("E-ReceitaSUS CI") na branch 'develop'.
+#
+# PREMISSA DE SEGURANÇA:
+# O CD só avança se todos os testes (backend + frontend) passaram.
+# Isso garante que nenhum commit com falha nos testes cause
+# uma sincronização indevida no banco de produção ou deploy
+# de funções com código quebrado.
 #
 # JOBS (executados em sequência):
 #   1. setup-environment  → Valida o ambiente (Node + Supabase CLI)
 #   2. sync-database      → Sincroniza o schema Prisma no banco
 #   3. deploy-functions   → Faz deploy das Edge Functions Supabase
+#
+# ─────────────────────────────────────────────────────────────
+# SECRETS NECESSÁRIOS NO REPOSITÓRIO
+# (Settings → Secrets and variables → Actions):
+#
+#   DATABASE_URL          → Connection string direta Supabase (porta 5432, sem pgbouncer)
+#                           Ex: postgresql://postgres.[ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+#   SUPABASE_ACCESS_TOKEN → Token pessoal do Supabase
+#                           (gerado em supabase.com/dashboard/account/tokens)
+#   SUPABASE_PROJECT_ID   → Project ref do Supabase (ex: pofzorepizdcefvodwln)
+#
+# NOTA: SUPABASE_JWT_SECRET NÃO é necessário neste pipeline.
+# O backend valida tokens via JWKS remoto (RS256 assimétrico),
+# derivando o endpoint público a partir de SUPABASE_URL em runtime.
+# Nenhuma chave secreta é necessária para esse fluxo de validação.
+# ─────────────────────────────────────────────────────────────
 # ============================================================
-name: E-ReceitaSUS CI/CD
+name: E-ReceitaSUS CD
 
+# ─────────────────────────────────────────────────────────────
+# TRIGGER: workflow_run
+# Este pipeline é disparado SOMENTE quando o CI ("E-ReceitaSUS CI")
+# conclui na branch 'develop'. O filtro 'branches' se refere ao
+# branch que originou o CI — portanto só afeta pushes diretos
+# à 'develop', nunca Pull Requests de outras branches.
+#
+# IMPORTANTE: o valor em 'workflows' deve ser idêntico ao campo
+# 'name:' definido em ci.yml para que o GitHub localize
+# o workflow correto.
+# ─────────────────────────────────────────────────────────────
 on:
-  push:
-    branches: [develop]
-  pull_request:
+  workflow_run:
+    workflows: ["E-ReceitaSUS CI"]
+    types: [completed]
     branches: [develop]
 
 # ─────────────────────────────────────────────────────────────
@@ -31,17 +64,26 @@ env:
 jobs:
   # ─────────────────────────────────────────────────────────────
   # JOB 1: CONFIGURAR AMBIENTE
-  # Responsabilidade: instalar Node.js e o Supabase CLI,
-  # garantindo que todas as ferramentas estão disponíveis
-  # antes de qualquer operação crítica.
+  # Responsabilidade: validar que o CI passou e instalar as
+  # ferramentas necessárias (Node.js e Supabase CLI).
+  #
+  # GUARDA DE QUALIDADE:
+  # O campo 'if' verifica github.event.workflow_run.conclusion.
+  # Se o CI falhou (conclusion != 'success'), este job é ignorado
+  # e, por consequência, todos os jobs subsequentes também são
+  # ignorados automaticamente via propagação do 'needs' em cadeia.
   # ─────────────────────────────────────────────────────────────
   setup-environment:
     name: Configurar Ambiente
     runs-on: ubuntu-latest
+    # Guarda principal do CD: só avança se o CI concluiu com êxito.
+    # Conclusões possíveis: success | failure | cancelled | timed_out
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      # Faz o download do código-fonte do repositório
-      # para o runner (máquina virtual do GitHub Actions)
+      # Faz o download do código-fonte do commit exato que passou no CI.
+      # Com trigger workflow_run, github.sha aponta para o commit
+      # que originou o CI — garantindo consistência entre teste e deploy.
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -77,17 +119,14 @@ jobs:
   # IMPORTANTE: usa 'prisma db push' com a DIRECT_URL (porta 5432)
   # pois o PgBouncer (porta 6543, ?pgbouncer=true) não suporta
   # o protocolo de query estendido exigido pelo Prisma.
-  #
-  # Condicional: só executa em 'push' direto (não em PRs),
-  # evitando sincronizar o banco com código ainda em revisão.
   # ─────────────────────────────────────────────────────────────
   sync-database:
     name: Sincronizar Banco de Dados (Prisma)
     runs-on: ubuntu-latest
-    # Depende do Job 1 — só avança se o ambiente foi validado
+    # Depende do Job 1 — só avança se o ambiente foi validado.
+    # Se setup-environment foi ignorado (CI falhou), este job
+    # também é ignorado automaticamente pela propagação do 'needs'.
     needs: setup-environment
-    # Não executa em Pull Requests: apenas em merges confirmados
-    if: github.event_name == 'push'
 
     steps:
       - name: Checkout Repository
@@ -97,12 +136,16 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
+          # Cache baseado no package-lock.json: evita redownload de
+          # módulos entre execuções, reduzindo o tempo de instalação.
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
 
-      # Instala todas as dependências listadas no package.json do backend.
-      # O 'working-directory' é obrigatório pois package.json está em ./backend/
-      # e não na raiz do repositório.
+      # npm ci instala exatamente as versões fixadas no package-lock.json.
+      # Mais determinístico que 'npm install': garante que produção usa
+      # as mesmas versões de dependências validadas pelo CI.
       - name: Instalar Dependências do Backend
-        run: npm install
+        run: npm ci
         working-directory: ./backend
 
       # Gera o Prisma Client tipado a partir do schema.prisma.
@@ -144,9 +187,9 @@ jobs:
   deploy-functions:
     name: Deploy Edge Functions (Supabase)
     runs-on: ubuntu-latest
-    # Depende do Job 2 — deploy só ocorre após o banco estar atualizado
+    # Depende do Job 2 — deploy só ocorre após o banco estar atualizado.
+    # Se sync-database foi ignorado, este job também é ignorado.
     needs: sync-database
-    if: github.event_name == 'push'
 
     steps:
       - name: Checkout Repository

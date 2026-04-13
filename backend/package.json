@@ -8,7 +8,7 @@
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "test": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --detectOpenHandles",
+    "test": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --detectOpenHandles --runInBand",
     "test:watch": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --watch",
     "test:coverage": "cross-env NODE_OPTIONS=\"--experimental-vm-modules\" jest --coverage",
     "prisma:generate": "prisma generate",
@@ -30,6 +30,8 @@
     "pg": "^8.20.0"
   },
   "devDependencies": {
+    "@swc/core": "^1.15.24",
+    "@swc/jest": "^0.2.39",
     "@types/bcrypt": "^5.0.2",
     "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
@@ -42,7 +44,6 @@
     "prisma": "^7.7.0",
     "supabase": "^2.84.4",
     "supertest": "^7.0.0",
-    "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
     "ts-node-dev": "^2.0.0",
     "tsx": "^4.19.2",

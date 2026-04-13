@@ -31,6 +31,9 @@ void main() {
 
   group('AuthService com Supabase SDK', () {
     /// Valida login via signInWithPassword.
+    /// O AuthService lê userMetadata para resolver firstName/lastName:
+    /// - 'name' legado é dividido em primeiro e último nome pelo _resolveFirstName/_resolveLastName.
+    /// - result.name retorna '$firstName $lastName' via getter do UserModel.
     test('deve autenticar e mapear UserModel corretamente', () async {
       final mockAuthResponse = MockAuthResponse();
       final mockUser = MockUser();
@@ -63,6 +66,7 @@ void main() {
 
       expect(result.id, '11111111-1111-1111-1111-111111111111');
       expect(result.email, 'teste@sus.gov.br');
+      // result.name é um getter que retorna '$firstName $lastName'.trim()
       expect(result.name, 'Dr. Teste');
       expect(result.professionalType, ProfessionalType.medico);
       expect(result.token, 'jwt-token-valido');
@@ -76,6 +80,10 @@ void main() {
     });
 
     /// Valida fluxo de cadastro com metadados.
+    /// CORREÇÃO: registerWithProfessionalInfo agora usa firstName, lastName
+    /// e birthDate como parâmetros nomeados obrigatórios.
+    /// O AuthService constrói o UserModel diretamente dos parâmetros —
+    /// não lê userMetadata do mockUser, apenas o id.
     test('deve cadastrar com signUp e retornar perfil', () async {
       final mockAuthResponse = MockAuthResponse();
       final mockUser = MockUser();
@@ -92,8 +100,10 @@ void main() {
       when(mockUser.id).thenReturn('22222222-2222-2222-2222-222222222222');
 
       final result = await authService.registerWithProfessionalInfo(
-        name: 'Novo Usuario',
+        firstName: 'Novo',
+        lastName: 'Usuario',
         email: 'novo@sus.gov.br',
+        birthDate: DateTime(1990, 1, 1),
         password: 'Senha123!',
         professionalType: ProfessionalType.enfermeiro,
         professionalId: '654321',

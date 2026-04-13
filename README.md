@@ -1,5 +1,3 @@
-[![Board Status](https://dev.azure.com/ldickmann/3875d22d-5c39-4cf3-bbc5-5aacc10584e0/47b8c04f-5b27-4e76-a77c-6c34aac29f88/_apis/work/boardbadge/41a4671e-43f5-4f82-afb2-b33d033a329b)](https://dev.azure.com/ldickmann/3875d22d-5c39-4cf3-bbc5-5aacc10584e0/_boards/board/t/47b8c04f-5b27-4e76-a77c-6c34aac29f88/Backlog%20items/)
-
 # 📱 E-ReceitaSUS
 
 > Sistema completo de gestão e digitalização de prescrições médicas com autenticação segura, histórico de receitas e rastreamento em tempo real.
@@ -28,6 +26,13 @@ Elimina a necessidade de receitas físicas, reduz erros de prescrição, facilit
   - [🏗 Arquitetura](#-arquitetura)
   - [🔐 Autenticação](#-autenticação)
   - [🧩 Modelagem de Dados](#-modelagem-de-dados)
+  - [⚙️ CI/CD Pipeline](#️-cicd-pipeline)
+  - [📝 Padrão de Commits](#-padrão-de-commits)
+    - [Formato: `<tipo>(escopo): <descrição resumida> AB#<número-da-task>`](#formato-tipoescopo-descrição-resumida-abnúmero-da-task)
+    - [Tipos aceitos](#tipos-aceitos)
+    - [Exemplos](#exemplos)
+    - [Jobs executados em sequência](#jobs-executados-em-sequência)
+    - [Segurança](#segurança)
   - [📂 Estrutura do Projeto](#-estrutura-do-projeto)
   - [🚀 Como Executar](#-como-executar)
     - [Pré-requisitos](#pré-requisitos)
@@ -38,8 +43,8 @@ Elimina a necessidade de receitas físicas, reduz erros de prescrição, facilit
     - [Frontend (Testes)](#frontend-testes)
   - [📜 Scripts do Backend](#-scripts-do-backend)
   - [🎓 Contexto Acadêmico](#-contexto-acadêmico)
-  - [Aluno e Desenvolvedor](#aluno-e-desenvolvedor)
-    - [Desenvolvido com TypeScript, Flutter e boas práticas de engenharia de software, seguindo princípios de arquitetura em camadas, TDD e garantindo qualidade e manutenibilidade do código. O projeto é uma solução completa para digitalização de prescrições médicas, com foco em segurança, usabilidade e escalabilidade](#desenvolvido-com-typescript-flutter-e-boas-práticas-de-engenharia-de-software-seguindo-princípios-de-arquitetura-em-camadas-tdd-e-garantindo-qualidade-e-manutenibilidade-do-código-o-projeto-é-uma-solução-completa-para-digitalização-de-prescrições-médicas-com-foco-em-segurança-usabilidade-e-escalabilidade)
+  - [👨‍💻 Aluno e Desenvolvedor](#-aluno-e-desenvolvedor)
+    - [Desenvolvido com TypeScript, Flutter e boas práticas de engenharia de software, seguindo princípios de arquitetura em camadas, TDD e garantindo qualidade e manutenibilidade do código](#desenvolvido-com-typescript-flutter-e-boas-práticas-de-engenharia-de-software-seguindo-princípios-de-arquitetura-em-camadas-tdd-e-garantindo-qualidade-e-manutenibilidade-do-código)
 
 ---
 
@@ -58,7 +63,7 @@ Elimina a necessidade de receitas físicas, reduz erros de prescrição, facilit
 
 ### Backend
 
-- **Node.js** + **TypeScript**
+- **Node.js 22 LTS** + **TypeScript**
 - **Express.js**
 - **Prisma ORM** + **PostgreSQL**
 - **jose** (validação JWT/JWKS)
@@ -79,6 +84,7 @@ Elimina a necessidade de receitas físicas, reduz erros de prescrição, facilit
 - **Type Safety end-to-end**
 - **Migrations versionadas com Prisma**
 - **Separação de responsabilidades em camadas**
+- **GitHub Actions** (CI/CD automatizado)
 
 ---
 
@@ -127,10 +133,75 @@ Enums utilizados:
 
 ---
 
+## ⚙️ CI/CD Pipeline
+
+O projeto utiliza **GitHub Actions** para automatizar a validação, sincronização do banco e deploy de funções a cada push na branch `develop`.
+
+## 📝 Padrão de Commits
+
+Este projeto segue o padrão **Conventional Commits** combinado com a referência `AB#<número>` do **Azure DevOps**, que cria vínculo automático entre o commit e o Work Item no Azure Boards.
+
+### Formato: `<tipo>(escopo): <descrição resumida> AB#<número-da-task>`
+
+### Tipos aceitos
+
+| Tipo       | Quando usar                                             |
+| ---------- | ------------------------------------------------------- |
+| `feat`     | Nova funcionalidade para o usuário                      |
+| `fix`      | Correção de bug                                         |
+| `ci`       | Mudanças em arquivos de CI/CD (`.github/`, pipelines)   |
+| `chore`    | Tarefas de manutenção que não afetam código de produção |
+| `docs`     | Alterações apenas em documentação                       |
+| `test`     | Adição ou correção de testes                            |
+| `refactor` | Refatoração sem mudança de comportamento                |
+| `perf`     | Melhoria de performance                                 |
+
+### Exemplos
+
+```bash
+# Nova funcionalidade
+feat(prescription): adicionar endpoint de cancelamento de receita AB#90
+
+# Correção de bug
+fix(auth): corrigir validação de JWT expirado AB#91
+
+# CI/CD — feature nova no pipeline
+ci: implementar sincronização Prisma e deploy de Edge Functions AB#86
+
+# CI/CD — correção no pipeline
+fix(ci): corrigir indentação dos jobs no workflow AB#86
+
+# Documentação
+docs: atualizar README com seção de CI/CD e padrão de commits AB#87
+```
+
+### Jobs executados em sequência
+
+| Job                            | Responsabilidade                                     | Gatilho                                          |
+| ------------------------------ | ---------------------------------------------------- | ------------------------------------------------ |
+| **Configurar Ambiente**        | Instala Node.js 22 e Supabase CLI                    | `push` e `pull_request`                          |
+| **Sincronizar Banco de Dados** | Executa `npx prisma db push` contra o banco Supabase | Apenas `push`                                    |
+| **Deploy Edge Functions**      | Executa `supabase functions deploy`                  | Apenas `push` (se `supabase/functions/` existir) |
+
+### Segurança
+
+Todas as credenciais são injetadas via **GitHub Secrets** — nenhuma é exposta no código-fonte:
+
+| Secret                  | Uso                                                    |
+| ----------------------- | ------------------------------------------------------ |
+| `DATABASE_URL`          | Conexão direta com o banco (porta 5432, sem PgBouncer) |
+| `SUPABASE_ACCESS_TOKEN` | Autenticação no Supabase CLI                           |
+| `SUPABASE_PROJECT_ID`   | Referência do projeto Supabase                         |
+
+---
+
 ## 📂 Estrutura do Projeto
 
 ```text
 e-receitasus/
+├── .github/
+│   └── workflows/
+│       └── main.yml          # Pipeline de CI/CD
 ├── backend/
 │   ├── src/
 │   │   ├── controllers/
@@ -160,7 +231,7 @@ e-receitasus/
 
 ### Pré-requisitos
 
-- Node.js 18+
+- Node.js 22+
 - PostgreSQL 14+
 - Flutter SDK 3.4+
 
@@ -225,20 +296,25 @@ flutter test
 ## 🎓 Contexto Acadêmico
 
 **Disciplina:** Hands On Work IX  
+**Professor:** Mestre [LinkedIn: Professor Ewerton Eyre](https://www.linkedin.com/in/ewertoneyre/)  
 **Curso:** Análise e Desenvolvimento de Sistemas  
 **Instituição:** UNIVALI – Universidade do Vale do Itajaí  
 **Desenvolvedor:** Lucas Elias Dickmann
 
 ---
 
-## Aluno e Desenvolvedor
+## 👨‍💻 Aluno e Desenvolvedor
 
-**Desenvolvedor:** Lucas Elias Dickmann  
-**LinkedIn:** [Lucas E. Dickmann](https://linkedin.com/in/lucasdickmann)  
-**GitHub:** [ldickmann](https://github.com/ldickmann)  
-**E-mail:** [Lucas E. Dickmann](mailto:ldickmann12@gmail.com)  
-**E-mail Acadêmico:** [Lucas E. Dickmann](mailto:lucas.8315540@edu.univali.br)
+Lucas Elias Dickmann
+
+[![LinkedIn](https://img.shields.io/badge/LinkedIn-lucasdickmann-blue?logo=linkedin)](https://linkedin.com/in/lucasdickmann)
+
+[![GitHub](https://img.shields.io/badge/GitHub-ldickmann-black?logo=github)](https://github.com/ldickmann)
+
+[![E-mail](https://img.shields.io/badge/E--mail-ldickmann12%40gmail.com-red?logo=gmail)](mailto:ldickmann12@gmail.com)
+
+[![E-mail Acadêmico](https://img.shields.io/badge/E--mail%20Acad%C3%AAmico-lucas.8315540%40edu.univali.br-red?logo=gmail)](mailto:lucas.8315540@edu.univali.br)
 
 ---
 
-### Desenvolvido com TypeScript, Flutter e boas práticas de engenharia de software, seguindo princípios de arquitetura em camadas, TDD e garantindo qualidade e manutenibilidade do código. O projeto é uma solução completa para digitalização de prescrições médicas, com foco em segurança, usabilidade e escalabilidade
+### Desenvolvido com TypeScript, Flutter e boas práticas de engenharia de software, seguindo princípios de arquitetura em camadas, TDD e garantindo qualidade e manutenibilidade do código

@@ -3,19 +3,16 @@ import request from 'supertest';
 import { PrescriptionStatus } from '@prisma/client';
 import { prisma } from '../src/utils/prismaClient.js';
 
-/**
- * Mock da validacao JWT para simular identidades autenticadas.
- */
-const jwtVerifyMock = jest.fn();
+const jwtVerifyMock = jest.fn<
+  (token: unknown, key: unknown, options?: unknown) => Promise<{ payload: { sub: string; aud: string } }>
+>();
 
-jest.unstable_mockModule('jose', async () => {
-  const actual = await import('jose');
-  return {
-    ...actual,
-    jwtVerify: jwtVerifyMock,
-  };
-});
+jest.unstable_mockModule('jose', async () => ({
+  createRemoteJWKSet: jest.fn(() => ({})),
+  jwtVerify: jwtVerifyMock,
+}));
 
+// Dynamic import APÓS o mock para garantir que app.ts já resolve jose mockado
 const { app } = await import('../src/app.js');
 
 describe('Prescription List - GET /prescriptions/my', () => {
@@ -101,50 +98,27 @@ describe('Prescription List - GET /prescriptions/my', () => {
 
     jwtVerifyMock.mockImplementation(async (token: unknown) => {
       if (token === tokenPaciente) {
-        return {
-          payload: {
-            sub: paciente.id,
-            aud: 'authenticated',
-          },
-        };
+        return { payload: { sub: paciente.id, aud: 'authenticated' } };
       }
-
       if (token === tokenOutroPaciente) {
-        return {
-          payload: {
-            sub: outroPaciente.id,
-            aud: 'authenticated',
-          },
-        };
+        return { payload: { sub: outroPaciente.id, aud: 'authenticated' } };
       }
-
       throw new Error('invalid token');
     });
   });
 
-  /**
-   * Sem token deve retornar 401.
-   */
   it('deve retornar 401 sem autenticacao', async () => {
     const response = await request(app).get('/prescriptions/my');
-
     expect(response.status).toBe(401);
   });
 
-  /**
-   * Token invalido deve retornar 403.
-   */
   it('deve retornar 403 com token invalido', async () => {
     const response = await request(app)
       .get('/prescriptions/my')
       .set('Authorization', 'Bearer token-invalido');
-
     expect(response.status).toBe(403);
   });
 
-  /**
-   * Deve listar apenas receitas do paciente autenticado.
-   */
   it('deve listar receitas do usuario autenticado', async () => {
     const response = await request(app)
       .get('/prescriptions/my')
@@ -154,9 +128,6 @@ describe('Prescription List - GET /prescriptions/my', () => {
     expect(response.body.count).toBe(3);
   });
 
-  /**
-   * Deve filtrar por status.
-   */
   it('deve filtrar por status ACTIVE', async () => {
     const response = await request(app)
       .get('/prescriptions/my?status=ACTIVE')
@@ -166,9 +137,6 @@ describe('Prescription List - GET /prescriptions/my', () => {
     expect(response.body.count).toBe(2);
   });
 
-  /**
-   * Status invalido deve retornar 400.
-   */
   it('deve retornar 400 para status invalido', async () => {
     const response = await request(app)
       .get('/prescriptions/my?status=INVALID')
@@ -177,9 +145,6 @@ describe('Prescription List - GET /prescriptions/my', () => {
     expect(response.status).toBe(400);
   });
 
-  /**
-   * Deve obter receita propria por ID.
-   */
   it('deve buscar receita especifica do proprio paciente', async () => {
     const response = await request(app)
       .get('/prescriptions/' + ownPrescriptionId)
@@ -189,9 +154,6 @@ describe('Prescription List - GET /prescriptions/my', () => {
     expect(response.body.data.id).toBe(ownPrescriptionId);
   });
 
-  /**
-   * Deve bloquear acesso a receita de outro paciente.
-   */
   it('deve retornar 403 ao acessar receita de outro usuario', async () => {
     const response = await request(app)
       .get('/prescriptions/' + foreignPrescriptionId)
@@ -200,9 +162,6 @@ describe('Prescription List - GET /prescriptions/my', () => {
     expect(response.status).toBe(403);
   });
 
-  /**
-   * Deve retornar 404 para ID inexistente.
-   */
   it('deve retornar 404 para receita inexistente', async () => {
     const response = await request(app)
       .get('/prescriptions/00000000-0000-0000-0000-000000000000')
