@@ -3,20 +3,22 @@ import request from 'supertest';
 import { prisma } from '../src/utils/prismaClient.js';
 
 /**
- * Mock da funcao jwtVerify do pacote jose.
- * Isso permite simular tokens validos/invalidos sem depender da chave privada real.
+ * jest.mock é hoistado automaticamente antes dos requires.
+ * Usa jest.requireActual para preservar o restante do módulo jose intacto.
  */
-const jwtVerifyMock = jest.fn<(token: string, key: unknown) => Promise<{ payload: Record<string, unknown> }>>();
-
-jest.unstable_mockModule('jose', async () => {
-  const actual = await import('jose');
+jest.mock('jose', () => {
+  const actual = jest.requireActual<typeof import('jose')>('jose');
   return {
     ...actual,
-    jwtVerify: jwtVerifyMock,
+    jwtVerify: jest.fn(),
   };
 });
 
-const { app } = await import('../src/app.js');
+import { app } from '../src/app.js';
+import { jwtVerify } from 'jose';
+
+/** Referência tipada ao mock — aponta para o jest.fn() criado na factory acima. */
+const jwtVerifyMock = jest.mocked(jwtVerify);
 
 /**
  * Configura mock de token valido para um usuario especifico.
@@ -29,7 +31,7 @@ function mockValidToken(userId: string): void {
       sub: userId,
       aud: 'authenticated',
     },
-  });
+  } as any);
 }
 
 describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
@@ -58,9 +60,6 @@ describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
     jwtVerifyMock.mockReset();
   });
 
-  /**
-   * Deve permitir acesso ao perfil com token valido.
-   */
   it('deve retornar 200 no GET /user/me com token valido', async () => {
     mockValidToken(user.id);
 
@@ -73,9 +72,6 @@ describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
     expect(response.body.email).toBe(user.email);
   });
 
-  /**
-   * Deve bloquear sem token.
-   */
   it('deve retornar 401 sem Authorization', async () => {
     const response = await request(app).get('/user/me');
 
@@ -83,9 +79,6 @@ describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
     expect(String(response.body.message)).toContain('Token');
   });
 
-  /**
-   * Deve bloquear token invalido.
-   */
   it('deve retornar 403 quando assinatura for invalida', async () => {
     jwtVerifyMock.mockRejectedValueOnce(new Error('invalid signature'));
 
@@ -96,9 +89,6 @@ describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
     expect(response.status).toBe(403);
   });
 
-  /**
-   * Endpoints legados devem permanecer desativados com 410.
-   */
   it('deve retornar 410 no POST /auth/login', async () => {
     const response = await request(app).post('/auth/login').send({
       email: 'qualquer@sus.gov.br',
