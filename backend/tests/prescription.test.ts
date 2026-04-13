@@ -3,12 +3,9 @@ import request from 'supertest';
 import { PrescriptionStatus } from '@prisma/client';
 import { prisma } from '../src/utils/prismaClient.js';
 
-/**
- * Mock do módulo jose via jest.unstable_mockModule (padrão ESM).
- * Deve ser declarado ANTES do dynamic import do app para garantir
- * que o middleware carregue o mock e não o módulo real.
- */
-const jwtVerifyMock = jest.fn();
+const jwtVerifyMock = jest.fn<
+  (token: unknown, key: unknown, options?: unknown) => Promise<{ payload: { sub: string; aud: string } }>
+>();
 
 jest.unstable_mockModule('jose', async () => ({
   createRemoteJWKSet: jest.fn(() => ({})),

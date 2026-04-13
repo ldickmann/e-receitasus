@@ -2,15 +2,9 @@ import { jest } from '@jest/globals';
 import request from 'supertest';
 import { prisma } from '../src/utils/prismaClient.js';
 
-/**
- * Mock do módulo jose via jest.unstable_mockModule (padrão ESM).
- * Deve ser declarado ANTES do dynamic import do app para garantir
- * que o middleware carregue o mock e não o módulo real.
- *
- * jwtVerifyMock é declarado fora do factory para poder ser
- * referenciado nos helpers e nos beforeEach dos testes.
- */
-const jwtVerifyMock = jest.fn();
+const jwtVerifyMock = jest.fn<
+  (token: unknown, key: unknown, options?: unknown) => Promise<{ payload: { sub: string; aud: string } }>
+>();
 
 jest.unstable_mockModule('jose', async () => ({
   createRemoteJWKSet: jest.fn(() => ({})),
