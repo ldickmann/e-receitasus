@@ -75,16 +75,13 @@ jobs:
           --health-retries 5
 
     steps:
-      # Faz o download do código-fonte para o runner
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Node 22 LTS: alinhado com a versão usada em desenvolvimento
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          # Cache invalidado automaticamente quando package-lock.json muda
           cache: "npm"
           cache-dependency-path: backend/package-lock.json
 
@@ -94,10 +91,18 @@ jobs:
         run: npm ci
         working-directory: ./backend
 
+      # CORREÇÃO: prisma generate deve rodar ANTES do db push.
+      # Gera os arquivos em node_modules/.prisma/client/ que o Jest
+      # precisa para resolver o módulo @prisma/client nos testes.
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+        working-directory: ./backend
+        env:
+          DATABASE_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
+          DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
+
       # Aplica o schema.prisma no banco temporário do CI.
       # Cria todas as tabelas antes dos testes rodarem.
-      # DATABASE_URL e DIRECT_URL apontam para o mesmo service container
-      # pois não há PgBouncer envolvido — conexão direta ao PostgreSQL.
       - name: Aplicar Schema no Banco de CI (db push)
         run: npx prisma db push
         working-directory: ./backend
@@ -106,16 +111,11 @@ jobs:
           DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
 
       # Executa a suíte completa de testes de integração.
-      # Os testes fazem operações reais no banco do service container,
-      # garantindo que a lógica de negócio funciona end-to-end.
-      # O pipeline falhará aqui se qualquer teste retornar erro,
-      # impedindo o merge do código problemático.
       - name: Executar Testes de Integração (npm test)
         run: npm test
         working-directory: ./backend
         env:
           NODE_OPTIONS: "--experimental-vm-modules"
-          # Aponta para o PostgreSQL do service container, não para produção
           DATABASE_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
           DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
           # Necessária para o jwt.util.ts não lançar AuthConfigurationError.
@@ -138,13 +138,14 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # Action oficial do Flutter: instala o SDK na versão estável mais recente.
-      # 'stable' garante alinhamento com a versão usada em desenvolvimento.
+      # CORREÇÃO: usar 'channel: stable' em vez de 'flutter-version: stable'.
+      # 'stable' é um canal de distribuição, não um número de versão.
+      # A action subosito/flutter-action@v2 exige o parâmetro correto
+      # para identificar qual SDK instalar.
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
         with:
-          flutter-version: "stable"
-          # Cache do Flutter SDK para acelerar execuções futuras
+          channel: "stable"
           cache: true
 
       # Instala todos os pacotes declarados no pubspec.yaml,
@@ -153,9 +154,7 @@ jobs:
         run: flutter pub get
         working-directory: ./frontend
 
-      # Executa todos os arquivos *_test.dart encontrados em test/.
-      # --reporter=expanded: exibe o nome de cada teste individualmente
-      # no log, facilitando a identificação de falhas.
+      # --reporter=expanded: exibe cada teste individualmente no log
       - name: Executar Testes Unitários (flutter test)
         run: flutter test --reporter=expanded
         working-directory: ./frontend
