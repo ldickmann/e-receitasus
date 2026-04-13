@@ -17,6 +17,17 @@ on:
   pull_request:
     branches: [develop]
 
+# ─────────────────────────────────────────────────────────────
+# VARIÁVEIS DE AMBIENTE GLOBAIS DO PIPELINE
+# FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: antecipa a migração obrigatória
+# para Node.js 24 (obrigatória a partir de junho de 2026 pelo GitHub).
+# Garante compatibilidade futura das actions: checkout, setup-node
+# e supabase/setup-cli sem necessidade de atualizar versões manualmente.
+# Ref: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+# ─────────────────────────────────────────────────────────────
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   # ─────────────────────────────────────────────────────────────
   # JOB 1: CONFIGURAR AMBIENTE
