@@ -110,20 +110,14 @@ jobs:
           DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
 
       # Executa a suíte completa de testes de integração.
-      # CORREÇÃO OOM: --runInBand força execução serial dos testes no mesmo
-      # processo Node.js, reduzindo uso de memória drasticamente.
-      # --max-old-space-size=512 limita o heap do Node a 512MB,
-      # evitando que o runner de CI (7GB compartilhados) seja esgotado
-      # pelo ts-jest + vm-modules que são pesados em memória.
+      # @swc/jest compila TypeScript via Rust sem criar contextos V8 por módulo,
+      # eliminando o consumo excessivo de heap que causava OOM com ts-jest.
       - name: Executar Testes de Integração (npm test)
-        run: npm test -- --runInBand
+        run: npm test
         working-directory: ./backend
         env:
-          NODE_OPTIONS: "--experimental-vm-modules --max-old-space-size=512"
           DATABASE_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
           DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
-          # Necessária para o jwt.util.ts não lançar AuthConfigurationError.
-          # Não precisa ser real pois jwtVerify é completamente mockado nos testes.
           SUPABASE_URL: "https://placeholder.supabase.co"
 
   # ─────────────────────────────────────────────────────────────
