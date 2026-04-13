@@ -91,7 +91,6 @@ jobs:
         run: npm ci
         working-directory: ./backend
 
-      # CORREÇÃO: prisma generate deve rodar ANTES do db push.
       # Gera os arquivos em node_modules/.prisma/client/ que o Jest
       # precisa para resolver o módulo @prisma/client nos testes.
       - name: Gerar Prisma Client
@@ -111,11 +110,16 @@ jobs:
           DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
 
       # Executa a suíte completa de testes de integração.
+      # CORREÇÃO OOM: --runInBand força execução serial dos testes no mesmo
+      # processo Node.js, reduzindo uso de memória drasticamente.
+      # --max-old-space-size=512 limita o heap do Node a 512MB,
+      # evitando que o runner de CI (7GB compartilhados) seja esgotado
+      # pelo ts-jest + vm-modules que são pesados em memória.
       - name: Executar Testes de Integração (npm test)
-        run: npm test
+        run: npm test -- --runInBand
         working-directory: ./backend
         env:
-          NODE_OPTIONS: "--experimental-vm-modules"
+          NODE_OPTIONS: "--experimental-vm-modules --max-old-space-size=512"
           DATABASE_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
           DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
           # Necessária para o jwt.util.ts não lançar AuthConfigurationError.
@@ -138,10 +142,8 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # CORREÇÃO: usar 'channel: stable' em vez de 'flutter-version: stable'.
-      # 'stable' é um canal de distribuição, não um número de versão.
-      # A action subosito/flutter-action@v2 exige o parâmetro correto
-      # para identificar qual SDK instalar.
+      # 'channel: stable' instala a versão estável mais recente do Flutter SDK.
+      # Parâmetro correto da subosito/flutter-action@v2 para canal de distribuição.
       - name: Setup Flutter SDK
         uses: subosito/flutter-action@v2
         with:
