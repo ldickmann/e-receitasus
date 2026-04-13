@@ -27,6 +27,10 @@ Elimina a necessidade de receitas físicas, reduz erros de prescrição, facilit
   - [🔐 Autenticação](#-autenticação)
   - [🧩 Modelagem de Dados](#-modelagem-de-dados)
   - [⚙️ CI/CD Pipeline](#️-cicd-pipeline)
+  - [📝 Padrão de Commits](#-padrão-de-commits)
+    - [Formato: `<tipo>(escopo): <descrição resumida> AB#<número-da-task>`](#formato-tipoescopo-descrição-resumida-abnúmero-da-task)
+    - [Tipos aceitos](#tipos-aceitos)
+    - [Exemplos](#exemplos)
     - [Jobs executados em sequência](#jobs-executados-em-sequência)
     - [Segurança](#segurança)
   - [📂 Estrutura do Projeto](#-estrutura-do-projeto)
@@ -132,6 +136,44 @@ Enums utilizados:
 ## ⚙️ CI/CD Pipeline
 
 O projeto utiliza **GitHub Actions** para automatizar a validação, sincronização do banco e deploy de funções a cada push na branch `develop`.
+
+## 📝 Padrão de Commits
+
+Este projeto segue o padrão **Conventional Commits** combinado com a referência `AB#<número>` do **Azure DevOps**, que cria vínculo automático entre o commit e o Work Item no Azure Boards.
+
+### Formato: `<tipo>(escopo): <descrição resumida> AB#<número-da-task>`
+
+### Tipos aceitos
+
+| Tipo       | Quando usar                                             |
+| ---------- | ------------------------------------------------------- |
+| `feat`     | Nova funcionalidade para o usuário                      |
+| `fix`      | Correção de bug                                         |
+| `ci`       | Mudanças em arquivos de CI/CD (`.github/`, pipelines)   |
+| `chore`    | Tarefas de manutenção que não afetam código de produção |
+| `docs`     | Alterações apenas em documentação                       |
+| `test`     | Adição ou correção de testes                            |
+| `refactor` | Refatoração sem mudança de comportamento                |
+| `perf`     | Melhoria de performance                                 |
+
+### Exemplos
+
+```bash
+# Nova funcionalidade
+feat(prescription): adicionar endpoint de cancelamento de receita AB#90
+
+# Correção de bug
+fix(auth): corrigir validação de JWT expirado AB#91
+
+# CI/CD — feature nova no pipeline
+ci: implementar sincronização Prisma e deploy de Edge Functions AB#86
+
+# CI/CD — correção no pipeline
+fix(ci): corrigir indentação dos jobs no workflow AB#86
+
+# Documentação
+docs: atualizar README com seção de CI/CD e padrão de commits AB#87
+```
 
 ### Jobs executados em sequência
 
