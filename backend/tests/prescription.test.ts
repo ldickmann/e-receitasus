@@ -7,13 +7,12 @@ import { prisma } from '../src/utils/prismaClient.js';
  * jest.mock é hoistado automaticamente antes dos requires.
  * Usa jest.requireActual para preservar o restante do módulo jose intacto.
  */
-jest.mock('jose', () => {
-  const actual = jest.requireActual<typeof import('jose')>('jose');
-  return {
-    ...actual,
-    jwtVerify: jest.fn(),
-  };
-});
+jest.mock('jose', () => ({
+  // Retorna placeholder — jwtVerify é completamente mockado nos testes,
+  // portanto o argumento de key nunca é usado de verdade.
+  createRemoteJWKSet: jest.fn(() => ({})),
+  jwtVerify: jest.fn(),
+}));
 
 import { app } from '../src/app.js';
 import { jwtVerify } from 'jose';
