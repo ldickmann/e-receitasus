@@ -1,11 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/prescription_service.dart'; // Importação do novo serviço
 import 'history_screen.dart';
 
+/// Tela Inicial do Paciente
+///
+/// Refatorada para a Etapa 2 para suportar sincronismo em tempo real
+/// com o banco de dados Supabase.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
+  /// Encerra a sessão e redireciona para o login
   Future<void> _handleLogout(BuildContext context) async {
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     await authProvider.logout();
@@ -15,11 +21,11 @@ class HomeScreen extends StatelessWidget {
   }
 
   void _handleSolicitation() {
-    print('Ação de Solicitar Receita');
+    debugPrint('Ação de Solicitar Receita acionada');
   }
 
   void _handleTrack() {
-    print('Ação de Rastrear Receita');
+    debugPrint('Ação de Rastrear Receita acionada');
   }
 
   void _handleHistory(BuildContext context) {
@@ -32,103 +38,153 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
-    final userName = authProvider.user?.name ?? 'Usuário';
+    final userName = authProvider.user?.name ?? 'Usuário SUS';
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('E-ReceitaSUS - Área do Paciente'),
-        backgroundColor: Colors.blueAccent,
+        // Mantendo consistência visual com o tema definido no main.dart
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () => _handleLogout(context),
+            tooltip: 'Sair do aplicativo',
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            // Card de Boas-Vindas
-            Card(
-              elevation: 4,
-              child: Padding(
-                padding: const EdgeInsets.all(20.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Bem-vindo(a), $userName!',
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
+      body: RefreshIndicator(
+        // Adicionada funcionalidade de "puxar para atualizar"
+        onRefresh: () async => debugPrint('Atualizando dados...'),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16.0),
+          physics: const AlwaysScrollableScrollPhysics(),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              // Card de Boas-Vindas Dinâmico
+              Card(
+                elevation: 4,
+                child: Padding(
+                  padding: const EdgeInsets.all(20.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Bem-vindo(a), $userName!',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Use a opção abaixo para solicitar ou rastrear sua receita.',
-                    ),
-                  ],
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Acompanhe abaixo suas prescrições digitais em tempo real.',
+                      ),
+                    ],
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 20),
 
-            // Módulo 1: Solicitação Remota
-            ElevatedButton.icon(
-              onPressed: _handleSolicitation,
-              icon: const Icon(Icons.medical_services_outlined, size: 24),
-              label: const Text(
-                'Solicitar Revalidação de Receita',
-                style: TextStyle(fontSize: 16),
+              // Ações Principais
+              ElevatedButton.icon(
+                onPressed: _handleSolicitation,
+                icon: const Icon(Icons.medical_services_outlined, size: 24),
+                label: const Text('Solicitar Revalidação'),
               ),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 15),
-              ),
-            ),
-            const SizedBox(height: 10),
+              const SizedBox(height: 10),
 
-            // Módulo 2: Rastreabilidade
-            OutlinedButton.icon(
-              onPressed: _handleTrack,
-              icon: const Icon(Icons.track_changes),
-              label: const Text('Rastrear Status do Pedido'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 15),
+              OutlinedButton.icon(
+                onPressed: _handleTrack,
+                icon: const Icon(Icons.track_changes),
+                label: const Text('Rastrear Status do Pedido'),
               ),
-            ),
-            const SizedBox(height: 30),
+              const SizedBox(height: 30),
 
-            // Módulo 3: Histórico
-            const Text(
-              'Histórico',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 10),
-
-            OutlinedButton.icon(
-              onPressed: () => _handleHistory(context),
-              icon: const Icon(Icons.history),
-              label: const Text('Ver Histórico Completo'),
-              style: OutlinedButton.styleFrom(
-                padding: const EdgeInsets.symmetric(vertical: 15),
+              // Seção de Prescrições Ativas (Real-time)
+              const Text(
+                'Prescrições Recentes',
+                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
               ),
-            ),
+              const SizedBox(height: 10),
 
-            // Placeholder
-            const Center(
-              child: Padding(
-                padding: EdgeInsets.all(30.0),
-                child: Text(
-                  'Nenhum histórico encontrado. Solicite sua primeira receita!',
-                  textAlign: TextAlign.center,
-                ),
+              // IMPLEMENTAÇÃO DO STREAMBUILDER (Ponto Crítico da Etapa 2)
+              // Substitui o antigo Placeholder estático
+              StreamBuilder<List<Map<String, dynamic>>>(
+                stream: PrescriptionService().streamPrescriptions(),
+                builder: (context, snapshot) {
+                  // Estado de Carregamento
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(20.0),
+                        child: CircularProgressIndicator(),
+                      ),
+                    );
+                  }
+
+                  // Estado de Erro
+                  if (snapshot.hasError) {
+                    return const Center(
+                      child: Text('Erro ao carregar dados da nuvem.'),
+                    );
+                  }
+
+                  // Estado Vazio (Sem receitas no banco)
+                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(30.0),
+                        child: Text(
+                          'Nenhuma receita encontrada no sistema.\nSolicite sua primeira prescrição digital!',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: Colors.grey),
+                        ),
+                      ),
+                    );
+                  }
+
+                  // Lista de Receitas Reais
+                  final list = snapshot.data!;
+                  return ListView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: list.length,
+                    itemBuilder: (context, index) {
+                      final item = list[index];
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 10),
+                        child: ListTile(
+                          leading: const CircleAvatar(
+                            backgroundColor: Color(0xFF4CAF50),
+                            child: Icon(Icons.medication, color: Colors.white),
+                          ),
+                          title: Text(
+                            item['medicine'] ?? 'Medicamento',
+                            style: const TextStyle(fontWeight: FontWeight.bold),
+                          ),
+                          subtitle:
+                              Text('Médico: ${item['doctorName'] ?? 'N/A'}'),
+                          trailing:
+                              const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () =>
+                              debugPrint('Detalhes da receita: ${item['id']}'),
+                        ),
+                      );
+                    },
+                  );
+                },
               ),
-            ),
-          ],
+
+              const SizedBox(height: 20),
+
+              TextButton.icon(
+                onPressed: () => _handleHistory(context),
+                icon: const Icon(Icons.history),
+                label: const Text('Acessar Histórico Completo'),
+              ),
+            ],
+          ),
         ),
       ),
     );

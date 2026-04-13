@@ -1,23 +1,21 @@
 /**
- * Configuração do Jest para TypeScript com ES Modules
+ * Configuração do Jest para TypeScript com @swc/jest
  *
  * Este arquivo usa CommonJS (.cjs) para compatibilidade com Jest,
- * enquanto o projeto principal usa ES Modules (type: "module" no package.json)
+ * enquanto o projeto principal usa ES Modules (type: "module" no package.json).
+ *
+ * O @swc/jest substitui o ts-jest como transformador. Por ser escrito em Rust,
+ * consome muito menos memória (~70-80% menos heap) e não requer
+ * --experimental-vm-modules, resolvendo o OOM em ambientes de CI.
  *
  * @see https://jestjs.io/docs/configuration
- * @see https://kulshekhar.github.io/ts-jest/docs/getting-started/presets
+ * @see https://swc.rs/docs/usage/jest
  */
 
 module.exports = {
   // ============================================================
-  // PRESET E AMBIENTE
+  // AMBIENTE
   // ============================================================
-
-  /**
-   * Preset do ts-jest otimizado para ES Modules
-   * Configura automaticamente o Jest para trabalhar com TypeScript e ESM
-   */
-  preset: "ts-jest/presets/default-esm",
 
   /**
    * Ambiente de execução dos testes
@@ -37,7 +35,6 @@ module.exports = {
 
   /**
    * Timeout máximo para cada teste individual (em ms)
-   * Ajuste conforme necessidade dos testes (ex: testes E2E podem precisar de mais tempo)
    */
   testTimeout: 10000,
 
@@ -62,59 +59,32 @@ module.exports = {
   resetModules: true,
 
   // ============================================================
-  // ES MODULES
-  // ============================================================
-
-  /**
-   * Extensões de arquivo que devem ser tratadas como ES Modules
-   * Necessário para que o Jest processe imports/exports corretamente
-   */
-  extensionsToTreatAsEsm: [".ts"],
-
-  // ============================================================
   // TRANSFORMAÇÃO DE CÓDIGO
   // ============================================================
 
   /**
-   * Configuração do ts-jest para transpilar TypeScript
+   * Configuração do @swc/jest para transpilar TypeScript para CommonJS.
    *
-   * IMPORTANTE: A configuração foi movida para dentro do array
-   * ao invés de usar 'globals' (depreciado desde ts-jest v29)
+   * Diferente do ts-jest com vm modules, o SWC compila diretamente para CJS
+   * sem criar contextos V8 isolados por módulo — eliminando o consumo excessivo
+   * de memória que causava OOM no CI.
    */
+  extensionsToTreatAsEsm: [".ts"],
+
   transform: {
-    "^.+\\.tsx?$": [
-      "ts-jest",
+    "^.+\\.(t|j)sx?$": [
+      "@swc/jest",
       {
-        // Habilita suporte a ES Modules
-        useESM: true,
-
-        // Configurações do TypeScript para compilação dos testes
-        tsconfig: {
-          // Usa ES Modules ao invés de CommonJS
-          module: "ESNext",
-
-          // Resolução de módulos no estilo Node
-          moduleResolution: "node",
-
-          // Permite importações default de módulos CommonJS
-          esModuleInterop: true,
-
-          // Permite imports sintéticos (compatibilidade)
-          allowSyntheticDefaultImports: true,
-
-          // Permite JavaScript nos arquivos de teste
-          allowJs: true,
-
-          // Tipo de saída do compilador
-          outDir: "./dist",
-
-          // Diretório raiz dos arquivos TypeScript
-          rootDir: "./",
+        jsc: {
+          parser: {
+            syntax: "typescript",
+            decorators: true,
+          },
+          target: "es2020",
         },
-
-        // Desabilita verificação de tipos para acelerar testes
-        // (use 'tsc --noEmit' em CI para validação de tipos)
-        isolatedModules: true,
+        module: {
+          type: "es6", // ← era "commonjs", causa raiz do problema
+        },
       },
     ],
   },
@@ -124,15 +94,15 @@ module.exports = {
   // ============================================================
 
   /**
-   * Resolve problemas com extensões .js em imports TypeScript
-   * e garante que o Prisma Client seja encontrado corretamente
+   * Resolve problemas com extensões .js em imports TypeScript (padrão NodeNext)
+   * e garante que o Prisma Client seja encontrado corretamente.
    *
    * Exemplos:
    * - import { User } from './models/user.js' → './models/user'
    * - import { PrismaClient } from '@prisma/client' → node_modules/.prisma/client
    */
   moduleNameMapper: {
-    // Remove extensão .js de imports relativos
+    // Remove extensão .js de imports relativos (convenção TypeScript NodeNext)
     "^(\\.\\.?\\/.+)\\.js$": "$1",
 
     // Mapeia @prisma/client para o client gerado
@@ -144,15 +114,12 @@ module.exports = {
   // ============================================================
 
   /**
-   * Padrões de arquivos/pastas a serem ignorados na transformação
+   * Padrões de arquivos/pastas a serem ignorados na transformação.
    *
-   * Por padrão, node_modules é ignorado, MAS precisamos processar:
-   * - .prisma/ (Prisma Client gerado)
-   * - @prisma/ (pacotes do Prisma)
-   *
-   * Regex negativo: ignora tudo EXCETO esses padrões
+   * Regex negativo: ignora tudo EXCETO os pacotes do Prisma,
+   * que precisam ser processados pelo SWC.
    */
-  transformIgnorePatterns: ["node_modules/(?!(\\.prisma|@prisma)/)"],
+  transformIgnorePatterns: ["node_modules/(?!(\\.prisma|@prisma|jose)/)"],
 
   /**
    * Pastas a serem ignoradas completamente pelo Jest
@@ -184,10 +151,6 @@ module.exports = {
    */
   coverageReporters: ["text", "text-summary", "html", "lcov"],
 
-  /**
-   * Limites mínimos de cobertura (opcional)
-   * Descomente para forçar cobertura mínima em CI
-   */
   // coverageThreshold: {
   //   global: {
   //     branches: 80,
@@ -203,25 +166,22 @@ module.exports = {
 
   /**
    * Força o Jest a sair após todos os testes
-   * Útil quando há handles abertos (conexões de DB, timers, etc.)
    */
   forceExit: false,
 
   /**
    * Detecta handles abertos (conexões, timers) que impedem o Jest de finalizar
-   * Use com --detectOpenHandles no CLI para depuração
    */
   detectOpenHandles: true,
 
   /**
-   * Máximo de workers paralelos
-   * "50%" = usa metade dos cores da CPU
+   * Máximo de workers paralelos.
+   * Com @swc/jest o consumo de memória é baixo, então paralelismo é seguro.
    */
   maxWorkers: "50%",
 
   /**
    * Modo de exibição dos resultados
-   * "verbose" mostra cada teste individual
    */
   verbose: true,
 
@@ -229,26 +189,8 @@ module.exports = {
   // SETUP/TEARDOWN
   // ============================================================
 
-  /**
-   * Arquivos executados ANTES de todos os testes
-   * Útil para configurar variáveis de ambiente, mocks globais, etc.
-   */
   // setupFiles: ["<rootDir>/tests/setup.ts"],
-
-  /**
-   * Arquivos executados APÓS configurar o ambiente de teste
-   * Útil para configurar bibliotecas de teste (jest-extended, etc.)
-   */
   // setupFilesAfterEnv: ["<rootDir>/tests/setupAfterEnv.ts"],
-
-  /**
-   * Arquivo executado ANTES de cada teste
-   */
   // globalSetup: "<rootDir>/tests/globalSetup.ts",
-
-  /**
-   * Arquivo executado APÓS todos os testes
-   * Útil para limpar recursos (fechar DB, etc.)
-   */
   // globalTeardown: "<rootDir>/tests/globalTeardown.ts",
 };

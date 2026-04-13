@@ -1,49 +1,59 @@
-import bcrypt from 'bcrypt';
-import { createUser, findUserByEmail } from '../repositories/user.repository.js';
-import { signToken } from '../utils/jwt.util.js';
+import type { User } from '@prisma/client';
+import { findPublicUserById } from '../repositories/user.repository.js';
 
-const SALT_ROUNDS = 10;
+/**
+ * Erro de servico com status HTTP associado.
+ */
+export class AuthServiceError extends Error {
+  public readonly statusCode: number;
 
-interface RegisterUserPayload {
-  name: string;
-  email: string;
-  password: string;
-  professionalType?: string;
-  professionalId?: string;
-  professionalState?: string;
-  specialty?: string;
+  constructor(message: string, statusCode: number) {
+    super(message);
+    this.name = 'AuthServiceError';
+    this.statusCode = statusCode;
+  }
 }
 
-export const registerUser = async (payload: RegisterUserPayload) => {
-  const { name, email, password, professionalType, professionalId, professionalState, specialty } = payload;
-  
-  const existing = await findUserByEmail(email);
-  if (existing) throw new Error('Email already in use');
+/**
+ * Normaliza e valida userId recebido do middleware.
+ *
+ * @param userId ID vindo do token validado.
+ * @returns ID normalizado.
+ * @throws AuthServiceError quando invalido.
+ */
+function normalizeUserId(userId: string): string {
+  if (typeof userId !== 'string') {
+    throw new AuthServiceError('ID de usuario invalido.', 400);
+  }
 
-  const hash = await bcrypt.hash(password, SALT_ROUNDS);
-  const user = await createUser({ 
-    name, 
-    email, 
-    password: hash,
-    professionalType: professionalType || 'ADMINISTRATIVO',
-    professionalId,
-    professionalState,
-    specialty,
-  });
+  const normalized = userId.trim();
 
-  // remove senha antes de retornar
-  // @ts-ignore
-  const { password: _p, ...rest } = user;
-  return rest;
-};
+  if (normalized.length === 0) {
+    throw new AuthServiceError('ID de usuario vazio.', 400);
+  }
 
-export const loginUser = async ({ email, password }: { email: string; password: string }) => {
-  const user = await findUserByEmail(email);
-  if (!user) throw new Error('Invalid credentials');
+  return normalized;
+}
 
-  const ok = await bcrypt.compare(password, user.password);
-  if (!ok) throw new Error('Invalid credentials');
+/**
+ * Retorna perfil publico do usuario autenticado.
+ * Este servico nao autentica senha e nao emite token.
+ *
+ * @param userId Claim sub injetada no request.
+ * @returns Usuario da tabela publica.
+ * @throws AuthServiceError quando usuario nao estiver espelhado na public.User.
+ */
+export async function getAuthenticatedUserProfile(userId: string): Promise<User> {
+  const normalizedUserId = normalizeUserId(userId);
 
-  const token = signToken({ sub: user.id, email: user.email }, { expiresIn: '7d' } as any);
-  return token;
-};
+  const user = await findPublicUserById(normalizedUserId);
+
+  if (!user) {
+    throw new AuthServiceError(
+      'Usuario autenticado nao encontrado na tabela publica. Verifique a trigger de sincronizacao auth.users -> public.User.',
+      404
+    );
+  }
+
+  return user;
+}

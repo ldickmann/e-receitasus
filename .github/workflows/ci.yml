@@ -1,0 +1,157 @@
+# ============================================================
+# PIPELINE CI — E-ReceitaSUS
+# ============================================================
+# Responsabilidade EXCLUSIVA: Integração Contínua (CI)
+# Valida que nenhum commit introduz regressão nos testes
+# antes de um merge na branch 'develop'.
+#
+# DIFERENÇA em relação ao main.yml (CD):
+#   - ci.yml  → roda testes (backend + frontend) em PRs e pushes
+#   - main.yml → sincroniza banco e deploys (apenas em pushes)
+#
+# JOBS executados em paralelo para maior velocidade:
+#   1. test-backend  → PostgreSQL temporário + Jest
+#   2. test-frontend → Flutter SDK + flutter test
+# ============================================================
+name: E-ReceitaSUS CI
+
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [develop]
+
+# ─────────────────────────────────────────────────────────────
+# VARIÁVEIS DE AMBIENTE GLOBAIS
+# Antecipa a migração obrigatória para Node.js 24 nas actions
+# (obrigatória pelo GitHub a partir de junho de 2026).
+# ─────────────────────────────────────────────────────────────
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  # ─────────────────────────────────────────────────────────────
+  # JOB 1: TESTES DO BACKEND (Node.js + Jest)
+  # Responsabilidade: garantir que todos os testes de integração
+  # do backend passam antes de qualquer merge.
+  #
+  # ESTRATÉGIA DE BANCO:
+  # Os testes fazem operações reais no PostgreSQL (prisma.user.create,
+  # prisma.prescription.deleteMany etc.) via PrismaPg adapter.
+  # Usamos um service container — banco temporário que sobe dentro
+  # do próprio runner e é destruído ao fim do job, garantindo
+  # isolamento total do banco de produção (Supabase).
+  #
+  # SOBRE A SUPABASE_URL:
+  # Os testes definem process.env.SUPABASE_URL no beforeAll apenas
+  # para o jwt.util.ts não lançar AuthConfigurationError no boot.
+  # O jwtVerify é completamente mockado via jest.unstable_mockModule,
+  # portanto nenhuma chamada real ao Supabase é feita.
+  # ─────────────────────────────────────────────────────────────
+  test-backend:
+    name: Testes Backend (Jest)
+    runs-on: ubuntu-latest
+
+    # ─────────────────────────────────────────────────────────
+    # SERVICE CONTAINER: PostgreSQL temporário para os testes.
+    # Sobe automaticamente antes dos steps e é destruído ao fim.
+    # Credenciais são de uso interno do CI — não são segredos reais.
+    # ─────────────────────────────────────────────────────────
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci_user
+          POSTGRES_PASSWORD: ci_password
+          POSTGRES_DB: ci_database
+        ports:
+          - 5432:5432
+        # Aguarda o PostgreSQL estar pronto antes de iniciar os steps.
+        # Sem isso, o prisma db push pode falhar por timing de inicialização.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "npm"
+          cache-dependency-path: backend/package-lock.json
+
+      # npm ci instala exatamente as versões do package-lock.json.
+      # Mais rápido e determinístico que npm install em ambiente de CI.
+      - name: Instalar Dependências do Backend
+        run: npm ci
+        working-directory: ./backend
+
+      # Gera os arquivos em node_modules/.prisma/client/ que o Jest
+      # precisa para resolver o módulo @prisma/client nos testes.
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+        working-directory: ./backend
+        env:
+          DATABASE_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
+          DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
+
+      # Aplica o schema.prisma no banco temporário do CI.
+      # Cria todas as tabelas antes dos testes rodarem.
+      - name: Aplicar Schema no Banco de CI (db push)
+        run: npx prisma db push
+        working-directory: ./backend
+        env:
+          DATABASE_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
+          DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
+
+      # Executa a suíte completa de testes de integração.
+      # @swc/jest compila TypeScript via Rust sem criar contextos V8 por módulo,
+      # eliminando o consumo excessivo de heap que causava OOM com ts-jest.
+      - name: Executar Testes de Integração (npm test)
+        run: npm test
+        working-directory: ./backend
+        env:
+          NODE_OPTIONS: "--experimental-vm-modules"
+          DATABASE_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
+          DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
+          SUPABASE_URL: "https://placeholder.supabase.co"
+
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: TESTES DO FRONTEND (Flutter + flutter_test)
+  # Responsabilidade: garantir que todos os testes de widget e
+  # unitários do Flutter passam antes de qualquer merge.
+  #
+  # Os testes usam Mockito e FakeAuthService — sem conexão real
+  # com Supabase ou qualquer banco de dados.
+  # ─────────────────────────────────────────────────────────────
+  test-frontend:
+    name: Testes Frontend (Flutter)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # 'channel: stable' instala a versão estável mais recente do Flutter SDK.
+      # Parâmetro correto da subosito/flutter-action@v2 para canal de distribuição.
+      - name: Setup Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          channel: "stable"
+          cache: true
+
+      # Instala todos os pacotes declarados no pubspec.yaml,
+      # incluindo as dependências de teste (mockito, flutter_test).
+      - name: Instalar Dependências do Frontend
+        run: flutter pub get
+        working-directory: ./frontend
+
+      # --reporter=expanded: exibe cada teste individualmente no log
+      - name: Executar Testes Unitários (flutter test)
+        run: flutter test --reporter=expanded
+        working-directory: ./frontend

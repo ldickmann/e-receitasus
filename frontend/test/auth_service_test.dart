@@ -1,91 +1,136 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
 import 'package:mockito/annotations.dart';
-import 'package:http/http.dart' as http;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:mockito/mockito.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'package:e_receitasus/models/professional_type.dart';
 import 'package:e_receitasus/services/auth_service.dart';
 
-// O arquivo de mocks que será gerado pelo comando build_runner
 import 'auth_service_test.mocks.dart';
 
-// Anotação procurada pelo build_runner para gerar os mocks
-@GenerateMocks([http.Client, FlutterSecureStorage])
+@GenerateMocks([
+  SupabaseClient,
+  GoTrueClient,
+  AuthResponse,
+  User,
+  Session,
+])
 void main() {
-  late MockClient mockClient;
-  late MockFlutterSecureStorage mockStorage;
+  late MockSupabaseClient mockSupabaseClient;
+  late MockGoTrueClient mockGoTrueClient;
   late AuthService authService;
 
   setUp(() {
-    mockClient = MockClient();
-    mockStorage = MockFlutterSecureStorage();
+    mockSupabaseClient = MockSupabaseClient();
+    mockGoTrueClient = MockGoTrueClient();
 
-    // Injeção de dependência dos mocks no serviço
-    authService = AuthService(client: mockClient, storage: mockStorage);
+    when(mockSupabaseClient.auth).thenReturn(mockGoTrueClient);
+
+    authService = AuthService(supabaseClient: mockSupabaseClient);
   });
 
-  group('AuthService Tests', () {
-    // TESTE 1: Login com Sucesso
-    test(
-        'Deve retornar token e salvar no storage quando a API responder 200 OK',
-        () async {
-      // 1. Arrange (Preparação)
-      // Simula resposta 200 OK com um token JSON
-      when(mockClient.post(
-        any,
-        headers: anyNamed('headers'),
-        body: anyNamed('body'),
-      )).thenAnswer((_) async =>
-          http.Response('{"token": "token_jwt_simulado_123"}', 200));
+  group('AuthService com Supabase SDK', () {
+    /// Valida login via signInWithPassword.
+    /// O AuthService lê userMetadata para resolver firstName/lastName:
+    /// - 'name' legado é dividido em primeiro e último nome pelo _resolveFirstName/_resolveLastName.
+    /// - result.name retorna '$firstName $lastName' via getter do UserModel.
+    test('deve autenticar e mapear UserModel corretamente', () async {
+      final mockAuthResponse = MockAuthResponse();
+      final mockUser = MockUser();
+      final mockSession = MockSession();
 
-      // Simula que a gravação no storage funciona
-      when(mockStorage.write(key: anyNamed('key'), value: anyNamed('value')))
-          .thenAnswer((_) async => {});
+      when(
+        mockGoTrueClient.signInWithPassword(
+          email: 'teste@sus.gov.br',
+          password: 'Senha123!',
+        ),
+      ).thenAnswer((_) async => mockAuthResponse);
 
-      // 2. Act (Ação)
-      // Chama o método real usando os mocks
-      final result = await authService.login('teste@sus.gov.br', 'senha123');
+      when(mockAuthResponse.user).thenReturn(mockUser);
+      when(mockAuthResponse.session).thenReturn(mockSession);
 
-      // 3. Assert (Verificação)
-      // Verifica se o token foi salvo com a chave correta 'auth_token'
-      verify(mockStorage.write(
-              key: 'auth_token', value: 'token_jwt_simulado_123'))
-          .called(1);
+      when(mockUser.id).thenReturn('11111111-1111-1111-1111-111111111111');
+      when(mockUser.email).thenReturn('teste@sus.gov.br');
+      when(mockUser.userMetadata).thenReturn(<String, dynamic>{
+        'name': 'Dr. Teste',
+        'professional_type': 'MEDICO',
+        'professional_id': '123456',
+        'professional_state': 'SC',
+        'specialty': 'Clinica Geral',
+      });
 
-      // Verifica se o resultado (token) retornou corretamente
-      expect(result, 'token_jwt_simulado_123');
+      when(mockSession.accessToken).thenReturn('jwt-token-valido');
+      when(mockSession.expiresAt).thenReturn(1893456000);
+
+      final result = await authService.login('teste@sus.gov.br', 'Senha123!');
+
+      expect(result.id, '11111111-1111-1111-1111-111111111111');
+      expect(result.email, 'teste@sus.gov.br');
+      // result.name é um getter que retorna '$firstName $lastName'.trim()
+      expect(result.name, 'Dr. Teste');
+      expect(result.professionalType, ProfessionalType.medico);
+      expect(result.token, 'jwt-token-valido');
+
+      verify(
+        mockGoTrueClient.signInWithPassword(
+          email: 'teste@sus.gov.br',
+          password: 'Senha123!',
+        ),
+      ).called(1);
     });
 
-    // TESTE 2: Login Falhou (Senha incorreta)
-    test('Deve lançar exceção quando a API responder 401 Unauthorized',
-        () async {
-      // 1. Arrange
-      when(mockClient.post(any, headers: any, body: any)).thenAnswer(
-          (_) async => http.Response('{"error": "Unauthorized"}', 401));
+    /// Valida fluxo de cadastro com metadados.
+    /// CORREÇÃO: registerWithProfessionalInfo agora usa firstName, lastName
+    /// e birthDate como parâmetros nomeados obrigatórios.
+    /// O AuthService constrói o UserModel diretamente dos parâmetros —
+    /// não lê userMetadata do mockUser, apenas o id.
+    test('deve cadastrar com signUp e retornar perfil', () async {
+      final mockAuthResponse = MockAuthResponse();
+      final mockUser = MockUser();
 
-      // 2. Act & Assert
-      // Espera que a chamada de login falhe com erro
-      expect(
-        () => authService.login('email@errado.com', 'senha_errada'),
-        throwsException,
+      when(
+        mockGoTrueClient.signUp(
+          email: 'novo@sus.gov.br',
+          password: 'Senha123!',
+          data: anyNamed('data'),
+        ),
+      ).thenAnswer((_) async => mockAuthResponse);
+
+      when(mockAuthResponse.user).thenReturn(mockUser);
+      when(mockUser.id).thenReturn('22222222-2222-2222-2222-222222222222');
+
+      final result = await authService.registerWithProfessionalInfo(
+        firstName: 'Novo',
+        lastName: 'Usuario',
+        email: 'novo@sus.gov.br',
+        birthDate: DateTime(1990, 1, 1),
+        password: 'Senha123!',
+        professionalType: ProfessionalType.enfermeiro,
+        professionalId: '654321',
+        professionalState: 'SC',
+        specialty: 'APS',
       );
 
-      // Garante que NADA foi salvo no storage
-      verifyNever(
-          mockStorage.write(key: anyNamed('key'), value: anyNamed('value')));
+      expect(result.id, '22222222-2222-2222-2222-222222222222');
+      expect(result.email, 'novo@sus.gov.br');
+      expect(result.professionalType, ProfessionalType.enfermeiro);
+
+      verify(
+        mockGoTrueClient.signUp(
+          email: 'novo@sus.gov.br',
+          password: 'Senha123!',
+          data: anyNamed('data'),
+        ),
+      ).called(1);
     });
 
-    // TESTE 3: Logout
-    test('Deve limpar o token do storage ao fazer logout', () async {
-      // 1. Arrange
-      when(mockStorage.delete(key: anyNamed('key')))
-          .thenAnswer((_) async => {});
+    /// Valida encerramento de sessao.
+    test('deve chamar signOut no logout', () async {
+      when(mockGoTrueClient.signOut()).thenAnswer((_) async {});
 
-      // 2. Act
       await authService.logout();
 
-      // 3. Assert
-      verify(mockStorage.delete(key: 'auth_token')).called(1);
+      verify(mockGoTrueClient.signOut()).called(1);
     });
   });
 }

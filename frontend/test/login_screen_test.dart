@@ -1,83 +1,140 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
-import 'package:mockito/mockito.dart';
-import 'package:http/http.dart' as http;
-import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
+import 'package:e_receitasus/models/professional_type.dart';
+import 'package:e_receitasus/models/user_model.dart';
 import 'package:e_receitasus/providers/auth_provider.dart';
-import 'package:e_receitasus/services/auth_service.dart';
 import 'package:e_receitasus/screens/login_screen.dart';
+import 'package:e_receitasus/services/auth_service.dart';
 
-// Importa os mocks
-import 'auth_service_test.mocks.dart';
+/// Implementação fake do contrato IAuthService para testes de widget.
+///
+/// Este fake remove acoplamento com SupabaseClient e Mockito nesse teste de UI,
+/// focando apenas no comportamento visual e no fluxo do AuthProvider.
+class FakeAuthService implements IAuthService {
+  final bool shouldLoginSucceed;
 
-// Cria um Mock adicional para o FlutterSecureStorage, necessário para o AuthProvider
-class MockFlutterSecureStorage extends Mock implements FlutterSecureStorage {}
+  FakeAuthService({required this.shouldLoginSucceed});
+
+  /// Simula login com sucesso ou falha de forma determinística.
+  @override
+  Future<UserModel> login(String email, String password) async {
+    if (!shouldLoginSucceed) {
+      throw Exception('Invalid login credentials');
+    }
+
+    // CORREÇÃO: UserModel agora usa firstName/lastName em vez de name
+    return UserModel(
+      id: '11111111-1111-1111-1111-111111111111',
+      firstName: 'Usuário',
+      lastName: 'de Teste',
+      email: email,
+      professionalType: ProfessionalType.administrativo,
+      token: 'token-teste',
+      tokenExpiry: DateTime.now().add(const Duration(hours: 1)),
+    );
+  }
+
+  /// Simulação simples para manter contrato completo.
+  /// IAuthService.register agora usa parâmetros nomeados
+  /// com firstName, lastName e birthDate obrigatórios.
+  @override
+  Future<UserModel> register({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+  }) async {
+    return UserModel(
+      id: '22222222-2222-2222-2222-222222222222',
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      birthDate: birthDate,
+      professionalType: ProfessionalType.administrativo,
+    );
+  }
+
+  /// Simulação simples para manter contrato completo.
+  /// IAuthService.registerWithProfessionalInfo agora inclui
+  /// firstName, lastName e birthDate como parâmetros obrigatórios.
+  @override
+  Future<UserModel> registerWithProfessionalInfo({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+    required ProfessionalType professionalType,
+    String? professionalId,
+    String? professionalState,
+    String? specialty,
+  }) async {
+    return UserModel(
+      id: '33333333-3333-3333-3333-333333333333',
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      birthDate: birthDate,
+      professionalType: professionalType,
+      professionalId: professionalId,
+      professionalState: professionalState,
+      specialty: specialty,
+    );
+  }
+
+  /// Simulação de logout sem efeitos colaterais.
+  @override
+  Future<void> logout() async {}
+}
 
 void main() {
-  late MockClient mockClient;
   late IAuthService authService;
   late AuthProvider authProvider;
 
-  // Configuração executada antes de cada teste de widget
   setUp(() {
-    mockClient = MockClient();
-    // Configura o MockClient para que o login sempre retorne sucesso no widget test
-    // Simulamos que a API está respondendo com um token válido
-    when(mockClient.post(
-      any,
-      headers: anyNamed('headers'),
-      body: anyNamed('body'),
-    )).thenAnswer(
-        (_) async => http.Response('{"token": "simulated_jwt_token"}', 200));
-
-    authService = AuthService(client: mockClient);
-
-    // O AuthProvider depende de IAuthService, que é injetado.
+    authService = FakeAuthService(shouldLoginSucceed: true);
     authProvider = AuthProvider(authService);
   });
 
-  // O teste de widget testa a UI em um ambiente controlado
   testWidgets(
-      'LoginScreen deve exibir campos de email, senha e acionar o login ao clicar no botão',
-      (WidgetTester tester) async {
-    // 1. Constrói o widget encapsulado pelo Provider (ambiente real)
-    await tester.pumpWidget(
-      MultiProvider(
-        providers: [
-          ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
-        ],
-        child: const MaterialApp(
-          home: LoginScreen(),
+    'LoginScreen deve renderizar campos e navegar para home em login válido',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        MultiProvider(
+          providers: [
+            ChangeNotifierProvider<AuthProvider>.value(value: authProvider),
+          ],
+          child: MaterialApp(
+            home: const LoginScreen(),
+            routes: {
+              '/home': (_) => const Scaffold(body: Text('HOME_SCREEN')),
+            },
+          ),
         ),
-      ),
-    );
+      );
 
-    // 2. Verifica se os campos estão presentes (UX/UI Pura)
-    expect(find.widgetWithText(TextField, 'E-mail SUS'), findsOneWidget);
-    expect(find.widgetWithText(TextField, 'Senha'), findsOneWidget);
-    expect(find.widgetWithText(ElevatedButton, 'Entrar'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'E-mail SUS'), findsOneWidget);
+      expect(find.widgetWithText(TextFormField, 'Senha'), findsOneWidget);
+      expect(find.widgetWithText(ElevatedButton, 'Entrar'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Não tem conta? Cadastre-se'),
+          findsOneWidget);
 
-    // 3. Simula a entrada de dados (Preenche os campos)
-    await tester.enterText(
-        find.widgetWithText(TextField, 'E-mail SUS'), 'teste@sus.com');
-    await tester.enterText(find.widgetWithText(TextField, 'Senha'), 'senha123');
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'E-mail SUS'),
+        'teste@sus.gov.br',
+      );
+      await tester.enterText(
+        find.widgetWithText(TextFormField, 'Senha'),
+        'Senha123!',
+      );
 
-    // 4. Simula o clique no botão de Login
-    await tester.tap(find.widgetWithText(ElevatedButton, 'Entrar'));
-    await tester.pump(); // Redraws the widget tree
+      await tester.tap(find.widgetWithText(ElevatedButton, 'Entrar'));
+      await tester.pumpAndSettle();
 
-    // 5. Verifica o comportamento: o AuthProvider deve estar em estado de carregamento
-    // Verifica se o indicador de loading aparece após o clique.
-    expect(find.byType(CircularProgressIndicator), findsNothing);
-
-    // Nota: A simulação real do login exige que o AuthProvider seja mockado também,
-    // mas para fins de teste de widget TDD, verificar se o botão foi acionado e a UI responde
-    // já atende ao objetivo (o teste unitário já garantiu a comunicação da rede).
-
-    // 6. Teste de Registro: Verifica se o botão de registro está presente
-    expect(find.widgetWithText(TextButton, 'Não tem conta? Cadastre-se'),
-        findsOneWidget);
-  });
+      expect(find.text('HOME_SCREEN'), findsOneWidget);
+    },
+  );
 }
