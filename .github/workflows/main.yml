@@ -25,12 +25,12 @@ jobs:
   # antes de qualquer operação crítica.
   # ─────────────────────────────────────────────────────────────
   setup-environment:
-    name: Configure the Environment
+    name: Configurar Ambiente
     runs-on: ubuntu-latest
 
     steps:
       # Faz o download do código-fonte do repositório
-      # para o runner (VM do GitHub Actions).
+      # para o runner (máquina virtual do GitHub Actions)
       - name: Checkout Repository
         uses: actions/checkout@v4
 
@@ -50,131 +50,131 @@ jobs:
 
       # Valida que a instalação do CLI foi bem-sucedida.
       # Se este step falhar, os jobs seguintes não executam.
-      - name: Verify Supabase CLI Installation
+      - name: Verificar Instalação do Supabase CLI
         run: supabase --version
 
       # Confirma que o CLI responde a comandos sem precisar
       # de credenciais — valida a integridade do binário
-      - name: Check CLI Help
+      - name: Verificar Funcionamento do CLI
         run: supabase --help
 
-# ─────────────────────────────────────────────────────────────
-# JOB 2: SINCRONIZAR BANCO DE DADOS (PRISMA)
-# Responsabilidade: aplicar as mudanças do schema.prisma
-# diretamente no banco de dados do Supabase.
-#
-# IMPORTANTE: usa 'prisma db push' com a DIRECT_URL (porta 5432)
-# pois o PgBouncer (porta 6543, ?pgbouncer=true) não suporta
-# o protocolo de query estendido exigido pelo Prisma.
-#
-# Condicional: só executa em 'push' direto (não em PRs),
-# evitando sincronizar o banco com código ainda em revisão.
-# ─────────────────────────────────────────────────────────────
-sync-database:
-  name: Sync Database with Prisma
-  runs-on: ubuntu-latest
-  # Depende do Job 1 - só avança se o ambiente foi validado
-  needs: setup-environment
-  # Não executa em Pull Requests: Apenas em merges confirmados
-  if: github.event_name == 'push'
+  # ─────────────────────────────────────────────────────────────
+  # JOB 2: SINCRONIZAR BANCO DE DADOS (PRISMA)
+  # Responsabilidade: aplicar as mudanças do schema.prisma
+  # diretamente no banco de dados do Supabase.
+  #
+  # IMPORTANTE: usa 'prisma db push' com a DIRECT_URL (porta 5432)
+  # pois o PgBouncer (porta 6543, ?pgbouncer=true) não suporta
+  # o protocolo de query estendido exigido pelo Prisma.
+  #
+  # Condicional: só executa em 'push' direto (não em PRs),
+  # evitando sincronizar o banco com código ainda em revisão.
+  # ─────────────────────────────────────────────────────────────
+  sync-database:
+    name: Sincronizar Banco de Dados (Prisma)
+    runs-on: ubuntu-latest
+    # Depende do Job 1 — só avança se o ambiente foi validado
+    needs: setup-environment
+    # Não executa em Pull Requests: apenas em merges confirmados
+    if: github.event_name == 'push'
 
-  steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: "22"
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
 
-    # Instala todas as dependências listadas no package.json do backend.
-    # O 'working-directory' é obrigatório pois package.json está em ./backend/
-    # e não na raiz do repositório.
-    - name: Install Backend Dependencies
-      run: npm install
-      working-directory: ./backend
+      # Instala todas as dependências listadas no package.json do backend.
+      # O 'working-directory' é obrigatório pois package.json está em ./backend/
+      # e não na raiz do repositório.
+      - name: Instalar Dependências do Backend
+        run: npm install
+        working-directory: ./backend
 
-    # Gera o Prisma Client tipado a partir do schema.prisma.
-    # Sem este passo, o comando 'db push' não consegue
-    # interpretar corretamente o schema.
-    - name: Generate Prisma Client
-      run: npx prisma generate
-      working-directory: ./backend
-      env:
-        # DATABASE_URL aqui deve ser DIRECT_URL (porta 5432, sem pgbouncer)
-        # Valor configurado em: Settings → Secrets and variables → Actions
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Gera o Prisma Client tipado a partir do schema.prisma.
+      # Sem este passo, o comando 'db push' não consegue
+      # interpretar corretamente o schema.
+      - name: Gerar Prisma Client
+        run: npx prisma generate
+        working-directory: ./backend
+        env:
+          # DATABASE_URL aqui deve ser a DIRECT_URL (porta 5432, sem pgbouncer)
+          # Valor configurado em: Settings → Secrets and variables → Actions
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-    # Sincroniza o estado do schema.prisma com o banco de dados real.
-    # É como um "alinhamento de planta baixa": garante que o banco
-    # reflete exatamente o que está definido no schema.
-    # A flag '--accept-data-loss' foi OMITIDA intencionalmente:
-    # o pipeline deve falhar se houver risco de perda de dados,
-    # forçando uma revisão manual antes de prosseguir.
-    - name: Sync Schema with Database (db push)
-      run: npx prisma db push
-      working-directory: ./backend
-      env:
-        DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      # Sincroniza o estado do schema.prisma com o banco de dados real.
+      # É como um "alinhamento de planta baixa": garante que o banco
+      # reflete exatamente o que está definido no schema.
+      # A flag '--accept-data-loss' foi OMITIDA intencionalmente:
+      # o pipeline deve falhar se houver risco de perda de dados,
+      # forçando uma revisão manual antes de prosseguir.
+      - name: Sincronizar Schema com o Banco (db push)
+        run: npx prisma db push
+        working-directory: ./backend
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-# ─────────────────────────────────────────────────────────────
-# JOB 3: DEPLOY DAS EDGE FUNCTIONS (SUPABASE)
-# Responsabilidade: publicar as Edge Functions (Deno) do diretório
-# supabase/functions/ para o projeto Supabase em produção.
-#
-# SEGURANÇA: usa SUPABASE_ACCESS_TOKEN (token pessoal) e
-# SUPABASE_PROJECT_ID (ref do projeto) via GitHub Secrets —
-# nenhuma credencial é exposta no código-fonte.
-#
-# RESILIÊNCIA: verifica a existência da pasta supabase/functions/
-# antes de tentar o deploy. Se não existir, o step é ignorado
-# sem quebrar o pipeline — útil enquanto funções não foram criadas.
-# ─────────────────────────────────────────────────────────────
-deploy-functions:
-  name: Deploy Edge Functions to Supabase
-  runs-on: ubuntu-latest
-  # Depende do Job 2 - deploy só ocorre após o banco estar atualizado
-  needs: sync-database
-  if: github.event_name == 'push'
+  # ─────────────────────────────────────────────────────────────
+  # JOB 3: DEPLOY DAS EDGE FUNCTIONS (SUPABASE)
+  # Responsabilidade: publicar as Edge Functions (Deno) do diretório
+  # supabase/functions/ para o projeto Supabase em produção.
+  #
+  # SEGURANÇA: usa SUPABASE_ACCESS_TOKEN (token pessoal) e
+  # SUPABASE_PROJECT_ID (ref do projeto) via GitHub Secrets —
+  # nenhuma credencial é exposta no código-fonte.
+  #
+  # RESILIÊNCIA: verifica a existência da pasta supabase/functions/
+  # antes de tentar o deploy. Se não existir, o step é ignorado
+  # sem quebrar o pipeline — útil enquanto funções não foram criadas.
+  # ─────────────────────────────────────────────────────────────
+  deploy-functions:
+    name: Deploy Edge Functions (Supabase)
+    runs-on: ubuntu-latest
+    # Depende do Job 2 — deploy só ocorre após o banco estar atualizado
+    needs: sync-database
+    if: github.event_name == 'push'
 
-  steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    # CLI do Supabase é necessário para o comando 'functions deploy'
-    - name: Setup Supabase CLI
-      uses: supabase/setup-cli@v1
-      with:
-        version: "latest"
+      # CLI do Supabase é necessário para o comando 'functions deploy'
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: "latest"
 
-    # Verifica se a pasta de functions existe no repositório.
-    # O resultado é gravado em $GITHUB_OUTPUT para ser lido
-    # pelos steps seguintes via 'steps.check-functions.outputs.has_functions'.
-    - name: Check for Edge Functions
-      id: check-functions
-      run: |
-        if [ -d "supabase/functions" ]; then
-          echo "has_functions=true" >> $GITHUB_OUTPUT
-        else
-          echo "has_functions=false" >> $GITHUB_OUTPUT
-          echo "No Edge Function found. Deployment step skipped."
-        fi
+      # Verifica se a pasta de functions existe no repositório.
+      # O resultado é gravado em $GITHUB_OUTPUT para ser lido
+      # pelos steps seguintes via 'steps.check-functions.outputs.has_functions'.
+      - name: Verificar Existência de Edge Functions
+        id: check-functions
+        run: |
+          if [ -d "supabase/functions" ]; then
+            echo "has_functions=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_functions=false" >> $GITHUB_OUTPUT
+            echo "Nenhuma Edge Function encontrada. Etapa de deploy ignorada."
+          fi
 
-    # Vincula o Supabase CLI ao projeto remoto via Project Ref.
-    # Necessário antes de qualquer operação remota (deploy, migrations, etc.).
-    # Só executa se a pasta supabase/functions/ existir.
-    - name: Link Supabase Project
-      if: steps.check-functions.outputs.has_functions == 'true'
-      run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
-      env:
-        # Token de acesso pessoal do Supabase (gerado em supabase.com/dashboard/account/tokens)
-        SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      # Vincula o Supabase CLI ao projeto remoto via Project Ref.
+      # Necessário antes de qualquer operação remota (deploy, migrations, etc.).
+      # Só executa se a pasta supabase/functions/ existir.
+      - name: Linkar Projeto Supabase
+        if: steps.check-functions.outputs.has_functions == 'true'
+        run: supabase link --project-ref ${{ secrets.SUPABASE_PROJECT_ID }}
+        env:
+          # Token de acesso pessoal do Supabase (gerado em supabase.com/dashboard/account/tokens)
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
 
-    # Publica todas as funções dentro de supabase/functions/ de uma vez.
-    # Cada subpasta é tratada como uma função independente pelo CLI.
-    # Só executa se a pasta supabase/functions/ existir.
-    - name: Deploy de Todas as Edge Functions
-      if: steps.check-functions.outputs.has_functions == 'true'
-      run: supabase functions deploy
-      env:
-        SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      # Publica todas as funções dentro de supabase/functions/ de uma vez.
+      # Cada subpasta é tratada como uma função independente pelo CLI.
+      # Só executa se a pasta supabase/functions/ existir.
+      - name: Deploy de Todas as Edge Functions
+        if: steps.check-functions.outputs.has_functions == 'true'
+        run: supabase functions deploy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
