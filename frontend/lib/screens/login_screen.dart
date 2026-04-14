@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/professional_type.dart';
 import '../providers/auth_provider.dart';
 import 'register_screen.dart';
 
@@ -52,19 +51,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   String _resolveHomeRoute(AuthProvider authProvider) {
-    const prescriberTypes = {
-      ProfessionalType.medico,
-      ProfessionalType.dentista,
-      ProfessionalType.enfermeiro,
-      ProfessionalType.farmaceutico,
-      ProfessionalType.psicologo,
-      ProfessionalType.nutricionista,
-      ProfessionalType.fisioterapeuta,
-    };
     final type = authProvider.user?.professionalType;
-    return (type != null && prescriberTypes.contains(type))
-        ? '/doctor_home'
-        : '/home';
+    return (type != null && type.isPrescriber) ? '/doctor_home' : '/home';
   }
 
   void _handleRegister() {

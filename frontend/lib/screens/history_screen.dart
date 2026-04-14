@@ -95,7 +95,8 @@ class _HistoryTile extends StatelessWidget {
 
   String get _statusLabel {
     if (prescription.isExpired) return 'Vencida';
-    return prescription.status[0].toUpperCase() + prescription.status.substring(1);
+    final s = prescription.status;
+    return s.isEmpty ? '' : s[0].toUpperCase() + s.substring(1);
   }
 
   String _formatDate(DateTime date) {

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../models/professional_type.dart';
 import '../providers/auth_provider.dart';
 
 /// Tela de splash exibida durante inicialização do app
@@ -70,22 +69,8 @@ class _SplashScreenState extends State<SplashScreen>
   /// Profissionais prescritores (médico, dentista, etc.) acessam o painel do
   /// prescritor; pacientes e usuários administrativos acessam a tela do paciente.
   String _resolveHomeRoute(AuthProvider authProvider) {
-    final professionalType = authProvider.user?.professionalType;
-    if (professionalType == null) return '/home';
-
-    const prescriberTypes = {
-      ProfessionalType.medico,
-      ProfessionalType.dentista,
-      ProfessionalType.enfermeiro,
-      ProfessionalType.farmaceutico,
-      ProfessionalType.psicologo,
-      ProfessionalType.nutricionista,
-      ProfessionalType.fisioterapeuta,
-    };
-
-    return prescriberTypes.contains(professionalType)
-        ? '/doctor_home'
-        : '/home';
+    final type = authProvider.user?.professionalType;
+    return (type != null && type.isPrescriber) ? '/doctor_home' : '/home';
   }
 
   @override

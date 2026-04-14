@@ -336,8 +336,10 @@ class _PrescriptionListTile extends StatelessWidget {
               child: Text(
                 isExpired
                     ? 'Vencida'
-                    : prescription.status[0].toUpperCase() +
-                        prescription.status.substring(1),
+                    : prescription.status.isEmpty
+                        ? ''
+                        : prescription.status[0].toUpperCase() +
+                            prescription.status.substring(1),
                 style: TextStyle(
                     fontSize: 10,
                     color: statusColor,

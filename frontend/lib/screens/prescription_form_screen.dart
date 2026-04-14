@@ -667,7 +667,7 @@ class _DoctorSection extends StatelessWidget {
                   counterText: '',
                 ),
                 validator: (v) {
-                  if ((v ?? '').trim().length != 2) return 'UF?';
+                  if ((v ?? '').trim().length != 2) return 'UF inválida';
                   return null;
                 },
               ),
