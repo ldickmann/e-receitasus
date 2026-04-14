@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/professional_type.dart';
 import '../providers/auth_provider.dart';
 import 'register_screen.dart';
 
@@ -36,8 +37,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
-      // Navega para home
-      Navigator.pushReplacementNamed(context, '/home');
+      // Rota baseada no tipo de profissional
+      final route = _resolveHomeRoute(authProvider);
+      Navigator.pushReplacementNamed(context, route);
     } else {
       // Exibe erro
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,6 +49,22 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     }
+  }
+
+  String _resolveHomeRoute(AuthProvider authProvider) {
+    const prescriberTypes = {
+      ProfessionalType.medico,
+      ProfessionalType.dentista,
+      ProfessionalType.enfermeiro,
+      ProfessionalType.farmaceutico,
+      ProfessionalType.psicologo,
+      ProfessionalType.nutricionista,
+      ProfessionalType.fisioterapeuta,
+    };
+    final type = authProvider.user?.professionalType;
+    return (type != null && prescriberTypes.contains(type))
+        ? '/doctor_home'
+        : '/home';
   }
 
   void _handleRegister() {
