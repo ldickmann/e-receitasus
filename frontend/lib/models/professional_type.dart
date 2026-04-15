@@ -37,20 +37,20 @@ enum ProfessionalType {
     return councilName;
   }
 
-  /// Indica se este tipo de profissional tem autorização para prescrever
-  /// receitas médicas/odontológicas/de enfermagem conforme legislação vigente.
-  bool get isPrescriber {
-    const prescribers = {
-      ProfessionalType.medico,
-      ProfessionalType.dentista,
-      ProfessionalType.enfermeiro,
-      ProfessionalType.farmaceutico,
-      ProfessionalType.psicologo,
-      ProfessionalType.nutricionista,
-      ProfessionalType.fisioterapeuta,
-    };
-    return prescribers.contains(this);
-  }
+  /// Indica se este profissional tem autorização legal para emitir receitas.
+  ///
+  /// Conforme Lei Federal 5.081/66 (odontologia) e CFM (medicina), apenas
+  /// médicos e dentistas podem prescrever receitas médicas e odontológicas.
+  /// Outros profissionais de saúde possuem atribuições distintas reguladas
+  /// pelos seus respectivos conselhos, mas não emitem receituário.
+  bool get canPrescribe =>
+      this == ProfessionalType.medico || this == ProfessionalType.dentista;
+
+  /// Indica se o profissional é enfermeiro.
+  ///
+  /// Enfermeiros atuam na triagem de solicitações de renovação de receitas,
+  /// confirmando a necessidade clínica antes de encaminhar ao médico.
+  bool get isNurse => this == ProfessionalType.enfermeiro;
 
   String get registrationHint {
     if (requiresCouncil) {
