@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/prescription_model.dart';
-import '../models/prescription_type.dart';
 import '../services/prescription_service.dart';
 import 'prescription_view_screen.dart';
 
@@ -125,8 +124,7 @@ class _HistoryTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: type.backgroundColor,
             shape: BoxShape.circle,
-            border:
-                Border.all(color: type.foregroundColor.withOpacity(0.3)),
+            border: Border.all(color: type.foregroundColor.withOpacity(0.3)),
           ),
           child: Icon(type.icon, color: type.foregroundColor, size: 20),
         ),
@@ -168,12 +166,10 @@ class _HistoryTile extends StatelessWidget {
         onTap: () => Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) =>
-                PrescriptionViewScreen(prescription: prescription),
+            builder: (_) => PrescriptionViewScreen(prescription: prescription),
           ),
         ),
       ),
     );
   }
 }
-
