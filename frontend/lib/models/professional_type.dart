@@ -37,6 +37,21 @@ enum ProfessionalType {
     return councilName;
   }
 
+  /// Indica se este tipo de profissional tem autorização para prescrever
+  /// receitas médicas/odontológicas/de enfermagem conforme legislação vigente.
+  bool get isPrescriber {
+    const prescribers = {
+      ProfessionalType.medico,
+      ProfessionalType.dentista,
+      ProfessionalType.enfermeiro,
+      ProfessionalType.farmaceutico,
+      ProfessionalType.psicologo,
+      ProfessionalType.nutricionista,
+      ProfessionalType.fisioterapeuta,
+    };
+    return prescribers.contains(this);
+  }
+
   String get registrationHint {
     if (requiresCouncil) {
       return 'Ex: 123456-SP';
