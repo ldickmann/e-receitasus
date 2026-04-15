@@ -70,7 +70,10 @@ class _SplashScreenState extends State<SplashScreen>
   /// prescritor; pacientes e usuários administrativos acessam a tela do paciente.
   String _resolveHomeRoute(AuthProvider authProvider) {
     final type = authProvider.user?.professionalType;
-    return (type != null && type.isPrescriber) ? '/doctor_home' : '/home';
+    if (type == null) return '/home';
+    if (type.canPrescribe) return '/doctor_home';
+    if (type.isNurse) return '/nurse_home';
+    return '/home';
   }
 
   @override

@@ -52,7 +52,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _resolveHomeRoute(AuthProvider authProvider) {
     final type = authProvider.user?.professionalType;
-    return (type != null && type.isPrescriber) ? '/doctor_home' : '/home';
+    if (type == null) return '/home';
+    if (type.canPrescribe) return '/doctor_home';
+    if (type.isNurse) return '/nurse_home';
+    return '/home';
   }
 
   void _handleRegister() {
