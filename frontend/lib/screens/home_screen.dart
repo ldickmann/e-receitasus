@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../models/prescription_model.dart';
 import '../services/prescription_service.dart'; // Importação do novo serviço
 import 'history_screen.dart';
+import 'prescription_view_screen.dart';
 
 /// Tela Inicial do Paciente
 ///
@@ -167,8 +169,17 @@ class HomeScreen extends StatelessWidget {
                               Text('Médico: ${item['doctorName'] ?? 'N/A'}'),
                           trailing:
                               const Icon(Icons.arrow_forward_ios, size: 16),
-                          onTap: () =>
-                              debugPrint('Detalhes da receita: ${item['id']}'),
+                          onTap: () {
+                              final prescription = PrescriptionModel.fromJson(item);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => PrescriptionViewScreen(
+                                    prescription: prescription,
+                                  ),
+                                ),
+                              );
+                            },
                         ),
                       );
                     },

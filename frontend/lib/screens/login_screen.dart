@@ -36,8 +36,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
-      // Navega para home
-      Navigator.pushReplacementNamed(context, '/home');
+      // Rota baseada no tipo de profissional
+      final route = _resolveHomeRoute(authProvider);
+      Navigator.pushReplacementNamed(context, route);
     } else {
       // Exibe erro
       ScaffoldMessenger.of(context).showSnackBar(
@@ -47,6 +48,11 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       );
     }
+  }
+
+  String _resolveHomeRoute(AuthProvider authProvider) {
+    final type = authProvider.user?.professionalType;
+    return (type != null && type.isPrescriber) ? '/doctor_home' : '/home';
   }
 
   void _handleRegister() {
