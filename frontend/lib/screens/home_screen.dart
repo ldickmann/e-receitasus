@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/prescription_model.dart';
 import '../services/prescription_service.dart'; // Importação do novo serviço
+import '../widgets/prescription_card.dart';
 import 'history_screen.dart';
 import 'prescription_view_screen.dart';
 
@@ -146,40 +147,25 @@ class HomeScreen extends StatelessWidget {
                     );
                   }
 
-                  // Lista de Receitas Reais
-                  final list = snapshot.data!;
+                  // Lista de Receitas Reais — converte Map para modelo antes de renderizar
+                  final prescriptions =
+                      snapshot.data!.map(PrescriptionModel.fromJson).toList();
+
                   return ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: list.length,
+                    itemCount: prescriptions.length,
                     itemBuilder: (context, index) {
-                      final item = list[index];
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 10),
-                        child: ListTile(
-                          leading: const CircleAvatar(
-                            backgroundColor: Color(0xFF4CAF50),
-                            child: Icon(Icons.medication, color: Colors.white),
+                      final prescription = prescriptions[index];
+                      return PrescriptionCard(
+                        prescription: prescription,
+                        onTap: () => Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => PrescriptionViewScreen(
+                              prescription: prescription,
+                            ),
                           ),
-                          title: Text(
-                            item['medicine'] ?? 'Medicamento',
-                            style: const TextStyle(fontWeight: FontWeight.bold),
-                          ),
-                          subtitle:
-                              Text('Médico: ${item['doctorName'] ?? 'N/A'}'),
-                          trailing:
-                              const Icon(Icons.arrow_forward_ios, size: 16),
-                          onTap: () {
-                              final prescription = PrescriptionModel.fromJson(item);
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => PrescriptionViewScreen(
-                                    prescription: prescription,
-                                  ),
-                                ),
-                              );
-                            },
                         ),
                       );
                     },
