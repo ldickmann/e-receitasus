@@ -93,7 +93,7 @@ class HomeScreen extends StatelessWidget {
               ElevatedButton.icon(
                 onPressed: _handleSolicitation,
                 icon: const Icon(Icons.medical_services_outlined, size: 24),
-                label: const Text('Solicitar Revalidação'),
+                label: const Text('Solicitar Renovação'),
               ),
               const SizedBox(height: 10),
 
