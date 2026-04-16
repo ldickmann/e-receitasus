@@ -15,10 +15,18 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  /// FocusNode do campo e-mail — ao pressionar Enter, move foco para a senha.
+  final _emailFocusNode = FocusNode();
+
+  /// FocusNode do campo senha — ao pressionar Enter, submete o formulário.
+  final _passwordFocusNode = FocusNode();
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -93,10 +101,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // Campo de Email
+                // Campo de Email — Enter move o foco para a senha
                 TextFormField(
                   controller: _emailController,
+                  focusNode: _emailFocusNode,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) {
+                    // Move o foco para o campo de senha ao pressionar Enter
+                    FocusScope.of(context).requestFocus(_passwordFocusNode);
+                  },
                   decoration: const InputDecoration(
                     labelText: 'E-mail SUS',
                     border: OutlineInputBorder(),
@@ -114,10 +128,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 15),
 
-                // Campo de Senha
+                // Campo de Senha — Enter submete o formulário diretamente
                 TextFormField(
                   controller: _passwordController,
+                  focusNode: _passwordFocusNode,
                   obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    // Submete o formulário ao pressionar Enter na senha
+                    _handleLogin();
+                  },
                   decoration: const InputDecoration(
                     labelText: 'Senha',
                     border: OutlineInputBorder(),
