@@ -1,16 +1,29 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+
 import '../providers/auth_provider.dart';
 
 /// Tela de cadastro exclusiva para pacientes do SUS.
 ///
-/// Separada da RegisterScreen (profissionais de saúde) para que o fluxo de
-/// pacientes seja mais simples, sem exigir dados de conselho profissional.
-/// Campos obrigatórios: nome, sobrenome, data de nascimento, e-mail, senha
-/// e telefone celular. CNS é o único campo opcional.
+/// Organizada em 5 seções para facilitar o preenchimento progressivo:
+/// 1. Dados Pessoais — nome, nascimento, sexo, raça, estado civil, CPF, nome social
+/// 2. Origem — cidade/UF de nascimento, escolaridade, nome da mãe
+/// 3. Acesso — e-mail, senha
+/// 4. Saúde — telefone (obrigatório), CNS
+/// 5. Endereço — CEP, logradouro e complementos
+///
+/// O parâmetro [httpClient] é opcional e destinado exclusivamente a testes —
+/// permite injetar um cliente HTTP fake sem necessidade de rede real.
 class PatientRegisterScreen extends StatefulWidget {
-  const PatientRegisterScreen({super.key});
+  /// Cliente HTTP customizado; `null` usa o cliente padrão do pacote `http`.
+  final http.Client? httpClient;
+
+  const PatientRegisterScreen({super.key, this.httpClient});
 
   @override
   State<PatientRegisterScreen> createState() => _PatientRegisterScreenState();
@@ -19,27 +32,244 @@ class PatientRegisterScreen extends StatefulWidget {
 class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
   final _formKey = GlobalKey<FormState>();
 
+  // --- Dados Pessoais ---
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
+  final _socialNameController = TextEditingController();
+  final _cpfController = TextEditingController();
+  DateTime? _selectedBirthDate;
+  String? _gender;
+  String? _ethnicity;
+  String? _maritalStatus;
+
+  // --- Origem ---
+  final _motherParentNameController = TextEditingController();
+  final _birthCityController = TextEditingController();
+  String? _birthState;
+  String? _education;
+
+  // --- Acesso ---
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
-  final _cnsController = TextEditingController();
-  final _phoneController = TextEditingController();
-
-  DateTime? _selectedBirthDate;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
+  // --- Saúde ---
+  final _phoneController = TextEditingController();
+  final _cnsController = TextEditingController();
+
+  // --- Endereço ---
+  final _zipCodeController = TextEditingController();
+  final _streetController = TextEditingController();
+  final _streetNumberController = TextEditingController();
+  final _complementController = TextEditingController();
+  final _districtController = TextEditingController();
+  final _addressCityController = TextEditingController();
+  String? _addressState;
+
+  // Controla o estado de busca do CEP via ViaCEP
+  bool _isSearchingCep = false;
+  // Evita chamadas duplicadas para o mesmo CEP já buscado
+  String? _lastFetchedCep;
+
+  // ---------------------------------------------------------------------------
+  // Listas de opções para campos com valores controlados
+  // ---------------------------------------------------------------------------
+
+  static const _genderOptions = [
+    'MASCULINO',
+    'FEMININO',
+    'NAO_BINARIO',
+    'PREFIRO_NAO_INFORMAR',
+  ];
+
+  static const _genderLabels = {
+    'MASCULINO': 'Masculino',
+    'FEMININO': 'Feminino',
+    'NAO_BINARIO': 'Não binário',
+    'PREFIRO_NAO_INFORMAR': 'Prefiro não informar',
+  };
+
+  // Classificação IBGE de raça/cor — padrão adotado pelo SUS
+  static const _ethnicityOptions = [
+    'BRANCA',
+    'PARDA',
+    'PRETA',
+    'AMARELA',
+    'INDIGENA',
+    'NAO_INFORMADO',
+  ];
+
+  static const _ethnicityLabels = {
+    'BRANCA': 'Branca',
+    'PARDA': 'Parda',
+    'PRETA': 'Preta',
+    'AMARELA': 'Amarela',
+    'INDIGENA': 'Indígena',
+    'NAO_INFORMADO': 'Não informado',
+  };
+
+  static const _maritalStatusOptions = [
+    'SOLTEIRO',
+    'CASADO',
+    'UNIAO_ESTAVEL',
+    'DIVORCIADO',
+    'VIUVO',
+    'SEPARADO',
+  ];
+
+  static const _maritalStatusLabels = {
+    'SOLTEIRO': 'Solteiro(a)',
+    'CASADO': 'Casado(a)',
+    'UNIAO_ESTAVEL': 'União Estável',
+    'DIVORCIADO': 'Divorciado(a)',
+    'VIUVO': 'Viúvo(a)',
+    'SEPARADO': 'Separado(a)',
+  };
+
+  static const _educationOptions = [
+    'SEM_INSTRUCAO',
+    'ENSINO_FUNDAMENTAL',
+    'ENSINO_MEDIO',
+    'ENSINO_SUPERIOR',
+    'POS_GRADUACAO',
+  ];
+
+  static const _educationLabels = {
+    'SEM_INSTRUCAO': 'Sem instrução',
+    'ENSINO_FUNDAMENTAL': 'Ensino Fundamental',
+    'ENSINO_MEDIO': 'Ensino Médio',
+    'ENSINO_SUPERIOR': 'Ensino Superior',
+    'POS_GRADUACAO': 'Pós-graduação',
+  };
+
+  // 26 UFs + DF ordenados alfabeticamente
+  static const _ufOptions = [
+    'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
+    'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
+    'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    // Registra listener para disparar busca ViaCEP assim que 8 dígitos forem digitados
+    _zipCodeController.addListener(_onCepChanged);
+  }
+
+  /// Callback do listener do campo CEP.
+  ///
+  /// Dispara a busca apenas quando exatamente 8 dígitos são digitados
+  /// e o CEP é diferente do último já consultado — evita chamadas repetidas.
+  void _onCepChanged() {
+    final cep = _zipCodeController.text.trim();
+    if (cep.length == 8 && cep != _lastFetchedCep) {
+      _fetchAddressFromCep(cep);
+    }
+  }
+
+  /// Consulta a API pública ViaCEP e preenche automaticamente os campos de endereço.
+  ///
+  /// A ViaCEP (viacep.com.br) é um serviço gratuito do governo brasileiro —
+  /// não envia dados do usuário, apenas consulta logradouros pelo CEP informado.
+  /// CEP inválido retorna `{"erro": true}` com status 200 — tratado separadamente.
+  Future<void> _fetchAddressFromCep(String cep) async {
+    // Impede chamada paralela se uma busca já está em andamento
+    if (_isSearchingCep) return;
+
+    // Registra o CEP consultado antes de iniciar para evitar reentrada
+    _lastFetchedCep = cep;
+    setState(() => _isSearchingCep = true);
+
+    try {
+      final uri = Uri.parse('https://viacep.com.br/ws/$cep/json/');
+      // Usa cliente injetado (testes) ou o cliente global padrão (produção).
+      // O timeout de 10s é aplicado apenas ao cliente padrão — em testes,
+      // o MockClient retorna imediatamente e o Timer de timeout causaria
+      // comportamento indefinido no scheduler sintético do flutter_test.
+      final client = widget.httpClient;
+      final responseFuture = client != null
+          ? client.get(uri)
+          : http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await responseFuture;
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        // Decodifica explicitamente como UTF-8 — evita corrupção de caracteres
+        // especiais (ç, ã, é…) em APIs que omitem charset no Content-Type header.
+        // response.body usa latin1 como fallback quando charset não é declarado.
+        final data =
+            jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+
+        // ViaCEP responde com {"erro": true} para CEPs inexistentes (status 200)
+        if (data.containsKey('erro')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                  'CEP não encontrado. Preencha o endereço manualmente.'),
+            ),
+          );
+          return;
+        }
+
+        // Preenche todos os campos — sobrescreve valores anteriores porque
+        // o usuário acabou de digitar um novo CEP e espera ver o endereço atualizado
+        setState(() {
+          _streetController.text = (data['logradouro'] as String?) ?? '';
+          _districtController.text = (data['bairro'] as String?) ?? '';
+          _addressCityController.text = (data['localidade'] as String?) ?? '';
+
+          // UF vem como sigla em maiúsculas — compatível com _ufOptions
+          final uf = (data['uf'] as String?)?.toUpperCase();
+          if (uf != null && _ufOptions.contains(uf)) {
+            _addressState = uf;
+          }
+        });
+      }
+    } on TimeoutException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Tempo esgotado ao consultar o CEP. Tente novamente.'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+              'Não foi possível consultar o CEP. Verifique a conexão.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSearchingCep = false);
+    }
+  }
+
   @override
   void dispose() {
+    // Remove o listener antes de descartar o controller para evitar memory leak
+    _zipCodeController.removeListener(_onCepChanged);
     _firstNameController.dispose();
     _lastNameController.dispose();
+    _socialNameController.dispose();
+    _cpfController.dispose();
+    _motherParentNameController.dispose();
+    _birthCityController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
-    _cnsController.dispose();
     _phoneController.dispose();
+    _cnsController.dispose();
+    _zipCodeController.dispose();
+    _streetController.dispose();
+    _streetNumberController.dispose();
+    _complementController.dispose();
+    _districtController.dispose();
+    _addressCityController.dispose();
     super.dispose();
   }
 
@@ -57,10 +287,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
       cancelText: 'Cancelar',
       confirmText: 'Confirmar',
     );
-
-    if (picked != null) {
-      setState(() => _selectedBirthDate = picked);
-    }
+    if (picked != null) setState(() => _selectedBirthDate = picked);
   }
 
   /// Envia o formulário ao provider e reage ao resultado.
@@ -85,11 +312,25 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
       email: _emailController.text.trim(),
       birthDate: _selectedBirthDate!,
       password: _passwordController.text,
-      cns: _cnsController.text.trim().isEmpty
-          ? null
-          : _cnsController.text.trim(),
-      // Telefone é obrigatório — o validator já garante que não está vazio
+      // Telefone é obrigatório — o validator já garante preenchimento
       phone: _phoneController.text.trim(),
+      cns: _nullIfEmpty(_cnsController.text),
+      cpf: _nullIfEmpty(_cpfController.text),
+      socialName: _nullIfEmpty(_socialNameController.text),
+      motherParentName: _nullIfEmpty(_motherParentNameController.text),
+      birthCity: _nullIfEmpty(_birthCityController.text),
+      birthState: _birthState,
+      gender: _gender,
+      ethnicity: _ethnicity,
+      maritalStatus: _maritalStatus,
+      education: _education,
+      zipCode: _nullIfEmpty(_zipCodeController.text),
+      street: _nullIfEmpty(_streetController.text),
+      streetNumber: _nullIfEmpty(_streetNumberController.text),
+      complement: _nullIfEmpty(_complementController.text),
+      district: _nullIfEmpty(_districtController.text),
+      addressCity: _nullIfEmpty(_addressCityController.text),
+      addressState: _addressState,
     );
 
     if (!mounted) return;
@@ -104,10 +345,9 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
           duration: Duration(seconds: 5),
         ),
       );
-      // Retorna para LoginScreen — o usuário fará login após confirmar o e-mail
+      // Retorna para LoginScreen — usuário fará login após confirmar o e-mail
       Navigator.pop(context);
     } else {
-      // Exibe mensagem de erro do provider sem expor detalhes internos
       if (authProvider.errorMessage != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -118,6 +358,12 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
         authProvider.clearError();
       }
     }
+  }
+
+  /// Retorna null para strings vazias — evita gravar string vazia no banco.
+  String? _nullIfEmpty(String value) {
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
   }
 
   /// Formata a data de nascimento selecionada para exibição no botão.
@@ -134,52 +380,62 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Cadastro de Paciente'),
-        // Garante botão de voltar visível para telas com teclado aberto
         leading: const BackButton(),
       ),
       body: SafeArea(
         child: Selector<AuthProvider, bool>(
-          // Reconstrói apenas o corpo quando isLoading muda, não toda a árvore
+          // Reconstrói apenas o corpo quando isLoading muda — evita rebuild total
           selector: (_, auth) => auth.isLoading,
           builder: (context, isLoading, _) {
             return SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Form(
                 key: _formKey,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
+                    // =========================================================
+                    // SEÇÃO 1 — Dados Pessoais
+                    // =========================================================
                     const _SectionHeader('Dados Pessoais'),
                     const SizedBox(height: 12),
+
                     // Nome — obrigatório
-                    TextFormField(
+                    _buildTextField(
                       controller: _firstNameController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Nome *',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.person),
-                      ),
-                      textInputAction: TextInputAction.next,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Informe o nome.' : null,
+                      label: 'Nome *',
+                      icon: Icons.person,
+                      capitalization: TextCapitalization.words,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Informe o nome.'
+                          : null,
                     ),
                     const SizedBox(height: 12),
+
                     // Sobrenome — obrigatório
-                    TextFormField(
+                    _buildTextField(
                       controller: _lastNameController,
-                      textCapitalization: TextCapitalization.words,
-                      decoration: const InputDecoration(
-                        labelText: 'Sobrenome *',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.person_outline),
-                      ),
-                      textInputAction: TextInputAction.next,
-                      validator: (v) =>
-                          (v == null || v.trim().isEmpty) ? 'Informe o sobrenome.' : null,
+                      label: 'Sobrenome *',
+                      icon: Icons.person_outline,
+                      capitalization: TextCapitalization.words,
+                      validator: (v) => (v == null || v.trim().isEmpty)
+                          ? 'Informe o sobrenome.'
+                          : null,
                     ),
                     const SizedBox(height: 12),
-                    // Data de nascimento — obrigatória, sem restrição de idade
+
+                    // Nome Social — opcional; respeita a identidade do paciente
+                    _buildTextField(
+                      controller: _socialNameController,
+                      label: 'Nome Social',
+                      icon: Icons.badge_outlined,
+                      capitalization: TextCapitalization.words,
+                      hint: 'Opcional',
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Data de nascimento — obrigatória
                     Semantics(
                       label: 'Data de nascimento: $_formattedBirthDate',
                       button: true,
@@ -189,9 +445,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                         onPressed: _selectBirthDate,
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 16,
-                          ),
+                              horizontal: 16, vertical: 16),
                           alignment: Alignment.centerLeft,
                         ),
                         child: Row(
@@ -199,16 +453,12 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                             Icon(
                               Icons.calendar_today,
                               size: 20,
-                              // Usa a cor primária para indicar que é selecionável,
-                              // igual ao comportamento dos outros ícones prefixos
                               color: Theme.of(context).colorScheme.primary,
                             ),
                             const SizedBox(width: 12),
                             Text(
                               _formattedBirthDate,
                               style: TextStyle(
-                                // Cor primária enquanto não selecionado (placeholder)
-                                // Cor padrão de texto quando já tem valor
                                 color: _selectedBirthDate == null
                                     ? Theme.of(context).colorScheme.primary
                                     : Theme.of(context).colorScheme.onSurface,
@@ -218,22 +468,127 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                         ),
                       ),
                     ),
-                    const SizedBox(height: 20),
+                    const SizedBox(height: 12),
+
+                    // Sexo — dropdown com valores controlados pelo SUS
+                    _buildDropdown(
+                      value: _gender,
+                      label: 'Sexo',
+                      icon: Icons.wc,
+                      options: _genderOptions,
+                      labels: _genderLabels,
+                      onChanged: (v) => setState(() => _gender = v),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Raça/Cor — classificação IBGE exigida pelo SUS
+                    _buildDropdown(
+                      value: _ethnicity,
+                      label: 'Raça / Cor',
+                      icon: Icons.people_outline,
+                      options: _ethnicityOptions,
+                      labels: _ethnicityLabels,
+                      onChanged: (v) => setState(() => _ethnicity = v),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Estado Civil
+                    _buildDropdown(
+                      value: _maritalStatus,
+                      label: 'Estado Civil',
+                      icon: Icons.favorite_outline,
+                      options: _maritalStatusOptions,
+                      labels: _maritalStatusLabels,
+                      onChanged: (v) => setState(() => _maritalStatus = v),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // CPF — 11 dígitos, sem formatação, único no banco
+                    _buildTextField(
+                      controller: _cpfController,
+                      label: 'CPF',
+                      icon: Icons.credit_card,
+                      keyboardType: TextInputType.number,
+                      hint: 'Apenas números — 11 dígitos',
+                      maxLength: 11,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null;
+                        // Valida comprimento — dígitos verificadores são checados
+                        // no backend para não expor o algoritmo de validação no cliente
+                        if (v.trim().length != 11) {
+                          return 'CPF deve ter 11 dígitos.';
+                        }
+                        return null;
+                      },
+                    ),
+
+                    // =========================================================
+                    // SEÇÃO 2 — Origem
+                    // =========================================================
+                    const _SectionHeader('Origem'),
+                    const SizedBox(height: 12),
+
+                    // Nome da mãe / responsável
+                    _buildTextField(
+                      controller: _motherParentNameController,
+                      label: 'Nome da mãe / responsável',
+                      icon: Icons.family_restroom,
+                      capitalization: TextCapitalization.words,
+                      hint: 'Opcional',
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Cidade de nascimento
+                    _buildTextField(
+                      controller: _birthCityController,
+                      label: 'Cidade de nascimento',
+                      icon: Icons.location_city_outlined,
+                      capitalization: TextCapitalization.words,
+                      hint: 'Opcional',
+                    ),
+                    const SizedBox(height: 12),
+
+                    // UF de nascimento
+                    _buildDropdown(
+                      value: _birthState,
+                      label: 'UF de nascimento',
+                      icon: Icons.map_outlined,
+                      options: _ufOptions,
+                      labels: {for (final uf in _ufOptions) uf: uf},
+                      onChanged: (v) => setState(() => _birthState = v),
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Escolaridade
+                    _buildDropdown(
+                      value: _education,
+                      label: 'Escolaridade',
+                      icon: Icons.school_outlined,
+                      options: _educationOptions,
+                      labels: _educationLabels,
+                      onChanged: (v) => setState(() => _education = v),
+                    ),
+
+                    // =========================================================
+                    // SEÇÃO 3 — Acesso
+                    // =========================================================
                     const _SectionHeader('Acesso'),
                     const SizedBox(height: 12),
+
                     // E-mail — obrigatório
-                    TextFormField(
+                    _buildTextField(
                       controller: _emailController,
+                      label: 'E-mail *',
+                      icon: Icons.email,
                       keyboardType: TextInputType.emailAddress,
                       autocorrect: false,
-                      decoration: const InputDecoration(
-                        labelText: 'E-mail *',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.email),
-                      ),
-                      textInputAction: TextInputAction.next,
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return 'Informe o e-mail.';
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Informe o e-mail.';
+                        }
                         // Validação básica de formato antes de enviar ao Supabase
                         if (!v.contains('@') || !v.contains('.')) {
                           return 'E-mail inválido.';
@@ -242,6 +597,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
+
                     // Senha — obrigatória, mínimo 6 caracteres (limite Supabase)
                     TextFormField(
                       controller: _passwordController,
@@ -251,13 +607,11 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.lock),
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscurePassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                          ),
-                          onPressed: () =>
-                              setState(() => _obscurePassword = !_obscurePassword),
+                          icon: Icon(_obscurePassword
+                              ? Icons.visibility_off
+                              : Icons.visibility),
+                          onPressed: () => setState(
+                              () => _obscurePassword = !_obscurePassword),
                           tooltip: _obscurePassword
                               ? 'Mostrar senha'
                               : 'Ocultar senha',
@@ -271,7 +625,8 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    // Confirmar senha — deve ser idêntica à senha
+
+                    // Confirmar senha — verifica correspondência localmente
                     TextFormField(
                       controller: _confirmPasswordController,
                       obscureText: _obscureConfirmPassword,
@@ -280,11 +635,9 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.lock_outline),
                         suffixIcon: IconButton(
-                          icon: Icon(
-                            _obscureConfirmPassword
-                                ? Icons.visibility_off
-                                : Icons.visibility,
-                          ),
+                          icon: Icon(_obscureConfirmPassword
+                              ? Icons.visibility_off
+                              : Icons.visibility),
                           onPressed: () => setState(() =>
                               _obscureConfirmPassword =
                                   !_obscureConfirmPassword),
@@ -293,31 +646,30 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                               : 'Ocultar senha',
                         ),
                       ),
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _handleSubmit(),
+                      textInputAction: TextInputAction.next,
                       validator: (v) {
                         if (v == null || v.isEmpty) {
                           return 'Confirme a senha.';
                         }
-                        // Verifica correspondência localmente para não enviar ao servidor
                         if (v != _passwordController.text) {
                           return 'As senhas não coincidem.';
                         }
                         return null;
                       },
                     ),
-                    const SizedBox(height: 20),
-                    // "Saúde" (sem "opcional") porque o telefone é obrigatório;
-                    // apenas o CNS permanece opcional nesta seção
+
+                    // =========================================================
+                    // SEÇÃO 4 — Saúde
+                    // =========================================================
                     const _SectionHeader('Saúde'),
                     const SizedBox(height: 12),
-                    // Telefone — obrigatório; DDD + número, exatamente 11 dígitos
+
+                    // Telefone — obrigatório; DDD (2) + 9 dígitos
                     TextFormField(
                       controller: _phoneController,
                       keyboardType: TextInputType.phone,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
-                        // DDD (2) + 9 dígitos = 11 caracteres
                         LengthLimitingTextInputFormatter(11),
                       ],
                       decoration: const InputDecoration(
@@ -329,7 +681,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                       textInputAction: TextInputAction.next,
                       validator: (v) {
                         if (v == null || v.trim().isEmpty) {
-                          // Campo obrigatório para contato do paciente
+                          // Obrigatório para contato e autenticação por SMS futura
                           return 'Informe o telefone celular.';
                         }
                         if (v.trim().length != 11) {
@@ -339,38 +691,161 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                       },
                     ),
                     const SizedBox(height: 12),
-                    // CNS — único campo verdadeiramente opcional; pode ser
-                    // informado depois pelo paciente no perfil
-                    TextFormField(
+
+                    // CNS — único campo opcional desta seção
+                    _buildTextField(
                       controller: _cnsController,
+                      label: 'CNS (Cartão Nacional de Saúde)',
+                      icon: Icons.credit_card,
                       keyboardType: TextInputType.number,
+                      hint: 'Opcional — 15 dígitos',
+                      maxLength: 15,
                       inputFormatters: [
                         FilteringTextInputFormatter.digitsOnly,
-                        // Limita a 15 dígitos conforme especificação do CNS
-                        LengthLimitingTextInputFormatter(15),
                       ],
-                      decoration: const InputDecoration(
-                        labelText: 'CNS (Cartão Nacional de Saúde)',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.credit_card),
-                        hintText: 'Opcional — até 15 dígitos',
-                      ),
-                      textInputAction: TextInputAction.done,
-                      onFieldSubmitted: (_) => _handleSubmit(),
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null;
+                        if (v.trim().length != 15) {
+                          return 'CNS deve ter 15 dígitos.';
+                        }
+                        return null;
+                      },
                     ),
+
+                    // =========================================================
+                    // SEÇÃO 5 — Endereço
+                    // =========================================================
+                    const _SectionHeader('Endereço'),
+                    const SizedBox(height: 12),
+
+                    // Campo CEP com busca automática via ViaCEP.
+                    // Ao digitar o 8º dígito, dispara a consulta e preenche
+                    // rua, bairro, cidade e UF automaticamente.
+                    TextFormField(
+                      // Key utilizada nos testes de widget para encontrar
+                      // este campo de forma inequívoca entre os demais
+                      key: const Key('cep_field'),
+                      controller: _zipCodeController,
+                      keyboardType: TextInputType.number,
+                      maxLength: 8,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                      ],
+                      decoration: InputDecoration(
+                        labelText: 'CEP',
+                        hintText: '8 dígitos',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.location_on_outlined),
+                        // Oculta o contador — o hint já informa o limite
+                        counterText: '',
+                        // Spinner visível enquanto a consulta ViaCEP está em andamento
+                        suffixIcon: _isSearchingCep
+                            ? const Padding(
+                                padding: EdgeInsets.all(12),
+                                child: SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                      strokeWidth: 2),
+                                ),
+                              )
+                            : null,
+                      ),
+                      textInputAction: TextInputAction.next,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) return null;
+                        if (v.trim().length != 8) {
+                          return 'CEP deve ter 8 dígitos.';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Logradouro — preenchido automaticamente pelo ViaCEP
+                    _buildTextField(
+                      key: const Key('street_field'),
+                      controller: _streetController,
+                      label: 'Logradouro (Rua / Av.)',
+                      icon: Icons.signpost_outlined,
+                      capitalization: TextCapitalization.words,
+                      hint: 'Opcional',
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Número e Complemento lado a lado
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 2,
+                          child: _buildTextField(
+                            controller: _streetNumberController,
+                            label: 'Número',
+                            icon: Icons.tag,
+                            keyboardType: TextInputType.text,
+                            hint: 'Ex: 123',
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 3,
+                          child: _buildTextField(
+                            controller: _complementController,
+                            label: 'Complemento',
+                            icon: Icons.apartment_outlined,
+                            hint: 'Apto, bloco...',
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Bairro
+                    _buildTextField(
+                      controller: _districtController,
+                      label: 'Bairro',
+                      icon: Icons.holiday_village_outlined,
+                      capitalization: TextCapitalization.words,
+                      hint: 'Opcional',
+                    ),
+                    const SizedBox(height: 12),
+
+                    // Cidade do endereço
+                    _buildTextField(
+                      controller: _addressCityController,
+                      label: 'Cidade',
+                      icon: Icons.location_city,
+                      capitalization: TextCapitalization.words,
+                      hint: 'Opcional',
+                    ),
+                    const SizedBox(height: 12),
+
+                    // UF do endereço
+                    _buildDropdown(
+                      value: _addressState,
+                      label: 'UF',
+                      icon: Icons.map,
+                      options: _ufOptions,
+                      labels: {for (final uf in _ufOptions) uf: uf},
+                      onChanged: (v) => setState(() => _addressState = v),
+                    ),
+
+                    // =========================================================
+                    // Botão de envio
+                    // =========================================================
                     const SizedBox(height: 28),
-                    // Botão de cadastro — desabilitado durante loading para evitar duplo envio
                     FilledButton(
                       onPressed: isLoading ? null : _handleSubmit,
                       style: FilledButton.styleFrom(
-                        // Target de toque ≥ 48dp conforme diretrizes de acessibilidade
+                        // Target de toque >= 48dp conforme diretrizes de acessibilidade
                         minimumSize: const Size.fromHeight(48),
                       ),
                       child: isLoading
                           ? const SizedBox(
                               width: 24,
                               height: 24,
-                              child: CircularProgressIndicator(strokeWidth: 2),
+                              child:
+                                  CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text('Cadastrar'),
                     ),
@@ -384,7 +859,87 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
       ),
     );
   }
+
+  // ---------------------------------------------------------------------------
+  // Helpers de construção de widgets para reduzir repetição
+  // ---------------------------------------------------------------------------
+
+  /// Campo de texto padrão do formulário.
+  ///
+  /// Centraliza a decoração para manter consistência visual sem duplicar código.
+  Widget _buildTextField({
+    Key? key,
+    required TextEditingController controller,
+    required String label,
+    required IconData icon,
+    TextInputType keyboardType = TextInputType.text,
+    TextCapitalization capitalization = TextCapitalization.none,
+    String? hint,
+    int? maxLength,
+    List<TextInputFormatter>? inputFormatters,
+    bool autocorrect = true,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      key: key,
+      controller: controller,
+      keyboardType: keyboardType,
+      textCapitalization: capitalization,
+      autocorrect: autocorrect,
+      maxLength: maxLength,
+      inputFormatters: inputFormatters,
+      decoration: InputDecoration(
+        labelText: label,
+        hintText: hint,
+        border: const OutlineInputBorder(),
+        prefixIcon: Icon(icon),
+        // Esconde o contador de caracteres — o hint já informa o limite
+        counterText: maxLength != null ? '' : null,
+      ),
+      textInputAction: TextInputAction.next,
+      validator: validator,
+    );
+  }
+
+  /// Dropdown padrão para campos de seleção controlada.
+  ///
+  /// Usa DropdownButtonFormField para integração nativa com Form/validate.
+  Widget _buildDropdown({
+    required String? value,
+    required String label,
+    required IconData icon,
+    required List<String> options,
+    required Map<String, String> labels,
+    required ValueChanged<String?> onChanged,
+  }) {
+    return DropdownButtonFormField<String>(
+      value: value,
+      decoration: InputDecoration(
+        labelText: label,
+        border: const OutlineInputBorder(),
+        prefixIcon: Icon(icon),
+      ),
+      // Item nulo como "Opcional" — permite desfazer seleção
+      items: [
+        const DropdownMenuItem<String>(
+          value: null,
+          child: Text('Opcional'),
+        ),
+        ...options.map(
+          (opt) => DropdownMenuItem<String>(
+            value: opt,
+            child: Text(labels[opt] ?? opt),
+          ),
+        ),
+      ],
+      onChanged: onChanged,
+    );
+  }
 }
+
+// =============================================================================
+// Widgets auxiliares
+// =============================================================================
 
 /// Cabeçalho de seção do formulário.
 ///
@@ -400,6 +955,7 @@ class _SectionHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        const SizedBox(height: 8),
         Text(
           title,
           style: Theme.of(context).textTheme.titleSmall?.copyWith(

@@ -132,7 +132,8 @@ void main() {
     ///
     /// Nota: neste teste o session é null (confirmação de e-mail habilitada),
     /// portanto o update via PostgREST NÃO é chamado — comportamento esperado.
-    test('deve cadastrar paciente com todos os campos e retornar UserModel correto',
+    test(
+        'deve cadastrar paciente com todos os campos e retornar UserModel correto',
         () async {
       // Paciente com todos os dados do fluxo PatientRegisterScreen
       final mockAuthResponse = MockAuthResponse();

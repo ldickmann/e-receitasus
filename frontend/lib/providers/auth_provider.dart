@@ -123,7 +123,7 @@ class AuthProvider with ChangeNotifier {
   /// Delega cadastro de paciente ao service e atualiza estado.
   ///
   /// Fluxo BaaS: service chama signUp no Supabase → trigger cria User(PACIENTE)
-  /// → service atualiza campos opcionais via PostgREST se houver sessão imediata.
+  /// → service atualiza todos os campos via PostgREST se houver sessão imediata.
   /// Retorna true em sucesso; false com errorMessage preenchido em falha.
   Future<bool> registerPatient({
     required String firstName,
@@ -131,8 +131,24 @@ class AuthProvider with ChangeNotifier {
     required String email,
     required DateTime birthDate,
     required String password,
+    required String phone,
     String? cns,
-    String? phone,
+    String? cpf,
+    String? socialName,
+    String? motherParentName,
+    String? birthCity,
+    String? birthState,
+    String? gender,
+    String? ethnicity,
+    String? maritalStatus,
+    String? education,
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
   }) async {
     _setLoading(true);
     _clearError();
@@ -144,8 +160,24 @@ class AuthProvider with ChangeNotifier {
         email: email,
         birthDate: birthDate,
         password: password,
-        cns: cns,
         phone: phone,
+        cns: cns,
+        cpf: cpf,
+        socialName: socialName,
+        motherParentName: motherParentName,
+        birthCity: birthCity,
+        birthState: birthState,
+        gender: gender,
+        ethnicity: ethnicity,
+        maritalStatus: maritalStatus,
+        education: education,
+        zipCode: zipCode,
+        street: street,
+        streetNumber: streetNumber,
+        complement: complement,
+        district: district,
+        addressCity: addressCity,
+        addressState: addressState,
       );
 
       _setLoading(false);

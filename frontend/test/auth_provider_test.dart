@@ -100,7 +100,8 @@ void main() {
         );
 
         // ASSERT
-        expect(result, isTrue, reason: 'Cadastro bem-sucedido deve retornar true');
+        expect(result, isTrue,
+            reason: 'Cadastro bem-sucedido deve retornar true');
         expect(provider.isAuthenticated, isTrue);
         expect(provider.isLoading, isFalse);
         expect(provider.errorMessage, isNull);
@@ -149,7 +150,8 @@ void main() {
         );
 
         // ASSERT
-        expect(result, isFalse, reason: 'Falha no cadastro deve retornar false');
+        expect(result, isFalse,
+            reason: 'Falha no cadastro deve retornar false');
         expect(provider.isAuthenticated, isFalse);
         expect(provider.isLoading, isFalse);
         // O provider interpreta a exceção e expõe mensagem amigável
@@ -196,8 +198,10 @@ void main() {
       );
 
       // ASSERT — deve ter emitido true (início) e false (fim)
-      expect(loadingStates, contains(true), reason: 'Deve emitir isLoading=true');
-      expect(loadingStates.last, isFalse, reason: 'Deve terminar com isLoading=false');
+      expect(loadingStates, contains(true),
+          reason: 'Deve emitir isLoading=true');
+      expect(loadingStates.last, isFalse,
+          reason: 'Deve terminar com isLoading=false');
     });
   });
 
@@ -238,7 +242,8 @@ void main() {
         );
 
         // ASSERT
-        expect(result, isTrue, reason: 'Cadastro de profissional bem-sucedido deve retornar true');
+        expect(result, isTrue,
+            reason: 'Cadastro de profissional bem-sucedido deve retornar true');
         expect(provider.isAuthenticated, isTrue);
         expect(provider.isLoading, isFalse);
         expect(provider.errorMessage, isNull);
@@ -362,7 +367,8 @@ void main() {
       ).thenAnswer((_) async => medicoCompleto);
 
       await provider.login('carlos.oliveira@sus.gov.br', 'Senha@456');
-      expect(provider.isAuthenticated, isTrue, reason: 'Pré-condição: usuário deve estar logado');
+      expect(provider.isAuthenticated, isTrue,
+          reason: 'Pré-condição: usuário deve estar logado');
 
       when(mockService.logout()).thenAnswer((_) async {});
 

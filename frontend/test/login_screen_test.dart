@@ -70,8 +70,9 @@ class FakeAuthService implements IAuthService {
 
   /// Simulação de cadastro de paciente para manter contrato completo.
   ///
-  /// Retorna UserModel com professionalType.paciente —
-  /// reflete o tipo correto esperado pelo fluxo de cadastro de pacientes.
+  /// Inclui todos os 22 parâmetros do IAuthService.registerPatient —
+  /// campos novos são ignorados neste fake pois a LoginScreen não os usa.
+  /// A assinatura completa é obrigatória para implementar o contrato IAuthService.
   @override
   Future<UserModel> registerPatient({
     required String firstName,
@@ -79,8 +80,24 @@ class FakeAuthService implements IAuthService {
     required String email,
     required DateTime birthDate,
     required String password,
+    required String phone,
     String? cns,
-    String? phone,
+    String? cpf,
+    String? socialName,
+    String? motherParentName,
+    String? birthCity,
+    String? birthState,
+    String? gender,
+    String? ethnicity,
+    String? maritalStatus,
+    String? education,
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
   }) async {
     return UserModel(
       id: '44444444-4444-4444-4444-444444444444',
@@ -89,8 +106,9 @@ class FakeAuthService implements IAuthService {
       email: email,
       birthDate: birthDate,
       professionalType: ProfessionalType.paciente,
-      cns: cns,
+      // Apenas campos usados pelo fluxo de paciente são mapeados no fake
       phone: phone,
+      cns: cns,
     );
   }
 }
