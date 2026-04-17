@@ -82,10 +82,14 @@ jobs:
 
     steps:
       # Faz o download do código-fonte do commit exato que passou no CI.
-      # Com trigger workflow_run, github.sha aponta para o commit
-      # que originou o CI — garantindo consistência entre teste e deploy.
+      # ATENÇÃO: em workflow_run, github.sha aponta para o HEAD da branch
+      # padrão do repositório (ex: main), NÃO para o commit que disparou o CI.
+      # É obrigatório usar github.event.workflow_run.head_sha para garantir
+      # que o CD opera sobre o mesmo código que foi testado pelo CI.
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       # Node 22 LTS: versão estável com suporte ativo,
       # evita avisos de depreciação das versões anteriores
@@ -129,8 +133,12 @@ jobs:
     needs: setup-environment
 
     steps:
+      # Mesmo ref do job anterior — garante consistência entre jobs do CD.
+      # Cada job cria um novo runner, por isso o checkout precisa ser repetido.
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -192,8 +200,12 @@ jobs:
     needs: sync-database
 
     steps:
+      # Mesmo ref dos jobs anteriores — deploy usa os mesmos arquivos
+      # que passaram no CI e foram sincronizados no banco.
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
 
       # CLI do Supabase é necessário para o comando 'functions deploy'
       - name: Setup Supabase CLI
