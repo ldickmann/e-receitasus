@@ -256,13 +256,11 @@ class AuthService implements IAuthService {
         motherParentName:
             _notEmpty(motherParentName) ? motherParentName!.trim() : null,
         birthCity: _notEmpty(birthCity) ? birthCity!.trim() : null,
-        birthState: _notEmpty(birthState)
-            ? birthState!.trim().toUpperCase()
-            : null,
+        birthState:
+            _notEmpty(birthState) ? birthState!.trim().toUpperCase() : null,
         gender: _notEmpty(gender) ? gender!.trim() : null,
         ethnicity: _notEmpty(ethnicity) ? ethnicity!.trim() : null,
-        maritalStatus:
-            _notEmpty(maritalStatus) ? maritalStatus!.trim() : null,
+        maritalStatus: _notEmpty(maritalStatus) ? maritalStatus!.trim() : null,
         education: _notEmpty(education) ? education!.trim() : null,
         zipCode: _notEmpty(zipCode) ? zipCode!.trim() : null,
         street: _notEmpty(street) ? street!.trim() : null,
@@ -270,9 +268,8 @@ class AuthService implements IAuthService {
         complement: _notEmpty(complement) ? complement!.trim() : null,
         district: _notEmpty(district) ? district!.trim() : null,
         addressCity: _notEmpty(addressCity) ? addressCity!.trim() : null,
-        addressState: _notEmpty(addressState)
-            ? addressState!.trim().toUpperCase()
-            : null,
+        addressState:
+            _notEmpty(addressState) ? addressState!.trim().toUpperCase() : null,
       );
     } on AuthException catch (e) {
       throw Exception(e.message);

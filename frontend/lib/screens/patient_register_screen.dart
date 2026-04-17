@@ -146,9 +146,33 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
 
   // 26 UFs + DF ordenados alfabeticamente
   static const _ufOptions = [
-    'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO', 'MA',
-    'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI', 'RJ', 'RN',
-    'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+    'AC',
+    'AL',
+    'AP',
+    'AM',
+    'BA',
+    'CE',
+    'DF',
+    'ES',
+    'GO',
+    'MA',
+    'MT',
+    'MS',
+    'MG',
+    'PA',
+    'PB',
+    'PR',
+    'PE',
+    'PI',
+    'RJ',
+    'RN',
+    'RS',
+    'RO',
+    'RR',
+    'SC',
+    'SP',
+    'SE',
+    'TO',
   ];
 
   @override
@@ -207,8 +231,8 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
         if (data.containsKey('erro')) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text(
-                  'CEP não encontrado. Preencha o endereço manualmente.'),
+              content:
+                  Text('CEP não encontrado. Preencha o endereço manualmente.'),
             ),
           );
           return;
@@ -232,16 +256,15 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content:
-              Text('Tempo esgotado ao consultar o CEP. Tente novamente.'),
+          content: Text('Tempo esgotado ao consultar o CEP. Tente novamente.'),
         ),
       );
     } catch (_) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text(
-              'Não foi possível consultar o CEP. Verifique a conexão.'),
+          content:
+              Text('Não foi possível consultar o CEP. Verifique a conexão.'),
         ),
       );
     } finally {
@@ -388,8 +411,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
           selector: (_, auth) => auth.isLoading,
           builder: (context, isLoading, _) {
             return SingleChildScrollView(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -745,8 +767,8 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                                 child: SizedBox(
                                   width: 20,
                                   height: 20,
-                                  child: CircularProgressIndicator(
-                                      strokeWidth: 2),
+                                  child:
+                                      CircularProgressIndicator(strokeWidth: 2),
                                 ),
                               )
                             : null,
@@ -844,8 +866,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                           ? const SizedBox(
                               width: 24,
                               height: 24,
-                              child:
-                                  CircularProgressIndicator(strokeWidth: 2),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           : const Text('Cadastrar'),
                     ),
