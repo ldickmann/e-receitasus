@@ -172,15 +172,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                 const SizedBox(height: 10),
 
-                // Botão de Cadastro (profissional)
+                // Botão de Cadastro (profissional do SUS)
                 TextButton(
                   onPressed: _handleRegister,
-                  child: const Text('Não tem conta? Cadastre-se'),
+                  child: const Text('Cadastro para Profissionais do SUS'),
                 ),
-                // Botão de cadastro de paciente — fluxo separado sem dados de conselho
-                TextButton(
+                // Botão de cadastro de paciente — fluxo separado sem dados de conselho.
+                // Usa cor secundária (azul) para diferenciar visualmente dos dois fluxos.
+                ElevatedButton(
                   onPressed: _handlePatientRegister,
-                  child: const Text('Sou paciente? Cadastre-se aqui'),
+                  style: ElevatedButton.styleFrom(
+                    // Azul secundário — identidade visual do E-ReceitaSUS
+                    backgroundColor: const Color(0xFF1565C0),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  child: const Text('Cadastro Usuário SUS'),
                 ),
               ],
             ),

@@ -7,8 +7,8 @@ import '../providers/auth_provider.dart';
 ///
 /// Separada da RegisterScreen (profissionais de saúde) para que o fluxo de
 /// pacientes seja mais simples, sem exigir dados de conselho profissional.
-/// Campos obrigatórios: nome, sobrenome, data de nascimento, e-mail e senha.
-/// CNS e telefone são opcionais — podem ser preenchidos no perfil depois.
+/// Campos obrigatórios: nome, sobrenome, data de nascimento, e-mail, senha
+/// e telefone celular. CNS é o único campo opcional.
 class PatientRegisterScreen extends StatefulWidget {
   const PatientRegisterScreen({super.key});
 
@@ -88,9 +88,8 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
       cns: _cnsController.text.trim().isEmpty
           ? null
           : _cnsController.text.trim(),
-      phone: _phoneController.text.trim().isEmpty
-          ? null
-          : _phoneController.text.trim(),
+      // Telefone é obrigatório — o validator já garante que não está vazio
+      phone: _phoneController.text.trim(),
     );
 
     if (!mounted) return;
@@ -184,13 +183,38 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                     Semantics(
                       label: 'Data de nascimento: $_formattedBirthDate',
                       button: true,
-                      child: OutlinedButton.icon(
+                      // OutlinedButton puro com Row evita overflow do ícone
+                      // que ocorria com OutlinedButton.icon + alignment.centerLeft
+                      child: OutlinedButton(
                         onPressed: _selectBirthDate,
-                        icon: const Icon(Icons.calendar_today),
-                        label: Text(_formattedBirthDate),
                         style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 16,
+                          ),
                           alignment: Alignment.centerLeft,
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.calendar_today,
+                              size: 20,
+                              // Usa a cor primária para indicar que é selecionável,
+                              // igual ao comportamento dos outros ícones prefixos
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 12),
+                            Text(
+                              _formattedBirthDate,
+                              style: TextStyle(
+                                // Cor primária enquanto não selecionado (placeholder)
+                                // Cor padrão de texto quando já tem valor
+                                color: _selectedBirthDate == null
+                                    ? Theme.of(context).colorScheme.primary
+                                    : Theme.of(context).colorScheme.onSurface,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),
@@ -283,9 +307,40 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                       },
                     ),
                     const SizedBox(height: 20),
-                    const _SectionHeader('Saúde (opcional)'),
+                    // "Saúde" (sem "opcional") porque o telefone é obrigatório;
+                    // apenas o CNS permanece opcional nesta seção
+                    const _SectionHeader('Saúde'),
                     const SizedBox(height: 12),
-                    // CNS — Cartão Nacional de Saúde, máximo 15 dígitos
+                    // Telefone — obrigatório; DDD + número, exatamente 11 dígitos
+                    TextFormField(
+                      controller: _phoneController,
+                      keyboardType: TextInputType.phone,
+                      inputFormatters: [
+                        FilteringTextInputFormatter.digitsOnly,
+                        // DDD (2) + 9 dígitos = 11 caracteres
+                        LengthLimitingTextInputFormatter(11),
+                      ],
+                      decoration: const InputDecoration(
+                        labelText: 'Telefone celular *',
+                        border: OutlineInputBorder(),
+                        prefixIcon: Icon(Icons.phone),
+                        hintText: 'DDD + número (11 dígitos)',
+                      ),
+                      textInputAction: TextInputAction.next,
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          // Campo obrigatório para contato do paciente
+                          return 'Informe o telefone celular.';
+                        }
+                        if (v.trim().length != 11) {
+                          return 'Informe DDD + número (11 dígitos).';
+                        }
+                        return null;
+                      },
+                    ),
+                    const SizedBox(height: 12),
+                    // CNS — único campo verdadeiramente opcional; pode ser
+                    // informado depois pelo paciente no perfil
                     TextFormField(
                       controller: _cnsController,
                       keyboardType: TextInputType.number,
@@ -300,33 +355,8 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                         prefixIcon: Icon(Icons.credit_card),
                         hintText: 'Opcional — até 15 dígitos',
                       ),
-                      textInputAction: TextInputAction.next,
-                    ),
-                    const SizedBox(height: 12),
-                    // Telefone — DDD + número, exatamente 11 dígitos
-                    TextFormField(
-                      controller: _phoneController,
-                      keyboardType: TextInputType.phone,
-                      inputFormatters: [
-                        FilteringTextInputFormatter.digitsOnly,
-                        // DDD (2) + 9 dígitos = 11 caracteres
-                        LengthLimitingTextInputFormatter(11),
-                      ],
-                      decoration: const InputDecoration(
-                        labelText: 'Telefone celular',
-                        border: OutlineInputBorder(),
-                        prefixIcon: Icon(Icons.phone),
-                        hintText: 'Opcional — DDD + número (11 dígitos)',
-                      ),
                       textInputAction: TextInputAction.done,
                       onFieldSubmitted: (_) => _handleSubmit(),
-                      validator: (v) {
-                        if (v == null || v.trim().isEmpty) return null;
-                        if (v.trim().length != 11) {
-                          return 'Informe DDD + número (11 dígitos).';
-                        }
-                        return null;
-                      },
                     ),
                     const SizedBox(height: 28),
                     // Botão de cadastro — desabilitado durante loading para evitar duplo envio

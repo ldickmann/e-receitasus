@@ -124,8 +124,11 @@ void main() {
       expect(find.widgetWithText(TextFormField, 'E-mail SUS'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'Senha'), findsOneWidget);
       expect(find.widgetWithText(ElevatedButton, 'Entrar'), findsOneWidget);
-      expect(find.widgetWithText(TextButton, 'Não tem conta? Cadastre-se'),
-          findsOneWidget);
+      // Botão renomeado conforme identidade do sistema
+      expect(
+        find.widgetWithText(TextButton, 'Cadastro para Profissionais do SUS'),
+        findsOneWidget,
+      );
 
       await tester.enterText(
         find.widgetWithText(TextFormField, 'E-mail SUS'),
