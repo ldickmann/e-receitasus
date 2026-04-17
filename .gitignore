@@ -141,8 +141,18 @@ backend/**/*.js
 backend/**/*.js.map
 backend/**/*.d.ts
 backend/**/*.d.ts.map
+
 # Exceção: arquivos de configuração JavaScript (não são artefatos de build)
 !backend/jest.config.cjs
 .github/appmod/assessment/reports/report-1770713257289/report.json
-.github/agents/e-receitasus-senior-dev.agent.md
 .github/modernize/
+
+# -----------------------------------------
+# GITHUB COPILOT CUSTOMIZATIONS (locais)
+# -----------------------------------------
+.github/agents/
+.github/copilot-instructions.md
+.github/instructions/
+.github/prompts/
+.github/skills/
+.github/hooks/
