@@ -157,8 +157,8 @@ jobs:
         working-directory: ./backend
 
       # Gera o Prisma Client tipado a partir do schema.prisma.
-      # Sem este passo, o comando 'db push' não consegue
-      # interpretar corretamente o schema.
+      # Necessário antes de executar qualquer comando Prisma que
+      # acesse o banco, pois o Client é gerado localmente.
       - name: Gerar Prisma Client
         run: npx prisma generate
         working-directory: ./backend
@@ -167,14 +167,13 @@ jobs:
           # Valor configurado em: Settings → Secrets and variables → Actions
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      # Sincroniza o estado do schema.prisma com o banco de dados real.
-      # É como um "alinhamento de planta baixa": garante que o banco
-      # reflete exatamente o que está definido no schema.
-      # A flag '--accept-data-loss' foi OMITIDA intencionalmente:
-      # o pipeline deve falhar se houver risco de perda de dados,
-      # forçando uma revisão manual antes de prosseguir.
-      - name: Sincronizar Schema com o Banco (db push)
-        run: npx prisma db push
+      # Aplica SOMENTE as migrations pendentes no banco de produção.
+      # Diferente do 'db push', o 'migrate deploy' nunca remove colunas
+      # ou enums existentes — ele apenas avança o histórico de migrations,
+      # tornando o pipeline seguro mesmo com commits desatualizados no runner.
+      # Referência: https://www.prisma.io/docs/orm/prisma-migrate/workflows/deploying-migrations
+      - name: Aplicar Migrations Pendentes (migrate deploy)
+        run: npx prisma migrate deploy
         working-directory: ./backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
