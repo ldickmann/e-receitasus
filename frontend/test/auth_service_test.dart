@@ -124,6 +124,67 @@ void main() {
       ).called(1);
     });
 
+    /// Valida cadastro de paciente com todos os campos preenchidos.
+    ///
+    /// Fluxo: signUp com metadata (first_name, last_name, birth_date,
+    /// professional_type=PACIENTE) → trigger cria User no banco →
+    /// AuthService retorna UserModel com professionalType.paciente.
+    ///
+    /// Nota: neste teste o session é null (confirmação de e-mail habilitada),
+    /// portanto o update via PostgREST NÃO é chamado — comportamento esperado.
+    test(
+        'deve cadastrar paciente com todos os campos e retornar UserModel correto',
+        () async {
+      // Paciente com todos os dados do fluxo PatientRegisterScreen
+      final mockAuthResponse = MockAuthResponse();
+      final mockUser = MockUser();
+
+      when(
+        mockGoTrueClient.signUp(
+          email: 'maria.santos@sus.gov.br',
+          password: 'Senha@123',
+          data: anyNamed('data'),
+        ),
+      ).thenAnswer((_) async => mockAuthResponse);
+
+      when(mockAuthResponse.user).thenReturn(mockUser);
+      // Session null simula confirmação de e-mail pendente — comportamento BaaS padrão
+      when(mockAuthResponse.session).thenReturn(null);
+      when(mockUser.id).thenReturn('aabbccdd-0000-0000-0000-000000000001');
+
+      final result = await authService.registerPatient(
+        firstName: 'Maria',
+        lastName: 'Santos',
+        email: 'maria.santos@sus.gov.br',
+        birthDate: DateTime(1985, 3, 22),
+        password: 'Senha@123',
+        cns: '123456789012345',
+        phone: '48991234567',
+      );
+
+      // Verifica mapeamento correto dos campos do paciente
+      expect(result.id, 'aabbccdd-0000-0000-0000-000000000001');
+      expect(result.firstName, 'Maria');
+      expect(result.lastName, 'Santos');
+      expect(result.email, 'maria.santos@sus.gov.br');
+      expect(result.professionalType, ProfessionalType.paciente);
+      expect(result.professionalType.isPatient, isTrue);
+      expect(result.professionalType.canPrescribe, isFalse);
+      // Telefone obrigatório deve estar presente no retorno
+      expect(result.phone, '48991234567');
+      // CNS opcional — preenchido neste teste completo
+      expect(result.cns, '123456789012345');
+      expect(result.birthDate, DateTime(1985, 3, 22));
+
+      verify(
+        mockGoTrueClient.signUp(
+          email: 'maria.santos@sus.gov.br',
+          password: 'Senha@123',
+          data: anyNamed('data'),
+        ),
+      ).called(1);
+    });
+
     /// Valida encerramento de sessao.
     test('deve chamar signOut no logout', () async {
       when(mockGoTrueClient.signOut()).thenAnswer((_) async {});

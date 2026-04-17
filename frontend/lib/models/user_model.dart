@@ -1,5 +1,10 @@
-import 'professional_type.dart';
+﻿import 'professional_type.dart';
 
+/// Modelo imutável do usuário — espelha os campos relevantes de public.User.
+///
+/// Campos de paciente (cns..addressState) são opcionais e só são preenchidos
+/// quando professionalType == ProfessionalType.paciente. Para demais perfis
+/// esses campos ficam nulos e não são exibidos nem enviados ao banco.
 class UserModel {
   final String id;
   final String firstName;
@@ -13,6 +18,64 @@ class UserModel {
   final String? token;
   final DateTime? tokenExpiry;
 
+  // -----------------------------------------------------------------------
+  // Campos exclusivos de paciente — sincronizados via PostgREST (RLS)
+  // -----------------------------------------------------------------------
+
+  /// Cartão Nacional de Saúde — 15 dígitos
+  final String? cns;
+
+  /// CPF — 11 dígitos sem formatação (constraint unique no banco)
+  final String? cpf;
+
+  /// Nome Social — não substitui nome civil em documentos oficiais
+  final String? socialName;
+
+  /// Nome da mãe ou, na ausência, do pai/responsável legal
+  final String? motherParentName;
+
+  /// Cidade de nascimento
+  final String? birthCity;
+
+  /// UF de nascimento — 2 caracteres
+  final String? birthState;
+
+  /// Sexo conforme declarado pelo paciente
+  final String? gender;
+
+  /// Raça/Cor conforme classificação IBGE
+  final String? ethnicity;
+
+  /// Estado civil
+  final String? maritalStatus;
+
+  /// Celular com DDD — 11 dígitos
+  final String? phone;
+
+  /// Escolaridade
+  final String? education;
+
+  /// CEP — 8 dígitos sem hífen
+  final String? zipCode;
+
+  /// Logradouro
+  final String? street;
+
+  /// Número do endereço
+  final String? streetNumber;
+
+  /// Complemento opcional
+  final String? complement;
+
+  /// Bairro
+  final String? district;
+
+  /// Cidade do endereço atual
+  final String? addressCity;
+
+  /// UF do endereço atual — 2 caracteres
+  final String? addressState;
+
   UserModel({
     required this.id,
     required this.firstName,
@@ -25,6 +88,25 @@ class UserModel {
     this.specialty,
     this.token,
     this.tokenExpiry,
+    // Campos de paciente — todos opcionais para compatibilidade com perfis profissionais
+    this.cns,
+    this.cpf,
+    this.socialName,
+    this.motherParentName,
+    this.birthCity,
+    this.birthState,
+    this.gender,
+    this.ethnicity,
+    this.maritalStatus,
+    this.phone,
+    this.education,
+    this.zipCode,
+    this.street,
+    this.streetNumber,
+    this.complement,
+    this.district,
+    this.addressCity,
+    this.addressState,
   });
 
   String get name {
@@ -62,6 +144,25 @@ class UserModel {
       specialty: json['specialty'] as String?,
       token: json['token'] as String?,
       tokenExpiry: _parseDate(json['tokenExpiry'] ?? json['token_expiry']),
+      // Campos de paciente — chaves camelCase conforme exposto pelo PostgREST
+      cns: json['cns'] as String?,
+      cpf: json['cpf'] as String?,
+      socialName: json['socialName'] as String?,
+      motherParentName: json['motherParentName'] as String?,
+      birthCity: json['birthCity'] as String?,
+      birthState: json['birthState'] as String?,
+      gender: json['gender'] as String?,
+      ethnicity: json['ethnicity'] as String?,
+      maritalStatus: json['maritalStatus'] as String?,
+      phone: json['phone'] as String?,
+      education: json['education'] as String?,
+      zipCode: json['zipCode'] as String?,
+      street: json['street'] as String?,
+      streetNumber: json['streetNumber'] as String?,
+      complement: json['complement'] as String?,
+      district: json['district'] as String?,
+      addressCity: json['addressCity'] as String?,
+      addressState: json['addressState'] as String?,
     );
   }
 
@@ -79,6 +180,25 @@ class UserModel {
       'specialty': specialty,
       'token': token,
       'tokenExpiry': tokenExpiry?.toIso8601String(),
+      // Inclui campos de paciente apenas se preenchidos para não poluir o JSON
+      if (cns != null) 'cns': cns,
+      if (cpf != null) 'cpf': cpf,
+      if (socialName != null) 'socialName': socialName,
+      if (motherParentName != null) 'motherParentName': motherParentName,
+      if (birthCity != null) 'birthCity': birthCity,
+      if (birthState != null) 'birthState': birthState,
+      if (gender != null) 'gender': gender,
+      if (ethnicity != null) 'ethnicity': ethnicity,
+      if (maritalStatus != null) 'maritalStatus': maritalStatus,
+      if (phone != null) 'phone': phone,
+      if (education != null) 'education': education,
+      if (zipCode != null) 'zipCode': zipCode,
+      if (street != null) 'street': street,
+      if (streetNumber != null) 'streetNumber': streetNumber,
+      if (complement != null) 'complement': complement,
+      if (district != null) 'district': district,
+      if (addressCity != null) 'addressCity': addressCity,
+      if (addressState != null) 'addressState': addressState,
     };
   }
 

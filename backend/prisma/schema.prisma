@@ -17,6 +17,8 @@ enum ProfessionalType {
   ASSISTENTE_SOCIAL
   ADMINISTRATIVO
   OUTROS
+  /// Usuário SUS que recebe receitas — não é profissional de saúde
+  PACIENTE
 }
 
 enum PrescriptionStatus {
@@ -36,6 +38,46 @@ model User {
   professionalId        String?
   professionalState     String?
   specialty             String?
+
+  /// Campos exclusivos do tipo PACIENTE — preenchidos apenas no cadastro de pacientes SUS
+
+  /// Cartão Nacional de Saúde — máximo 15 caracteres
+  cns                   String?
+  /// CPF do paciente — 11 dígitos sem formatação
+  cpf                   String?          @unique
+  /// Nome Social — opcional, não substitui o nome civil nos documentos
+  socialName            String?
+  /// Nome completo da mãe ou, na ausência, do pai/responsável legal
+  motherParentName      String?
+  /// Cidade onde o paciente nasceu
+  birthCity             String?
+  /// UF de nascimento — 2 caracteres (ex: SC)
+  birthState            String?          @db.Char(2)
+  /// Sexo conforme declarado pelo paciente
+  gender                String?
+  /// Raça/Cor conforme classificação IBGE
+  ethnicity             String?
+  /// Estado civil do paciente
+  maritalStatus         String?
+  /// Celular com DDD — 11 dígitos (ex: 47988420692)
+  phone                 String?
+  /// Escolaridade do paciente
+  education             String?
+  /// CEP do endereço — 8 dígitos sem hífen
+  zipCode               String?          @db.Char(8)
+  /// Logradouro (rua, avenida etc.)
+  street                String?
+  /// Número do endereço
+  streetNumber          String?
+  /// Complemento opcional (apto, bloco etc.)
+  complement            String?
+  /// Bairro
+  district              String?
+  /// Cidade do endereço atual
+  addressCity           String?
+  /// UF do endereço atual — 2 caracteres
+  addressState          String?          @db.Char(2)
+
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
 
@@ -44,6 +86,7 @@ model User {
 
   @@index([professionalType])
   @@index([createdAt])
+  @@index([cpf])
 }
 
 model Prescription {

@@ -9,7 +9,11 @@ enum ProfessionalType {
   assistenteSocial('ASSISTENTE_SOCIAL', 'Assistente Social', 'CRESS', true),
   administrativo(
       'ADMINISTRATIVO', 'Administrativo', 'Matricula funcional', false),
-  outros('OUTROS', 'Outros', 'Registro institucional', false);
+  outros('OUTROS', 'Outros', 'Registro institucional', false),
+
+  /// Paciente do SUS — cadastrado pelo app para acompanhar receitas.
+  /// Não exige registro em conselho profissional.
+  paciente('PACIENTE', 'Paciente', 'CNS', false);
 
   const ProfessionalType(
     this.value,
@@ -51,6 +55,13 @@ enum ProfessionalType {
   /// Enfermeiros atuam na triagem de solicitações de renovação de receitas,
   /// confirmando a necessidade clínica antes de encaminhar ao médico.
   bool get isNurse => this == ProfessionalType.enfermeiro;
+
+  /// Indica se o perfil é de paciente (não profissional de saúde).
+  ///
+  /// Pacientes não possuem registro em conselho e acessam apenas a tela de
+  /// acompanhamento de receitas. O valor PACIENTE é resolvido pelo trigger
+  /// `handle_new_user` no Supabase quando professionalType == 'PACIENTE'.
+  bool get isPatient => this == ProfessionalType.paciente;
 
   String get registrationHint {
     if (requiresCouncil) {

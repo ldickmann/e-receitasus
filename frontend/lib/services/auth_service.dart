@@ -5,14 +5,8 @@ import '../models/professional_type.dart';
 abstract class IAuthService {
   Future<UserModel> login(String email, String password);
 
-  Future<UserModel> register({
-    required String firstName,
-    required String lastName,
-    required String email,
-    required DateTime birthDate,
-    required String password,
-  });
-
+  /// Cadastra profissional de saúde com dados do conselho.
+  /// Utilizado pela RegisterScreen (médicos, enfermeiros, dentistas, etc.).
   Future<UserModel> registerWithProfessionalInfo({
     required String firstName,
     required String lastName,
@@ -23,6 +17,35 @@ abstract class IAuthService {
     String? professionalId,
     String? professionalState,
     String? specialty,
+  });
+
+  /// Cadastra paciente com todos os dados pessoais, de saúde e endereço.
+  /// Utilizado pela PatientRegisterScreen — fluxo BaaS:
+  /// signUp → trigger cria User(PACIENTE) → update via PostgREST se houver sessão.
+  Future<UserModel> registerPatient({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+    required String phone,
+    String? cns,
+    String? cpf,
+    String? socialName,
+    String? motherParentName,
+    String? birthCity,
+    String? birthState,
+    String? gender,
+    String? ethnicity,
+    String? maritalStatus,
+    String? education,
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
   });
 
   Future<void> logout();
@@ -72,27 +95,6 @@ class AuthService implements IAuthService {
     } catch (_) {
       throw Exception('Ocorreu um erro inesperado no login.');
     }
-  }
-
-  @override
-  Future<UserModel> register({
-    required String firstName,
-    required String lastName,
-    required String email,
-    required DateTime birthDate,
-    required String password,
-  }) {
-    return registerWithProfessionalInfo(
-      firstName: firstName,
-      lastName: lastName,
-      email: email,
-      birthDate: birthDate,
-      password: password,
-      professionalType: ProfessionalType.administrativo,
-      professionalId: null,
-      professionalState: null,
-      specialty: null,
-    );
   }
 
   @override
@@ -151,6 +153,133 @@ class AuthService implements IAuthService {
     }
   }
 
+  /// Cadastra paciente via Supabase Auth (BaaS).
+  ///
+  /// Fluxo:
+  /// 1. signUp com metadata (first_name, last_name, birth_date, professional_type=PACIENTE)
+  /// 2. O trigger `handle_new_user` cria o registro em public.User automaticamente
+  /// 3. Se o Supabase retornar sessão imediata (confirmação de e-mail desabilitada),
+  ///    atualiza todos os campos complementares via PostgREST em uma única chamada
+  /// 4. Se sessão for null (e-mail pendente de confirmação), os campos opcionais
+  ///    ficarão null até o usuário completar o perfil — comportamento aceitável
+  @override
+  Future<UserModel> registerPatient({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+    required String phone,
+    String? cns,
+    String? cpf,
+    String? socialName,
+    String? motherParentName,
+    String? birthCity,
+    String? birthState,
+    String? gender,
+    String? ethnicity,
+    String? maritalStatus,
+    String? education,
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
+  }) async {
+    try {
+      final response = await _supabase.auth.signUp(
+        email: email.trim().toLowerCase(),
+        password: password,
+        data: {
+          // snake_case — compatível com o trigger `handle_new_user` que lê esta chave
+          'first_name': firstName.trim(),
+          'last_name': lastName.trim(),
+          'birth_date': _formatBirthDate(birthDate),
+          // Instrui o trigger a criar o User como PACIENTE (sem conselho)
+          'professional_type': 'PACIENTE',
+        },
+      );
+
+      final user = response.user;
+      if (user == null) {
+        throw Exception('Cadastro não retornou usuário. Verifique o e-mail.');
+      }
+
+      // Atualiza campos complementares apenas quando há sessão ativa.
+      // Sem sessão (e-mail pendente), o trigger já criou o User; campos opcionais
+      // serão atualizados via tela de perfil quando o usuário confirmar o e-mail.
+      if (response.session != null) {
+        // Monta o mapa apenas com valores não-nulos/não-vazios para evitar
+        // sobrescrever valores existentes no banco com null acidentalmente
+        final updates = <String, dynamic>{
+          'birthDate': _formatBirthDate(birthDate),
+          'phone': phone.trim(),
+          if (_notEmpty(cns)) 'cns': cns!.trim(),
+          if (_notEmpty(cpf)) 'cpf': cpf!.trim(),
+          if (_notEmpty(socialName)) 'socialName': socialName!.trim(),
+          if (_notEmpty(motherParentName))
+            'motherParentName': motherParentName!.trim(),
+          if (_notEmpty(birthCity)) 'birthCity': birthCity!.trim(),
+          if (_notEmpty(birthState))
+            'birthState': birthState!.trim().toUpperCase(),
+          if (_notEmpty(gender)) 'gender': gender!.trim(),
+          if (_notEmpty(ethnicity)) 'ethnicity': ethnicity!.trim(),
+          if (_notEmpty(maritalStatus)) 'maritalStatus': maritalStatus!.trim(),
+          if (_notEmpty(education)) 'education': education!.trim(),
+          if (_notEmpty(zipCode)) 'zipCode': zipCode!.trim(),
+          if (_notEmpty(street)) 'street': street!.trim(),
+          if (_notEmpty(streetNumber)) 'streetNumber': streetNumber!.trim(),
+          if (_notEmpty(complement)) 'complement': complement!.trim(),
+          if (_notEmpty(district)) 'district': district!.trim(),
+          if (_notEmpty(addressCity)) 'addressCity': addressCity!.trim(),
+          if (_notEmpty(addressState))
+            'addressState': addressState!.trim().toUpperCase(),
+        };
+        // Usa o nome canônico da tabela com aspas — PostgREST do Supabase requer
+        // o nome exato conforme definido no schema Prisma ('User' com U maiúsculo)
+        await _supabase.from('User').update(updates).eq('id', user.id);
+      }
+
+      return UserModel(
+        id: user.id,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim().toLowerCase(),
+        birthDate: birthDate,
+        professionalType: ProfessionalType.paciente,
+        phone: phone.trim(),
+        cns: _notEmpty(cns) ? cns!.trim() : null,
+        cpf: _notEmpty(cpf) ? cpf!.trim() : null,
+        socialName: _notEmpty(socialName) ? socialName!.trim() : null,
+        motherParentName:
+            _notEmpty(motherParentName) ? motherParentName!.trim() : null,
+        birthCity: _notEmpty(birthCity) ? birthCity!.trim() : null,
+        birthState:
+            _notEmpty(birthState) ? birthState!.trim().toUpperCase() : null,
+        gender: _notEmpty(gender) ? gender!.trim() : null,
+        ethnicity: _notEmpty(ethnicity) ? ethnicity!.trim() : null,
+        maritalStatus: _notEmpty(maritalStatus) ? maritalStatus!.trim() : null,
+        education: _notEmpty(education) ? education!.trim() : null,
+        zipCode: _notEmpty(zipCode) ? zipCode!.trim() : null,
+        street: _notEmpty(street) ? street!.trim() : null,
+        streetNumber: _notEmpty(streetNumber) ? streetNumber!.trim() : null,
+        complement: _notEmpty(complement) ? complement!.trim() : null,
+        district: _notEmpty(district) ? district!.trim() : null,
+        addressCity: _notEmpty(addressCity) ? addressCity!.trim() : null,
+        addressState:
+            _notEmpty(addressState) ? addressState!.trim().toUpperCase() : null,
+      );
+    } on AuthException catch (e) {
+      throw Exception(e.message);
+    } catch (e) {
+      // Relança sem expor detalhes internos — mensagem genérica protege stack trace
+      if (e is Exception) rethrow;
+      throw Exception('Ocorreu um erro inesperado no cadastro de paciente.');
+    }
+  }
+
   @override
   Future<void> logout() async {
     await _supabase.auth.signOut();
@@ -201,6 +330,10 @@ class AuthService implements IAuthService {
       orElse: () => ProfessionalType.administrativo,
     );
   }
+
+  /// Verifica se uma string opcional tem valor não-vazio.
+  /// Evita repetição de null-check + isEmpty em todo o update map.
+  bool _notEmpty(String? value) => value != null && value.trim().isNotEmpty;
 
   String _formatBirthDate(DateTime birthDate) {
     final yyyy = birthDate.year.toString().padLeft(4, '0');

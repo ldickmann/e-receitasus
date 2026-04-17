@@ -73,6 +73,14 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
+  /// Navega para a tela de cadastro exclusiva de pacientes.
+  ///
+  /// Separado do fluxo profissional para que pacientes não vejam
+  /// campos de conselho (CRM, COREN etc.) que não se aplicam a eles.
+  void _handlePatientRegister() {
+    Navigator.pushNamed(context, '/register_patient');
+  }
+
   @override
   Widget build(BuildContext context) {
     final authProvider = Provider.of<AuthProvider>(context);
@@ -164,10 +172,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                 const SizedBox(height: 10),
 
-                // Botão de Cadastro
+                // Botão de Cadastro (profissional do SUS)
                 TextButton(
                   onPressed: _handleRegister,
-                  child: const Text('Não tem conta? Cadastre-se'),
+                  child: const Text('Cadastro para Profissionais do SUS'),
+                ),
+                // Botão de cadastro de paciente — fluxo separado sem dados de conselho.
+                // Usa cor secundária (azul) para diferenciar visualmente dos dois fluxos.
+                ElevatedButton(
+                  onPressed: _handlePatientRegister,
+                  style: ElevatedButton.styleFrom(
+                    // Azul secundário — identidade visual do E-ReceitaSUS
+                    backgroundColor: const Color(0xFF1565C0),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  child: const Text('Cadastro Usuário SUS'),
                 ),
               ],
             ),

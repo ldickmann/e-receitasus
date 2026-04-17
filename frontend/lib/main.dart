@@ -12,6 +12,7 @@ import 'screens/doctor_home_screen.dart';
 import 'screens/nurse_home_screen.dart';
 import 'screens/prescription_type_screen.dart';
 import 'screens/prescription_form_screen.dart';
+import 'screens/patient_register_screen.dart';
 import 'models/prescription_type.dart';
 
 /// Ponto de entrada da aplicação E-ReceitaSUS
@@ -107,6 +108,8 @@ class MyApp extends StatelessWidget {
           '/': (context) => const SplashScreen(),
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
+          // Rota dedicada ao cadastro de pacientes — fluxo separado do cadastro profissional
+          '/register_patient': (context) => const PatientRegisterScreen(),
           '/home': (context) => const HomeScreen(),
           '/doctor_home': (context) => const DoctorHomeScreen(),
           '/nurse_home': (context) => const NurseHomeScreen(),
