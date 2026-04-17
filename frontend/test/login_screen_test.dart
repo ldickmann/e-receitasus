@@ -37,27 +37,6 @@ class FakeAuthService implements IAuthService {
   }
 
   /// Simulação simples para manter contrato completo.
-  /// IAuthService.register agora usa parâmetros nomeados
-  /// com firstName, lastName e birthDate obrigatórios.
-  @override
-  Future<UserModel> register({
-    required String firstName,
-    required String lastName,
-    required String email,
-    required DateTime birthDate,
-    required String password,
-  }) async {
-    return UserModel(
-      id: '22222222-2222-2222-2222-222222222222',
-      firstName: firstName,
-      lastName: lastName,
-      email: email,
-      birthDate: birthDate,
-      professionalType: ProfessionalType.administrativo,
-    );
-  }
-
-  /// Simulação simples para manter contrato completo.
   /// IAuthService.registerWithProfessionalInfo agora inclui
   /// firstName, lastName e birthDate como parâmetros obrigatórios.
   @override
@@ -88,6 +67,32 @@ class FakeAuthService implements IAuthService {
   /// Simulação de logout sem efeitos colaterais.
   @override
   Future<void> logout() async {}
+
+  /// Simulação de cadastro de paciente para manter contrato completo.
+  ///
+  /// Retorna UserModel com professionalType.paciente —
+  /// reflete o tipo correto esperado pelo fluxo de cadastro de pacientes.
+  @override
+  Future<UserModel> registerPatient({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+    String? cns,
+    String? phone,
+  }) async {
+    return UserModel(
+      id: '44444444-4444-4444-4444-444444444444',
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      birthDate: birthDate,
+      professionalType: ProfessionalType.paciente,
+      cns: cns,
+      phone: phone,
+    );
+  }
 }
 
 void main() {

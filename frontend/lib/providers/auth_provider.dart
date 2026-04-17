@@ -79,6 +79,10 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  /// Delega cadastro de profissional ao service e atualiza estado.
+  ///
+  /// Retorna true em sucesso; false quando service lança exceção (errorMessage
+  /// é preenchido para exibição via SnackBar na tela).
   Future<bool> registerWithProfessionalInfo({
     required String firstName,
     required String lastName,
@@ -104,6 +108,44 @@ class AuthProvider with ChangeNotifier {
         professionalId: professionalId,
         professionalState: professionalState,
         specialty: specialty,
+      );
+
+      _setLoading(false);
+      return true;
+    } catch (e) {
+      _errorMessage = _parseErrorMessage(e);
+      _user = null;
+      _setLoading(false);
+      return false;
+    }
+  }
+
+  /// Delega cadastro de paciente ao service e atualiza estado.
+  ///
+  /// Fluxo BaaS: service chama signUp no Supabase → trigger cria User(PACIENTE)
+  /// → service atualiza campos opcionais via PostgREST se houver sessão imediata.
+  /// Retorna true em sucesso; false com errorMessage preenchido em falha.
+  Future<bool> registerPatient({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+    String? cns,
+    String? phone,
+  }) async {
+    _setLoading(true);
+    _clearError();
+
+    try {
+      _user = await _authService.registerPatient(
+        firstName: firstName,
+        lastName: lastName,
+        email: email,
+        birthDate: birthDate,
+        password: password,
+        cns: cns,
+        phone: phone,
       );
 
       _setLoading(false);

@@ -5,14 +5,8 @@ import '../models/professional_type.dart';
 abstract class IAuthService {
   Future<UserModel> login(String email, String password);
 
-  Future<UserModel> register({
-    required String firstName,
-    required String lastName,
-    required String email,
-    required DateTime birthDate,
-    required String password,
-  });
-
+  /// Cadastra profissional de saúde com dados do conselho.
+  /// Utilizado pela RegisterScreen (médicos, enfermeiros, dentistas, etc.).
   Future<UserModel> registerWithProfessionalInfo({
     required String firstName,
     required String lastName,
@@ -23,6 +17,19 @@ abstract class IAuthService {
     String? professionalId,
     String? professionalState,
     String? specialty,
+  });
+
+  /// Cadastra paciente com dados de saúde básicos.
+  /// Utilizado pela PatientRegisterScreen — fluxo BaaS:
+  /// signUp → trigger cria User(PACIENTE) → update via PostgREST se houver sessão.
+  Future<UserModel> registerPatient({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+    String? cns,
+    String? phone,
   });
 
   Future<void> logout();
@@ -72,27 +79,6 @@ class AuthService implements IAuthService {
     } catch (_) {
       throw Exception('Ocorreu um erro inesperado no login.');
     }
-  }
-
-  @override
-  Future<UserModel> register({
-    required String firstName,
-    required String lastName,
-    required String email,
-    required DateTime birthDate,
-    required String password,
-  }) {
-    return registerWithProfessionalInfo(
-      firstName: firstName,
-      lastName: lastName,
-      email: email,
-      birthDate: birthDate,
-      password: password,
-      professionalType: ProfessionalType.administrativo,
-      professionalId: null,
-      professionalState: null,
-      specialty: null,
-    );
   }
 
   @override
@@ -148,6 +134,77 @@ class AuthService implements IAuthService {
       throw Exception(e.message);
     } catch (_) {
       throw Exception('Ocorreu um erro inesperado no cadastro.');
+    }
+  }
+
+  /// Cadastra paciente via Supabase Auth (BaaS).
+  ///
+  /// Fluxo:
+  /// 1. signUp com metadata (first_name, last_name, birth_date, professional_type=PACIENTE)
+  /// 2. O trigger `handle_new_user` cria o registro em public.User automaticamente
+  /// 3. Se o Supabase retornar sessão imediata (confirmação de e-mail desabilitada),
+  ///    atualiza campos complementares (birthDate, cns, phone) via PostgREST
+  /// 4. Se sessão for null (e-mail pendente de confirmação), os campos opcionais
+  ///    ficarão null até o usuário completar o perfil — comportamento aceitável
+  @override
+  Future<UserModel> registerPatient({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+    String? cns,
+    String? phone,
+  }) async {
+    try {
+      final response = await _supabase.auth.signUp(
+        email: email.trim().toLowerCase(),
+        password: password,
+        data: {
+          // snake_case — compatível com o trigger `handle_new_user` que lê esta chave
+          'first_name': firstName.trim(),
+          'last_name': lastName.trim(),
+          'birth_date': _formatBirthDate(birthDate),
+          // Instrui o trigger a criar o User como PACIENTE (sem conselho)
+          'professional_type': 'PACIENTE',
+        },
+      );
+
+      final user = response.user;
+      if (user == null) {
+        throw Exception('Cadastro não retornou usuário. Verifique o e-mail.');
+      }
+
+      // Atualiza campos complementares apenas quando há sessão ativa.
+      // Sem sessão (e-mail pendente), o trigger já criou o User; campos opcionais
+      // serão atualizados via tela de perfil quando o usuário confirmar o e-mail.
+      if (response.session != null) {
+        final updates = <String, dynamic>{
+          'birthDate': _formatBirthDate(birthDate),
+          if (cns != null && cns.trim().isNotEmpty) 'cns': cns.trim(),
+          if (phone != null && phone.trim().isNotEmpty) 'phone': phone.trim(),
+        };
+        // Usa o nome canônico da tabela com aspas — PostgREST do Supabase requer
+        // o nome exato conforme definido no schema Prisma ('User' com U maiúsculo)
+        await _supabase.from('User').update(updates).eq('id', user.id);
+      }
+
+      return UserModel(
+        id: user.id,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        email: email.trim().toLowerCase(),
+        birthDate: birthDate,
+        professionalType: ProfessionalType.paciente,
+        cns: cns?.trim().isEmpty == true ? null : cns?.trim(),
+        phone: phone?.trim().isEmpty == true ? null : phone?.trim(),
+      );
+    } on AuthException catch (e) {
+      throw Exception(e.message);
+    } catch (e) {
+      // Relança sem expor detalhes internos — mensagem genérica protege stack trace
+      if (e is Exception) rethrow;
+      throw Exception('Ocorreu um erro inesperado no cadastro de paciente.');
     }
   }
 
