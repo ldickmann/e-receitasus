@@ -15,10 +15,18 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  /// FocusNode do campo e-mail — ao pressionar Enter, move foco para a senha.
+  final _emailFocusNode = FocusNode();
+
+  /// FocusNode do campo senha — ao pressionar Enter, submete o formulário.
+  final _passwordFocusNode = FocusNode();
+
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _emailFocusNode.dispose();
+    _passwordFocusNode.dispose();
     super.dispose();
   }
 
@@ -36,8 +44,9 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!mounted) return;
 
     if (success) {
-      // Navega para home
-      Navigator.pushReplacementNamed(context, '/home');
+      // Rota baseada no tipo de profissional
+      final route = _resolveHomeRoute(authProvider);
+      Navigator.pushReplacementNamed(context, route);
     } else {
       // Exibe erro
       ScaffoldMessenger.of(context).showSnackBar(
@@ -49,11 +58,27 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  String _resolveHomeRoute(AuthProvider authProvider) {
+    final type = authProvider.user?.professionalType;
+    if (type == null) return '/home';
+    if (type.canPrescribe) return '/doctor_home';
+    if (type.isNurse) return '/nurse_home';
+    return '/home';
+  }
+
   void _handleRegister() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (context) => const RegisterScreen()),
     );
+  }
+
+  /// Navega para a tela de cadastro exclusiva de pacientes.
+  ///
+  /// Separado do fluxo profissional para que pacientes não vejam
+  /// campos de conselho (CRM, COREN etc.) que não se aplicam a eles.
+  void _handlePatientRegister() {
+    Navigator.pushNamed(context, '/register_patient');
   }
 
   @override
@@ -84,10 +109,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 25),
 
-                // Campo de Email
+                // Campo de Email — Enter move o foco para a senha
                 TextFormField(
                   controller: _emailController,
+                  focusNode: _emailFocusNode,
                   keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  onFieldSubmitted: (_) {
+                    // Move o foco para o campo de senha ao pressionar Enter
+                    FocusScope.of(context).requestFocus(_passwordFocusNode);
+                  },
                   decoration: const InputDecoration(
                     labelText: 'E-mail SUS',
                     border: OutlineInputBorder(),
@@ -105,10 +136,16 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 15),
 
-                // Campo de Senha
+                // Campo de Senha — Enter submete o formulário diretamente
                 TextFormField(
                   controller: _passwordController,
+                  focusNode: _passwordFocusNode,
                   obscureText: true,
+                  textInputAction: TextInputAction.done,
+                  onFieldSubmitted: (_) {
+                    // Submete o formulário ao pressionar Enter na senha
+                    _handleLogin();
+                  },
                   decoration: const InputDecoration(
                     labelText: 'Senha',
                     border: OutlineInputBorder(),
@@ -135,10 +172,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                 const SizedBox(height: 10),
 
-                // Botão de Cadastro
+                // Botão de Cadastro (profissional do SUS)
                 TextButton(
                   onPressed: _handleRegister,
-                  child: const Text('Não tem conta? Cadastre-se'),
+                  child: const Text('Cadastro para Profissionais do SUS'),
+                ),
+                // Botão de cadastro de paciente — fluxo separado sem dados de conselho.
+                // Usa cor secundária (azul) para diferenciar visualmente dos dois fluxos.
+                ElevatedButton(
+                  onPressed: _handlePatientRegister,
+                  style: ElevatedButton.styleFrom(
+                    // Azul secundário — identidade visual do E-ReceitaSUS
+                    backgroundColor: const Color(0xFF1565C0),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(44),
+                  ),
+                  child: const Text('Cadastro Usuário SUS'),
                 ),
               ],
             ),

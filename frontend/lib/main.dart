@@ -8,6 +8,12 @@ import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/history_screen.dart';
+import 'screens/doctor_home_screen.dart';
+import 'screens/nurse_home_screen.dart';
+import 'screens/prescription_type_screen.dart';
+import 'screens/prescription_form_screen.dart';
+import 'screens/patient_register_screen.dart';
+import 'models/prescription_type.dart';
 
 /// Ponto de entrada da aplicação E-ReceitaSUS
 ///
@@ -102,8 +108,21 @@ class MyApp extends StatelessWidget {
           '/': (context) => const SplashScreen(),
           '/login': (context) => const LoginScreen(),
           '/register': (context) => const RegisterScreen(),
+          // Rota dedicada ao cadastro de pacientes — fluxo separado do cadastro profissional
+          '/register_patient': (context) => const PatientRegisterScreen(),
           '/home': (context) => const HomeScreen(),
+          '/doctor_home': (context) => const DoctorHomeScreen(),
+          '/nurse_home': (context) => const NurseHomeScreen(),
           '/history': (context) => const HistoryScreen(),
+          '/new_prescription': (context) => const PrescriptionTypeScreen(),
+          '/prescription_form_branca': (context) =>
+              const PrescriptionFormScreen(type: PrescriptionType.branca),
+          '/prescription_form_controlada': (context) =>
+              const PrescriptionFormScreen(type: PrescriptionType.controlada),
+          '/prescription_form_amarela': (context) =>
+              const PrescriptionFormScreen(type: PrescriptionType.amarela),
+          '/prescription_form_azul': (context) =>
+              const PrescriptionFormScreen(type: PrescriptionType.azul),
         },
 
         // Fallback de segurança para rotas inexistentes

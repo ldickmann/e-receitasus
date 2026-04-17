@@ -1,19 +1,22 @@
 # ============================================================
 # PIPELINE CD — E-ReceitaSUS
 # ============================================================
-# Disparado automaticamente após a conclusão bem-sucedida
-# do pipeline de CI ("E-ReceitaSUS CI") na branch 'develop'.
+# Disparado automaticamente em push direto nas branches
+# 'develop' e 'main' (ou seja, após merge de PR).
+#
+# COMPORTAMENTO POR BRANCH:
+#   develop → executa apenas os Jobs 1 e 2 (ambiente + banco)
+#   main    → executa os 3 Jobs (ambiente + banco + deploy Supabase)
 #
 # PREMISSA DE SEGURANÇA:
-# O CD só avança se todos os testes (backend + frontend) passaram.
-# Isso garante que nenhum commit com falha nos testes cause
-# uma sincronização indevida no banco de produção ou deploy
-# de funções com código quebrado.
+# O CD só é acionado por push, que no fluxo normal só ocorre
+# após aprovação e merge de PR — onde o CI (testes) já foi
+# obrigatoriamente executado pelas branch protection rules.
 #
 # JOBS (executados em sequência):
 #   1. setup-environment  → Valida o ambiente (Node + Supabase CLI)
-#   2. sync-database      → Sincroniza o schema Prisma no banco
-#   3. deploy-functions   → Faz deploy das Edge Functions Supabase
+#   2. sync-database      → Aplica migrations Prisma pendentes
+#   3. deploy-functions   → Deploy das Edge Functions (só na main)
 #
 # ─────────────────────────────────────────────────────────────
 # SECRETS NECESSÁRIOS NO REPOSITÓRIO
@@ -34,29 +37,26 @@
 name: E-ReceitaSUS CD
 
 # ─────────────────────────────────────────────────────────────
-# TRIGGER: workflow_run
-# Este pipeline é disparado SOMENTE quando o CI ("E-ReceitaSUS CI")
-# conclui na branch 'develop'. O filtro 'branches' se refere ao
-# branch que originou o CI — portanto só afeta pushes diretos
-# à 'develop', nunca Pull Requests de outras branches.
+# TRIGGER: push
+# Disparado quando um commit é enviado diretamente para 'develop'
+# ou 'main' — o que no fluxo de PR ocorre apenas após merge aprovado.
 #
-# IMPORTANTE: o valor em 'workflows' deve ser idêntico ao campo
-# 'name:' definido em ci.yml para que o GitHub localize
-# o workflow correto.
+# POR QUE NÃO 'workflow_run':
+# O trigger workflow_run sempre lê o arquivo .yml da branch padrão
+# (main), ignorando qualquer alteração feita no develop. Com 'push',
+# o GitHub lê o workflow da branch que recebeu o push — garantindo
+# que correções no CD entrem em vigor imediatamente após o merge.
 # ─────────────────────────────────────────────────────────────
 on:
-  workflow_run:
-    workflows: ["E-ReceitaSUS CI"]
-    types: [completed]
-    branches: [develop]
+  push:
+    branches:
+      - develop
+      - main
 
 # ─────────────────────────────────────────────────────────────
 # VARIÁVEIS DE AMBIENTE GLOBAIS DO PIPELINE
 # FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: antecipa a migração obrigatória
 # para Node.js 24 (obrigatória a partir de junho de 2026 pelo GitHub).
-# Garante compatibilidade futura das actions: checkout, setup-node
-# e supabase/setup-cli sem necessidade de atualizar versões manualmente.
-# Ref: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
 # ─────────────────────────────────────────────────────────────
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
@@ -64,28 +64,20 @@ env:
 jobs:
   # ─────────────────────────────────────────────────────────────
   # JOB 1: CONFIGURAR AMBIENTE
-  # Responsabilidade: validar que o CI passou e instalar as
-  # ferramentas necessárias (Node.js e Supabase CLI).
-  #
-  # GUARDA DE QUALIDADE:
-  # O campo 'if' verifica github.event.workflow_run.conclusion.
-  # Se o CI falhou (conclusion != 'success'), este job é ignorado
-  # e, por consequência, todos os jobs subsequentes também são
-  # ignorados automaticamente via propagação do 'needs' em cadeia.
+  # Responsabilidade: instalar as ferramentas necessárias
+  # (Node.js e Supabase CLI) antes dos jobs subsequentes.
   # ─────────────────────────────────────────────────────────────
   setup-environment:
     name: Configurar Ambiente
     runs-on: ubuntu-latest
-    # Guarda principal do CD: só avança se o CI concluiu com êxito.
-    # Conclusões possíveis: success | failure | cancelled | timed_out
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
 
     steps:
-      # Faz o download do código-fonte do commit exato que passou no CI.
-      # Com trigger workflow_run, github.sha aponta para o commit
-      # que originou o CI — garantindo consistência entre teste e deploy.
+      # Com trigger 'push', github.sha é exatamente o commit que
+      # disparou o push — sem ambiguidade.
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       # Node 22 LTS: versão estável com suporte ativo,
       # evita avisos de depreciação das versões anteriores
@@ -113,24 +105,27 @@ jobs:
 
   # ─────────────────────────────────────────────────────────────
   # JOB 2: SINCRONIZAR BANCO DE DADOS (PRISMA)
-  # Responsabilidade: aplicar as mudanças do schema.prisma
-  # diretamente no banco de dados do Supabase.
+  # Responsabilidade: aplicar as migrations Prisma pendentes
+  # no banco de dados do Supabase.
   #
-  # IMPORTANTE: usa 'prisma db push' com a DIRECT_URL (porta 5432)
-  # pois o PgBouncer (porta 6543, ?pgbouncer=true) não suporta
-  # o protocolo de query estendido exigido pelo Prisma.
+  # Executa tanto no develop quanto no main.
+  # IMPORTANTE: usa DIRECT_URL (porta 5432) — o PgBouncer
+  # (porta 6543) não suporta o protocolo de query estendido
+  # exigido pelo Prisma para executar migrations.
   # ─────────────────────────────────────────────────────────────
   sync-database:
     name: Sincronizar Banco de Dados (Prisma)
     runs-on: ubuntu-latest
-    # Depende do Job 1 — só avança se o ambiente foi validado.
-    # Se setup-environment foi ignorado (CI falhou), este job
-    # também é ignorado automaticamente pela propagação do 'needs'.
+    # Depende do Job 1 — só avança se o ambiente foi configurado.
     needs: setup-environment
 
     steps:
+      # Cada job cria um novo runner, por isso o checkout se repete.
+      # github.sha é o commit exato do push que disparou o CD.
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -149,24 +144,23 @@ jobs:
         working-directory: ./backend
 
       # Gera o Prisma Client tipado a partir do schema.prisma.
-      # Sem este passo, o comando 'db push' não consegue
-      # interpretar corretamente o schema.
+      # Necessário antes de executar qualquer comando Prisma que
+      # acesse o banco, pois o Client é gerado localmente.
       - name: Gerar Prisma Client
         run: npx prisma generate
         working-directory: ./backend
         env:
-          # DATABASE_URL aqui deve ser a DIRECT_URL (porta 5432, sem pgbouncer)
+          # DATABASE_URL deve ser a DIRECT_URL (porta 5432, sem pgbouncer)
           # Valor configurado em: Settings → Secrets and variables → Actions
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
-      # Sincroniza o estado do schema.prisma com o banco de dados real.
-      # É como um "alinhamento de planta baixa": garante que o banco
-      # reflete exatamente o que está definido no schema.
-      # A flag '--accept-data-loss' foi OMITIDA intencionalmente:
-      # o pipeline deve falhar se houver risco de perda de dados,
-      # forçando uma revisão manual antes de prosseguir.
-      - name: Sincronizar Schema com o Banco (db push)
-        run: npx prisma db push
+      # Aplica SOMENTE as migrations pendentes no banco de produção.
+      # 'migrate deploy' nunca remove colunas ou enums existentes —
+      # ele apenas avança o histórico de migrations registrado na
+      # tabela _prisma_migrations, sendo seguro para uso em CD.
+      # Referência: https://www.prisma.io/docs/orm/prisma-migrate/workflows/deploying-migrations
+      - name: Aplicar Migrations Pendentes (migrate deploy)
+        run: npx prisma migrate deploy
         working-directory: ./backend
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
@@ -175,6 +169,8 @@ jobs:
   # JOB 3: DEPLOY DAS EDGE FUNCTIONS (SUPABASE)
   # Responsabilidade: publicar as Edge Functions (Deno) do diretório
   # supabase/functions/ para o projeto Supabase em produção.
+  #
+  # EXECUTA APENAS NA MAIN — develop só sincroniza o banco.
   #
   # SEGURANÇA: usa SUPABASE_ACCESS_TOKEN (token pessoal) e
   # SUPABASE_PROJECT_ID (ref do projeto) via GitHub Secrets —
@@ -188,12 +184,16 @@ jobs:
     name: Deploy Edge Functions (Supabase)
     runs-on: ubuntu-latest
     # Depende do Job 2 — deploy só ocorre após o banco estar atualizado.
-    # Se sync-database foi ignorado, este job também é ignorado.
     needs: sync-database
+    # Deploy de functions apenas na main — develop só sincroniza o banco.
+    if: github.ref == 'refs/heads/main'
 
     steps:
+      # github.sha é o commit exato do push na main.
       - name: Checkout Repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
 
       # CLI do Supabase é necessário para o comando 'functions deploy'
       - name: Setup Supabase CLI

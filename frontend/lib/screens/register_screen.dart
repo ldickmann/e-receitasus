@@ -243,6 +243,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     prefixIcon: Icon(Icons.work),
                   ),
                   items: ProfessionalType.values
+                      // Exclui PACIENTE do dropdown — pacientes usam a tela própria
+                      .where((t) => !t.isPatient)
                       .map(
                         (type) => DropdownMenuItem<ProfessionalType>(
                           value: type,

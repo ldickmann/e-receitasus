@@ -37,27 +37,6 @@ class FakeAuthService implements IAuthService {
   }
 
   /// Simulação simples para manter contrato completo.
-  /// IAuthService.register agora usa parâmetros nomeados
-  /// com firstName, lastName e birthDate obrigatórios.
-  @override
-  Future<UserModel> register({
-    required String firstName,
-    required String lastName,
-    required String email,
-    required DateTime birthDate,
-    required String password,
-  }) async {
-    return UserModel(
-      id: '22222222-2222-2222-2222-222222222222',
-      firstName: firstName,
-      lastName: lastName,
-      email: email,
-      birthDate: birthDate,
-      professionalType: ProfessionalType.administrativo,
-    );
-  }
-
-  /// Simulação simples para manter contrato completo.
   /// IAuthService.registerWithProfessionalInfo agora inclui
   /// firstName, lastName e birthDate como parâmetros obrigatórios.
   @override
@@ -88,6 +67,50 @@ class FakeAuthService implements IAuthService {
   /// Simulação de logout sem efeitos colaterais.
   @override
   Future<void> logout() async {}
+
+  /// Simulação de cadastro de paciente para manter contrato completo.
+  ///
+  /// Inclui todos os 22 parâmetros do IAuthService.registerPatient —
+  /// campos novos são ignorados neste fake pois a LoginScreen não os usa.
+  /// A assinatura completa é obrigatória para implementar o contrato IAuthService.
+  @override
+  Future<UserModel> registerPatient({
+    required String firstName,
+    required String lastName,
+    required String email,
+    required DateTime birthDate,
+    required String password,
+    required String phone,
+    String? cns,
+    String? cpf,
+    String? socialName,
+    String? motherParentName,
+    String? birthCity,
+    String? birthState,
+    String? gender,
+    String? ethnicity,
+    String? maritalStatus,
+    String? education,
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
+  }) async {
+    return UserModel(
+      id: '44444444-4444-4444-4444-444444444444',
+      firstName: firstName,
+      lastName: lastName,
+      email: email,
+      birthDate: birthDate,
+      professionalType: ProfessionalType.paciente,
+      // Apenas campos usados pelo fluxo de paciente são mapeados no fake
+      phone: phone,
+      cns: cns,
+    );
+  }
 }
 
 void main() {
@@ -119,8 +142,11 @@ void main() {
       expect(find.widgetWithText(TextFormField, 'E-mail SUS'), findsOneWidget);
       expect(find.widgetWithText(TextFormField, 'Senha'), findsOneWidget);
       expect(find.widgetWithText(ElevatedButton, 'Entrar'), findsOneWidget);
-      expect(find.widgetWithText(TextButton, 'Não tem conta? Cadastre-se'),
-          findsOneWidget);
+      // Botão renomeado conforme identidade do sistema
+      expect(
+        find.widgetWithText(TextButton, 'Cadastro para Profissionais do SUS'),
+        findsOneWidget,
+      );
 
       await tester.enterText(
         find.widgetWithText(TextFormField, 'E-mail SUS'),

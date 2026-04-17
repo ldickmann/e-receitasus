@@ -56,12 +56,24 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    // Redireciona baseado no estado de autenticação
+    // Redireciona baseado no papel do usuário autenticado
     if (authProvider.isAuthenticated) {
-      Navigator.pushReplacementNamed(context, '/home');
+      final route = _resolveHomeRoute(authProvider);
+      Navigator.pushReplacementNamed(context, route);
     } else {
       Navigator.pushReplacementNamed(context, '/login');
     }
+  }
+
+  /// Determina a rota inicial conforme o tipo de profissional.
+  /// Profissionais prescritores (médico, dentista, etc.) acessam o painel do
+  /// prescritor; pacientes e usuários administrativos acessam a tela do paciente.
+  String _resolveHomeRoute(AuthProvider authProvider) {
+    final type = authProvider.user?.professionalType;
+    if (type == null) return '/home';
+    if (type.canPrescribe) return '/doctor_home';
+    if (type.isNurse) return '/nurse_home';
+    return '/home';
   }
 
   @override

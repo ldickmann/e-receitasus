@@ -1,0 +1,262 @@
+import 'package:flutter/material.dart';
+import '../models/prescription_type.dart';
+import 'prescription_form_screen.dart';
+
+/// Tela de seleção do tipo de receita para o médico prescritor.
+///
+/// Exibe os 4 tipos de receitas permitidas pela ANVISA conforme
+/// Portaria SVS/MS 344/98 e RDC 471/2021, com suas respectivas
+/// cores características e informações legais resumidas.
+class PrescriptionTypeScreen extends StatelessWidget {
+  const PrescriptionTypeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Nova Receita — Selecione o Tipo'),
+        backgroundColor: const Color(0xFF009B3A),
+        foregroundColor: Colors.white,
+      ),
+      body: SingleChildScrollView(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const _InfoBanner(),
+            const SizedBox(height: 16),
+            ...PrescriptionType.values.map(
+              (type) => Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _PrescriptionTypeCard(type: type),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const _AnvisaLegalNote(),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _InfoBanner extends StatelessWidget {
+  const _InfoBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFE3F2FD),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFF1565C0), width: 1),
+      ),
+      child: const Row(
+        children: [
+          Icon(Icons.info_outline, color: Color(0xFF1565C0), size: 20),
+          SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'Selecione o tipo de receita conforme a substância prescrita '
+              'e a legislação ANVISA vigente (Portaria SVS/MS 344/98).',
+              style: TextStyle(fontSize: 13, color: Color(0xFF0D47A1)),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PrescriptionTypeCard extends StatelessWidget {
+  const _PrescriptionTypeCard({required this.type});
+
+  final PrescriptionType type;
+
+  Color get _borderColor {
+    switch (type) {
+      case PrescriptionType.branca:
+        return const Color(0xFFBDBDBD);
+      case PrescriptionType.controlada:
+        return const Color(0xFF9E9E9E);
+      case PrescriptionType.amarela:
+        return const Color(0xFFF9A825);
+      case PrescriptionType.azul:
+        return const Color(0xFF1565C0);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: BorderSide(color: _borderColor, width: 1.5),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PrescriptionFormScreen(type: type),
+          ),
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: type.backgroundColor,
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: type.foregroundColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _borderColor),
+                ),
+                child: Icon(type.icon, color: type.foregroundColor, size: 28),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      type.displayName,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: type.foregroundColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      type.description,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: type.foregroundColor.withOpacity(0.75),
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      children: [
+                        _Badge(
+                          label: type.copiesLabel,
+                          icon: Icons.copy,
+                          borderColor: _borderColor,
+                          textColor: type.foregroundColor,
+                        ),
+                        _Badge(
+                          label: '${type.validityDays} dias',
+                          icon: Icons.schedule,
+                          borderColor: _borderColor,
+                          textColor: type.foregroundColor,
+                        ),
+                        if (type.requiresNotificationNumber)
+                          _Badge(
+                            label: 'Numeração SCTIE',
+                            icon: Icons.numbers,
+                            borderColor: _borderColor,
+                            textColor: type.foregroundColor,
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.arrow_forward_ios,
+                size: 16,
+                color: type.foregroundColor.withOpacity(0.5),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _Badge extends StatelessWidget {
+  const _Badge({
+    required this.label,
+    required this.icon,
+    required this.borderColor,
+    required this.textColor,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color borderColor;
+  final Color textColor;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: borderColor.withOpacity(0.6)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 11, color: textColor.withOpacity(0.7)),
+          const SizedBox(width: 3),
+          Text(
+            label,
+            style: TextStyle(fontSize: 11, color: textColor.withOpacity(0.8)),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AnvisaLegalNote extends StatelessWidget {
+  const _AnvisaLegalNote();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: const Color(0xFFFFCA28)),
+      ),
+      child: const Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.gavel, size: 16, color: Color(0xFFF57F17)),
+              SizedBox(width: 6),
+              Text(
+                'Base Legal',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFF57F17),
+                  fontSize: 13,
+                ),
+              ),
+            ],
+          ),
+          SizedBox(height: 6),
+          Text(
+            '• Portaria SVS/MS 344/1998 — Controle de substâncias entorpecentes e psicotrópicas\n'
+            '• RDC ANVISA 471/2021 — Receitas de medicamentos de uso contínuo\n'
+            '• RDC ANVISA 204/2017 — Notificação de Receita\n'
+            '• Lei 13.021/2014 — Exercício da Farmácia',
+            style: TextStyle(fontSize: 11, color: Color(0xFF5D4037), height: 1.5),
+          ),
+        ],
+      ),
+    );
+  }
+}
