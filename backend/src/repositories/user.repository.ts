@@ -4,6 +4,9 @@ import { prisma } from '../utils/prismaClient.js';
 /**
  * Dados aceitos para sincronizacao/atualizacao do perfil publico.
  * Nao contem senha, pois credenciais sao responsabilidade do Supabase Auth.
+ *
+ * Os campos abaixo de `specialty` sao exclusivos do tipo PACIENTE e sao
+ * opcionais para manter compatibilidade com os demais perfis profissionais.
  */
 export interface UpsertPublicUserData {
   id: string;
@@ -13,6 +16,45 @@ export interface UpsertPublicUserData {
   professionalId?: string | null;
   professionalState?: string | null;
   specialty?: string | null;
+
+  // --- Campos exclusivos do perfil PACIENTE ---
+
+  /** Cartao Nacional de Saude — max 15 caracteres */
+  cns?: string | null;
+  /** CPF — 11 digitos sem formatacao */
+  cpf?: string | null;
+  /** Nome Social — opcional, nao substitui nome civil em documentos */
+  socialName?: string | null;
+  /** Nome da mae ou, na ausencia, do pai/responsavel legal */
+  motherParentName?: string | null;
+  /** Cidade de nascimento */
+  birthCity?: string | null;
+  /** UF de nascimento — 2 caracteres */
+  birthState?: string | null;
+  /** Sexo conforme declarado pelo paciente */
+  gender?: string | null;
+  /** Raca/Cor conforme classificacao IBGE */
+  ethnicity?: string | null;
+  /** Estado civil */
+  maritalStatus?: string | null;
+  /** Celular com DDD — 11 digitos */
+  phone?: string | null;
+  /** Escolaridade */
+  education?: string | null;
+  /** CEP — 8 digitos sem hifen */
+  zipCode?: string | null;
+  /** Logradouro */
+  street?: string | null;
+  /** Numero do endereco */
+  streetNumber?: string | null;
+  /** Complemento opcional */
+  complement?: string | null;
+  /** Bairro */
+  district?: string | null;
+  /** Cidade do endereco atual */
+  addressCity?: string | null;
+  /** UF do endereco atual — 2 caracteres */
+  addressState?: string | null;
 }
 
 /**
@@ -92,6 +134,25 @@ export async function upsertPublicUser(data: UpsertPublicUserData): Promise<User
       professionalId: sanitizeOptionalText(data.professionalId),
       professionalState: sanitizeOptionalText(data.professionalState),
       specialty: sanitizeOptionalText(data.specialty),
+      // Campos de paciente — enviados apenas quando professionalType === PACIENTE
+      cns: sanitizeOptionalText(data.cns),
+      cpf: sanitizeOptionalText(data.cpf),
+      socialName: sanitizeOptionalText(data.socialName),
+      motherParentName: sanitizeOptionalText(data.motherParentName),
+      birthCity: sanitizeOptionalText(data.birthCity),
+      birthState: sanitizeOptionalText(data.birthState),
+      gender: sanitizeOptionalText(data.gender),
+      ethnicity: sanitizeOptionalText(data.ethnicity),
+      maritalStatus: sanitizeOptionalText(data.maritalStatus),
+      phone: sanitizeOptionalText(data.phone),
+      education: sanitizeOptionalText(data.education),
+      zipCode: sanitizeOptionalText(data.zipCode),
+      street: sanitizeOptionalText(data.street),
+      streetNumber: sanitizeOptionalText(data.streetNumber),
+      complement: sanitizeOptionalText(data.complement),
+      district: sanitizeOptionalText(data.district),
+      addressCity: sanitizeOptionalText(data.addressCity),
+      addressState: sanitizeOptionalText(data.addressState),
     },
     create: {
       id: normalizedId,
@@ -101,6 +162,25 @@ export async function upsertPublicUser(data: UpsertPublicUserData): Promise<User
       professionalId: sanitizeOptionalText(data.professionalId),
       professionalState: sanitizeOptionalText(data.professionalState),
       specialty: sanitizeOptionalText(data.specialty),
+      // Campos de paciente — presentes apenas quando professionalType === PACIENTE
+      cns: sanitizeOptionalText(data.cns),
+      cpf: sanitizeOptionalText(data.cpf),
+      socialName: sanitizeOptionalText(data.socialName),
+      motherParentName: sanitizeOptionalText(data.motherParentName),
+      birthCity: sanitizeOptionalText(data.birthCity),
+      birthState: sanitizeOptionalText(data.birthState),
+      gender: sanitizeOptionalText(data.gender),
+      ethnicity: sanitizeOptionalText(data.ethnicity),
+      maritalStatus: sanitizeOptionalText(data.maritalStatus),
+      phone: sanitizeOptionalText(data.phone),
+      education: sanitizeOptionalText(data.education),
+      zipCode: sanitizeOptionalText(data.zipCode),
+      street: sanitizeOptionalText(data.street),
+      streetNumber: sanitizeOptionalText(data.streetNumber),
+      complement: sanitizeOptionalText(data.complement),
+      district: sanitizeOptionalText(data.district),
+      addressCity: sanitizeOptionalText(data.addressCity),
+      addressState: sanitizeOptionalText(data.addressState),
     },
   });
 }
