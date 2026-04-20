@@ -32,36 +32,11 @@ class AuthConfigurationError extends Error {
 }
 
 /**
- * Cache do resolvedor JWKS remoto.
- * Isso evita recriar o resolvedor a cada requisição.
- */
-let remoteJwks: ReturnType<typeof createRemoteJWKSet> | null = null;
-let cachedIssuer: string | null = null;
-
-/**
- * Normaliza e valida a URL base do Supabase.
- *
- * @param rawUrl URL lida do ambiente.
- * @returns URL normalizada sem barra final.
- * @throws AuthConfigurationError quando formato for inválido.
- */
-function normalizeSupabaseUrl(rawUrl: string): string {
-  const normalized = rawUrl.trim().replace(/\/+$/, '');
-
-  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(normalized)) {
-    throw new AuthConfigurationError(
-      'SUPABASE_URL inválida. Use o formato: https://<project-ref>.supabase.co'
-    );
-  }
-
-  return normalized;
-}
-
-/**
  * Monta o issuer esperado para os tokens do Supabase.
+ * Valida formato da URL no boundary para falhar rapido em config errada.
  *
  * @returns Issuer completo no formato https://<project-ref>.supabase.co/auth/v1
- * @throws AuthConfigurationError quando SUPABASE_URL não estiver definida.
+ * @throws AuthConfigurationError quando SUPABASE_URL ausente ou malformada.
  */
 function getSupabaseIssuer(): string {
   const rawSupabaseUrl = process.env.SUPABASE_URL;
@@ -72,26 +47,34 @@ function getSupabaseIssuer(): string {
     );
   }
 
-  return `${normalizeSupabaseUrl(rawSupabaseUrl)}/auth/v1`;
+  const normalized = rawSupabaseUrl.trim().replace(/\/+$/, '');
+
+  if (!/^https:\/\/[a-z0-9-]+\.supabase\.co$/i.test(normalized)) {
+    throw new AuthConfigurationError(
+      'SUPABASE_URL inválida. Use o formato: https://<project-ref>.supabase.co'
+    );
+  }
+
+  return `${normalized}/auth/v1`;
 }
 
 /**
- * Retorna resolvedor JWKS remoto com cache em memória.
- * O pacote jose já gerencia cache interno de chaves por kid.
- *
- * @returns Resolvedor para validação de assinatura JWT.
+ * Resolvedor JWKS com cache interno por issuer.
+ * Encapsulado em IIFE para esconder estado mutável do escopo do módulo —
+ * reduz superfície de bugs e elimina duas variáveis `let` globais.
  */
-function getRemoteJwksResolver() {
-  const issuer = getSupabaseIssuer();
+const getRemoteJwksResolver = (() => {
+  let cache: { issuer: string; resolver: ReturnType<typeof createRemoteJWKSet> } | null = null;
 
-  if (!remoteJwks || cachedIssuer !== issuer) {
-    const jwksUrl = new URL(`${issuer}/.well-known/jwks.json`);
-    remoteJwks = createRemoteJWKSet(jwksUrl);
-    cachedIssuer = issuer;
-  }
-
-  return remoteJwks;
-}
+  return (): ReturnType<typeof createRemoteJWKSet> => {
+    const issuer = getSupabaseIssuer();
+    if (cache?.issuer !== issuer) {
+      const jwksUrl = new URL(`${issuer}/.well-known/jwks.json`);
+      cache = { issuer, resolver: createRemoteJWKSet(jwksUrl) };
+    }
+    return cache.resolver;
+  };
+})();
 
 /**
  * Extrai token Bearer de forma defensiva.

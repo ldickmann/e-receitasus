@@ -1,38 +1,43 @@
-// Importações de bibliotecas externas
+// Bibliotecas externas
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 
-// Importações locais (extensão .js obrigatória com moduleResolution: nodenext)
+// Imports locais (extensao .js obrigatoria com moduleResolution: nodenext)
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
+import { requestLogger } from './middlewares/request-logger.middleware.js';
 
-// Carrega variáveis de ambiente do arquivo .env
+// Carrega variaveis do .env antes de qualquer codigo que dependa de process.env
 dotenv.config();
 
-// Cria instância da aplicação Express
 export const app = express();
 
-// Middleware CORS para permitir requisições de diferentes origens
+// Logger de requisicoes registrado primeiro para capturar todas as rotas,
+// inclusive preflight CORS (OPTIONS) e respostas 4xx/5xx.
+app.use(requestLogger);
+
+// CORS aberto: o frontend Flutter roda em portas dinamicas durante o desenvolvimento.
+// Em producao, restringir origins via variavel de ambiente.
 app.use(cors());
 
-// Middleware para parsing de JSON nas requisições
+// Parse de JSON nas requisicoes
 app.use(express.json());
 
-// Rotas de autenticação (legadas: /auth/register e /auth/login retornam 410)
+// Rotas de autenticacao legadas (POST /auth/register e /auth/login retornam 410).
+// O fluxo oficial de cadastro/login e via Supabase Auth no frontend.
 app.use('/auth', authRoutes);
-// Rotas de usuários (perfil do usuário autenticado)
+
+// Rotas de usuarios (perfil do usuario autenticado via JWKS)
 app.use('/user', userRoutes);
-//
-// NOTA: As rotas /prescriptions e /history foram removidas. Toda a persistência
-// e leitura de prescrições é feita diretamente pelo Flutter via Supabase SDK
-// na tabela `prescriptions` (BaaS), com RLS controlando o acesso por papel.
 
-// Endpoint de health check para monitoramento
-app.get('/health', (_, res) => res.json({
-  status: 'ok',
-  timestamp: new Date().toISOString()
-}));
+// NOTA: Rotas /prescriptions e /history foram removidas. Toda a persistencia
+// e leitura de prescricoes e feita pelo Flutter via Supabase SDK na tabela
+// `prescriptions` (BaaS), com RLS controlando acesso por papel.
 
-// Exporta a aplicação como default
+// Health check para monitoramento (probes externos / uptime)
+app.get('/health', (_, res) =>
+  res.json({ status: 'ok', timestamp: new Date().toISOString() })
+);
+
 export default app;
