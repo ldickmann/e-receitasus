@@ -27,6 +27,16 @@ enum PrescriptionStatus {
   CANCELLED
 }
 
+/// Espelha o ciclo de vida de um pedido de renovação de prescrição.
+/// Fluxo: PENDING_TRIAGE → TRIAGED → PRESCRIBED ou REJECTED.
+/// Deve ser sincronizado com o enum RenewalStatus no Dart (frontend/lib/models/renewal_request_model.dart).
+enum RenewalStatus {
+  PENDING_TRIAGE
+  TRIAGED
+  PRESCRIBED
+  REJECTED
+}
+
 model User {
   id                    String           @id @default(uuid())
   firstName             String?
@@ -84,6 +94,13 @@ model User {
   prescriptionsCreated  Prescription[]   @relation("PrescribedBy")
   prescriptionsReceived Prescription[]   @relation("PatientPrescriptions")
 
+  /// Pedidos de renovação onde este usuário é o paciente solicitante
+  renewalRequestsAsPatient RenewalRequest[] @relation("PatientRenewalRequests")
+  /// Pedidos de renovação atribuídos a este médico para emissão
+  renewalRequestsAsDoctor  RenewalRequest[] @relation("DoctorRenewalRequests")
+  /// Pedidos de renovação triados por este enfermeiro
+  renewalRequestsAsNurse   RenewalRequest[] @relation("NurseRenewalRequests")
+
   @@index([professionalType])
   @@index([createdAt])
   @@index([cpf])
@@ -102,10 +119,55 @@ model Prescription {
   createdAt   DateTime           @default(now())
   updatedAt   DateTime           @updatedAt
 
-  patient     User               @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Cascade)
-  doctor      User?              @relation("PrescribedBy", fields: [doctorId], references: [id], onDelete: SetNull)
+  patient          User               @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Cascade)
+  doctor           User?              @relation("PrescribedBy", fields: [doctorId], references: [id], onDelete: SetNull)
+
+  /// Pedidos de renovação originados desta prescrição
+  renewalRequests  RenewalRequest[]
 
   @@index([patientId])
   @@index([status])
+  @@index([createdAt])
+}
+
+/// Representa um pedido de renovação de prescrição feito por um paciente.
+/// Percorre o ciclo: PENDING_TRIAGE → TRIAGED → PRESCRIBED (ou REJECTED).
+/// Os triggers de updated_at e block_duplicate_renewal ficam em
+/// supabase/migrations/ pois são PL/pgSQL que o Prisma não modela.
+model RenewalRequest {
+  id String @id @default(uuid())
+
+  /// FK para a prescrição original que será renovada
+  prescriptionId String
+  /// FK para o paciente solicitante (User.id = auth.users.id em texto)
+  patientUserId  String
+  /// Médico designado pelo enfermeiro; preenchido na transição TRIAGED
+  doctorUserId   String?
+  /// Enfermeiro responsável; preenchido ao aprovar ou rejeitar
+  nurseUserId    String?
+
+  status        RenewalStatus @default(PENDING_TRIAGE)
+
+  /// Observações opcionais do paciente (limite de 500 chars tratado no app)
+  patientNotes  String?
+  /// Notas do enfermeiro; obrigatórias quando status = REJECTED (validação no app)
+  nurseNotes    String?
+
+  /// ID da nova prescrição emitida ao concluir o fluxo (soft ref, sem FK,
+  /// pois a prescrição renovada pode ainda não existir no momento do update)
+  renewedPrescriptionId String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  prescription Prescription @relation(fields: [prescriptionId], references: [id])
+  patient      User         @relation("PatientRenewalRequests", fields: [patientUserId], references: [id], onDelete: Cascade)
+  doctor       User?        @relation("DoctorRenewalRequests", fields: [doctorUserId], references: [id], onDelete: SetNull)
+  nurse        User?        @relation("NurseRenewalRequests", fields: [nurseUserId], references: [id], onDelete: SetNull)
+
+  @@index([patientUserId])
+  @@index([status])
+  @@index([nurseUserId])
+  @@index([doctorUserId])
   @@index([createdAt])
 }
