@@ -6,14 +6,88 @@ import '../providers/auth_provider.dart';
 import '../services/prescription_service.dart';
 import 'prescription_view_screen.dart';
 
+// ---------------------------------------------------------------------------
+// Dados opcionais para pré-preenchimento (modo renovação)
+// ---------------------------------------------------------------------------
+
+/// Valores iniciais opcionais para os campos do formulário de prescrição.
+///
+/// Usado pelo fluxo de renovação ([RenewalPrescriptionScreen]) para pré-preencher
+/// os dados do paciente e do medicamento a partir da prescrição original,
+/// evitando retrabalho e reduzindo erros de transcrição.
+///
+/// Campos do prescritor não são incluídos pois já são lidos via [AuthProvider].
+/// CPF do paciente também é omitido intencionalmente — o médico deve confirmar
+/// o dado em cada emissão (princípio de minimização — LGPD art. 6º).
+class PrescriptionFormPrefill {
+  /// Nome do paciente da prescrição original.
+  final String? patientName;
+
+  /// Nome do medicamento prescrito originalmente.
+  final String? medicineName;
+
+  /// Posologia (dosagem) do medicamento original.
+  final String? dosage;
+
+  /// Instruções de uso da prescrição original.
+  final String? instructions;
+
+  /// Forma farmacêutica (ex: comprimido, solução).
+  final String? pharmaceuticalForm;
+
+  /// Via de administração (ex: oral, sublingual).
+  final String? route;
+
+  /// Quantidade numérica da prescrição original.
+  final String? quantity;
+
+  /// Quantidade por extenso (obrigatório em notificações).
+  final String? quantityWords;
+
+  const PrescriptionFormPrefill({
+    this.patientName,
+    this.medicineName,
+    this.dosage,
+    this.instructions,
+    this.pharmaceuticalForm,
+    this.route,
+    this.quantity,
+    this.quantityWords,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Formulário de prescrição
+// ---------------------------------------------------------------------------
+
 /// Formulário para preenchimento de receitas médicas digitais.
 ///
 /// Adapta os campos exibidos de acordo com o [PrescriptionType] selecionado,
 /// pré-preenchendo os dados do médico autenticado via [AuthProvider].
+///
+/// Aceita [prefill] opcional para o fluxo de renovação (pré-preenche dados
+/// do paciente e medicamento) e [onSaved] para notificar o chamador após
+/// salvar com sucesso — evitando a navegação padrão para [PrescriptionViewScreen].
 class PrescriptionFormScreen extends StatefulWidget {
-  const PrescriptionFormScreen({super.key, required this.type});
+  const PrescriptionFormScreen({
+    super.key,
+    required this.type,
+    this.prefill,
+    this.onSaved,
+  });
 
   final PrescriptionType type;
+
+  /// Valores iniciais opcionais para os campos do formulário (modo renovação).
+  final PrescriptionFormPrefill? prefill;
+
+  /// Callback chamado após salvar a prescrição com sucesso.
+  ///
+  /// Quando fornecido, o formulário retorna para a tela anterior (Navigator.pop)
+  /// em vez de navegar para [PrescriptionViewScreen], delegando a navegação
+  /// ao chamador. Usado pelo fluxo de renovação para capturar o ID da nova
+  /// prescrição e chamar [RenewalService.markAsPrescribed].
+  final void Function(PrescriptionModel)? onSaved;
 
   @override
   State<PrescriptionFormScreen> createState() => _PrescriptionFormScreenState();
@@ -60,6 +134,8 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
   void initState() {
     super.initState();
     final user = Provider.of<AuthProvider>(context, listen: false).user;
+
+    // Preenche dados do prescritor a partir do perfil autenticado
     _doctorNameCtrl = TextEditingController(text: user?.name ?? '');
     _doctorCouncilCtrl = TextEditingController(
       text: user?.formattedRegistration != null
@@ -69,6 +145,21 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
     _doctorCouncilStateCtrl =
         TextEditingController(text: user?.professionalState ?? '');
     _doctorSpecialtyCtrl.text = user?.specialty ?? '';
+
+    // Aplica pré-preenchimento opcional (modo renovação) — evita retrabalho e
+    // garante continuidade dos dados do medicamento e paciente da receita original.
+    // CPF não é pré-preenchido intencionalmente (LGPD — princípio da minimização).
+    final prefill = widget.prefill;
+    if (prefill != null) {
+      _patientNameCtrl.text = prefill.patientName ?? '';
+      _medicineCtrl.text = prefill.medicineName ?? '';
+      _dosageCtrl.text = prefill.dosage ?? '';
+      _instructionsCtrl.text = prefill.instructions ?? '';
+      _pharmaceuticalFormCtrl.text = prefill.pharmaceuticalForm ?? '';
+      _routeCtrl.text = prefill.route ?? '';
+      _quantityCtrl.text = prefill.quantity ?? '';
+      _quantityWordsCtrl.text = prefill.quantityWords ?? '';
+    }
   }
 
   @override
@@ -170,7 +261,18 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
 
       if (!mounted) return;
 
-      // Navega para a tela de visualização da receita gerada
+      // Modo renovação: notifica o chamador (RenewalPrescriptionScreen) e
+      // retorna para a tela anterior em vez de abrir PrescriptionViewScreen.
+      // O fluxo de renovação é responsável por chamar markAsPrescribed e exibir
+      // o SnackBar de confirmação com o contexto correto.
+      if (widget.onSaved != null) {
+        widget.onSaved!(saved);
+        if (!mounted) return;
+        Navigator.pop(context);
+        return;
+      }
+
+      // Modo normal (criação avulsa): navega para a visualização da receita emitida
       Navigator.pushReplacement(
         context,
         MaterialPageRoute(
