@@ -138,7 +138,8 @@ class _NurseWelcomeCard extends StatelessWidget {
 /// na [HomeScreen] para pedidos de renovação do paciente.
 class _PendingRenewalsSection extends StatefulWidget {
   @override
-  State<_PendingRenewalsSection> createState() => _PendingRenewalsSectionState();
+  State<_PendingRenewalsSection> createState() =>
+      _PendingRenewalsSectionState();
 }
 
 class _PendingRenewalsSectionState extends State<_PendingRenewalsSection> {
@@ -162,7 +163,6 @@ class _PendingRenewalsSectionState extends State<_PendingRenewalsSection> {
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
         ),
         const SizedBox(height: 12),
-
         StreamBuilder<List<RenewalRequestModel>>(
           stream: _stream,
           builder: (context, snapshot) {
@@ -179,8 +179,7 @@ class _PendingRenewalsSectionState extends State<_PendingRenewalsSection> {
             // Erro retornado pelo stream (ex.: sem permissão RLS ou offline)
             if (snapshot.hasError) {
               return const _ErrorState(
-                message:
-                    'Não foi possível carregar as solicitações. '
+                message: 'Não foi possível carregar as solicitações. '
                     'Verifique sua conexão e tente novamente.',
               );
             }
@@ -220,9 +219,9 @@ class _PendingRequestCard extends StatelessWidget {
   Color _chipColor(RenewalStatus status) {
     return switch (status) {
       RenewalStatus.pendingTriage => Colors.grey.shade300,
-      RenewalStatus.triaged      => Colors.amber.shade200,
-      RenewalStatus.prescribed   => Colors.green.shade200,
-      RenewalStatus.rejected     => Colors.red.shade200,
+      RenewalStatus.triaged => Colors.amber.shade200,
+      RenewalStatus.prescribed => Colors.green.shade200,
+      RenewalStatus.rejected => Colors.red.shade200,
     };
   }
 
