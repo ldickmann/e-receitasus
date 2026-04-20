@@ -131,6 +131,9 @@ class AuthService implements IAuthService {
       final cleanEmail = email.trim().toLowerCase();
       final cleanProfessionalId = professionalId?.trim();
 
+      // Enviamos TODOS os campos no metadata para o trigger `handle_new_user`
+      // criar o registro completo em public.professionals em uma unica operacao,
+      // mesmo com confirmacao de e-mail habilitada (sem sessao imediata).
       final response = await _supabase.auth.signUp(
         email: cleanEmail,
         password: password,
@@ -140,9 +143,19 @@ class AuthService implements IAuthService {
           'last_name': cleanLastName,
           'birth_date': _formatBirthDate(birthDate),
           'professional_type': professionalType.value,
-          'professional_id': cleanProfessionalId,
-          'professional_state': professionalState?.trim().toUpperCase(),
-          'specialty': specialty?.trim(),
+          if (_notEmpty(cleanProfessionalId))
+            'professional_id': cleanProfessionalId,
+          if (_notEmpty(professionalState))
+            'professional_state': professionalState!.trim().toUpperCase(),
+          if (_notEmpty(specialty)) 'specialty': specialty!.trim(),
+          if (_notEmpty(zipCode)) 'zip_code': zipCode!.trim(),
+          if (_notEmpty(street)) 'street': street!.trim(),
+          if (_notEmpty(streetNumber)) 'street_number': streetNumber!.trim(),
+          if (_notEmpty(complement)) 'complement': complement!.trim(),
+          if (_notEmpty(district)) 'district': district!.trim(),
+          if (_notEmpty(addressCity)) 'address_city': addressCity!.trim(),
+          if (_notEmpty(addressState))
+            'address_state': addressState!.trim().toUpperCase(),
         },
       );
 
@@ -166,9 +179,9 @@ class AuthService implements IAuthService {
           if (_notEmpty(addressState))
             'addressState': addressState!.trim().toUpperCase(),
         };
-        // Usa o nome canônico da tabela com aspas — PostgREST exige o nome
-        // exato conforme definido no schema Prisma ('User' com U maiúsculo)
-        await _supabase.from('User').update(updates).eq('id', user.id);
+        // Tabela separada por domínio: profissionais → public.professionals
+        // (migration 20260421000000_split_user_patients_professionals)
+        await _supabase.from('professionals').update(updates).eq('id', user.id);
       }
 
       return UserModel(
@@ -233,16 +246,39 @@ class AuthService implements IAuthService {
     String? addressState,
   }) async {
     try {
+      // Enviamos TODOS os campos no metadata do signUp (snake_case) porque o
+      // trigger `handle_new_user` ja sabe ler todas estas chaves no INSERT.
+      // Vantagem: funciona mesmo quando o Supabase exige confirmacao de e-mail
+      // (response.session == null) — sem isso, campos opcionais ficavam NULL.
       final response = await _supabase.auth.signUp(
         email: email.trim().toLowerCase(),
         password: password,
-        data: {
-          // snake_case — compatível com o trigger `handle_new_user` que lê esta chave
+        data: <String, dynamic>{
           'first_name': firstName.trim(),
           'last_name': lastName.trim(),
           'birth_date': _formatBirthDate(birthDate),
-          // Instrui o trigger a criar o User como PACIENTE (sem conselho)
           'professional_type': 'PACIENTE',
+          'phone': phone.trim(),
+          if (_notEmpty(cns)) 'cns': cns!.trim(),
+          if (_notEmpty(cpf)) 'cpf': cpf!.trim(),
+          if (_notEmpty(socialName)) 'social_name': socialName!.trim(),
+          if (_notEmpty(motherParentName))
+            'mother_parent_name': motherParentName!.trim(),
+          if (_notEmpty(gender)) 'gender': gender!.trim(),
+          if (_notEmpty(ethnicity)) 'ethnicity': ethnicity!.trim(),
+          if (_notEmpty(maritalStatus)) 'marital_status': maritalStatus!.trim(),
+          if (_notEmpty(education)) 'education': education!.trim(),
+          if (_notEmpty(birthCity)) 'birth_city': birthCity!.trim(),
+          if (_notEmpty(birthState))
+            'birth_state': birthState!.trim().toUpperCase(),
+          if (_notEmpty(zipCode)) 'zip_code': zipCode!.trim(),
+          if (_notEmpty(street)) 'street': street!.trim(),
+          if (_notEmpty(streetNumber)) 'street_number': streetNumber!.trim(),
+          if (_notEmpty(complement)) 'complement': complement!.trim(),
+          if (_notEmpty(district)) 'district': district!.trim(),
+          if (_notEmpty(addressCity)) 'address_city': addressCity!.trim(),
+          if (_notEmpty(addressState))
+            'address_state': addressState!.trim().toUpperCase(),
         },
       );
 
@@ -281,9 +317,9 @@ class AuthService implements IAuthService {
           if (_notEmpty(addressState))
             'addressState': addressState!.trim().toUpperCase(),
         };
-        // Usa o nome canônico da tabela com aspas — PostgREST do Supabase requer
-        // o nome exato conforme definido no schema Prisma ('User' com U maiúsculo)
-        await _supabase.from('User').update(updates).eq('id', user.id);
+        // Tabela separada por domínio: pacientes → public.patients
+        // (migration 20260421000000_split_user_patients_professionals)
+        await _supabase.from('patients').update(updates).eq('id', user.id);
       }
 
       return UserModel(

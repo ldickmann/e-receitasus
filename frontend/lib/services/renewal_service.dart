@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/renewal_request_model.dart';
@@ -112,7 +114,8 @@ class RenewalService implements IRenewalService {
   static const String _table = 'RenewalRequest';
 
   /// Nome da tabela de usuários — também criada via Prisma com quoted identifier.
-  static const String _userTable = 'User';
+  /// Tabela de profissionais — alterada na migration split_user_patients_professionals.
+  static const String _userTable = 'professionals';
 
   /// Construtor que aceita [SupabaseClient] opcional para facilitar injeção
   /// em testes unitários sem precisar instanciar o Supabase real.
@@ -149,14 +152,51 @@ class RenewalService implements IRenewalService {
     // em vez de quebrar. O RLS também bloquearia a query sem sessão.
     if (userId == null) return const Stream.empty();
 
-    // O filtro explícito por patientUserId melhora a performance da subscription
-    // Realtime e é redundante com o RLS (defesa em profundidade).
-    return _supabase
-        .from(_table)
-        .stream(primaryKey: ['id'])
-        .eq('patientUserId', userId)
-        .order('createdAt', ascending: false)
-        .map(_mapToModels);
+    late StreamController<List<RenewalRequestModel>> controller;
+    RealtimeChannel? channel;
+
+    /// Busca os pedidos do paciente com join para obter o nome do medicamento.
+    /// O join usa a FK [prescriptionId → prescriptions.id] via PostgREST.
+    Future<void> fetch() async {
+      try {
+        final rows = await _supabase
+            .from(_table)
+            .select('*, prescription:prescriptions(medicine_name, type)')
+            .eq('patientUserId', userId)
+            .order('createdAt', ascending: false);
+        if (!controller.isClosed) {
+          controller.add(_mapToModels(List<Map<String, dynamic>>.from(rows)));
+        }
+      } catch (e) {
+        if (!controller.isClosed) controller.addError(e);
+      }
+    }
+
+    controller = StreamController<List<RenewalRequestModel>>(
+      onListen: () {
+        fetch();
+        // Canal Realtime dispara refetch quando a tabela muda — garante UX
+        // responsivo sem polling, mesmo com o join não sendo suportado pelo
+        // stream nativo do Supabase SDK.
+        channel = _supabase
+            .channel(
+                'my_renewals_${userId}_${DateTime.now().millisecondsSinceEpoch}')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: _table,
+              callback: (_) => fetch(),
+            )
+            .subscribe();
+      },
+      onCancel: () {
+        // Limpa o canal para evitar vazamento de subscription ao descartar a tela.
+        if (channel != null) _supabase.removeChannel(channel!);
+        controller.close();
+      },
+    );
+
+    return controller.stream;
   }
 
   @override
@@ -176,15 +216,50 @@ class RenewalService implements IRenewalService {
 
   @override
   Stream<List<RenewalRequestModel>> streamPendingTriage() {
-    // Filtro explícito no status para clareza e para que a subscription Realtime
-    // ignore eventos de outros estados. O RLS (enfermeiro_ve_pendentes) é a
-    // guarda primária — retorna vazio para não-enfermeiros automaticamente.
-    return _supabase
-        .from(_table)
-        .stream(primaryKey: ['id'])
-        .eq('status', RenewalStatus.pendingTriage.value)
-        .order('createdAt', ascending: true) // FIFO — pedido mais antigo tem prioridade
-        .map(_mapToModels);
+    late StreamController<List<RenewalRequestModel>> controller;
+    RealtimeChannel? channel;
+
+    /// Busca pedidos PENDING_TRIAGE com join para exibir o nome do medicamento
+    /// na fila de triagem — essencial para contexto clínico do enfermeiro.
+    /// A policy [prescriptions_select_nurse_triage] permite que enfermeiros
+    /// leiam a prescrição referenciada sem expor dados além do necessário.
+    Future<void> fetch() async {
+      try {
+        final rows = await _supabase
+            .from(_table)
+            .select('*, prescription:prescriptions(medicine_name, type)')
+            .eq('status', RenewalStatus.pendingTriage.value)
+            .order('createdAt', ascending: true);
+        if (!controller.isClosed) {
+          controller.add(_mapToModels(List<Map<String, dynamic>>.from(rows)));
+        }
+      } catch (e) {
+        if (!controller.isClosed) controller.addError(e);
+      }
+    }
+
+    controller = StreamController<List<RenewalRequestModel>>(
+      onListen: () {
+        fetch();
+        // Filtro explícito no status para que a subscription Realtime ignore
+        // eventos de outros estados — subscription cirúrgica reduz tráfego.
+        channel = _supabase
+            .channel('pending_triage_${DateTime.now().millisecondsSinceEpoch}')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: _table,
+              callback: (_) => fetch(),
+            )
+            .subscribe();
+      },
+      onCancel: () {
+        if (channel != null) _supabase.removeChannel(channel!);
+        controller.close();
+      },
+    );
+
+    return controller.stream;
   }
 
   @override
@@ -227,15 +302,50 @@ class RenewalService implements IRenewalService {
     // estado vazio em vez de quebrar.
     if (userId == null) return const Stream.empty();
 
-    // Filtro por doctorUserId para que a subscription Realtime seja cirúrgica.
-    // O RLS (medico_ve_triados) já garante que só registros com status TRIAGED
-    // e doctorUserId = auth.uid() são retornados — filtro duplo = defesa em profundidade.
-    return _supabase
-        .from(_table)
-        .stream(primaryKey: ['id'])
-        .eq('doctorUserId', userId)
-        .order('createdAt', ascending: true) // FIFO — pedido mais antigo tem prioridade
-        .map(_mapToModels);
+    late StreamController<List<RenewalRequestModel>> controller;
+    RealtimeChannel? channel;
+
+    /// Busca pedidos TRIAGED com join para exibir o nome do medicamento no card.
+    /// A policy [prescriptions_select_doctor_triage] permite que o médico
+    /// designado leia a prescrição original mesmo não sendo o autor.
+    Future<void> fetch() async {
+      try {
+        final rows = await _supabase
+            .from(_table)
+            .select('*, prescription:prescriptions(medicine_name, type)')
+            .eq('doctorUserId', userId)
+            .order('createdAt', ascending: true);
+        if (!controller.isClosed) {
+          controller.add(_mapToModels(List<Map<String, dynamic>>.from(rows)));
+        }
+      } catch (e) {
+        if (!controller.isClosed) controller.addError(e);
+      }
+    }
+
+    controller = StreamController<List<RenewalRequestModel>>(
+      onListen: () {
+        fetch();
+        // Canal filtrado por doctorUserId — subscription cirúrgica para o
+        // médico autenticado, minimizando eventos Realtime desnecessários.
+        channel = _supabase
+            .channel(
+                'triaged_doctor_${userId}_${DateTime.now().millisecondsSinceEpoch}')
+            .onPostgresChanges(
+              event: PostgresChangeEvent.all,
+              schema: 'public',
+              table: _table,
+              callback: (_) => fetch(),
+            )
+            .subscribe();
+      },
+      onCancel: () {
+        if (channel != null) _supabase.removeChannel(channel!);
+        controller.close();
+      },
+    );
+
+    return controller.stream;
   }
 
   @override

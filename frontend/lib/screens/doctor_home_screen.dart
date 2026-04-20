@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/prescription_model.dart';
 import '../models/prescription_type.dart';
+import '../models/renewal_request_model.dart';
 import '../providers/auth_provider.dart';
 import '../services/prescription_service.dart';
+import '../services/renewal_service.dart';
 import 'prescription_type_screen.dart';
 import 'prescription_view_screen.dart';
+import 'renewal_prescription_screen.dart';
 
 /// Tela principal para profissionais de saúde (médicos, dentistas, etc.).
 ///
@@ -88,6 +91,12 @@ class DoctorHomeScreen extends StatelessWidget {
               const _PrescriptionTypeLegend(),
               const SizedBox(height: 24),
 
+              // Seção de renovações pendentes — aparece apenas quando há pedidos
+              // com status TRIAGED designados para este médico.
+              // Usa StreamBuilder direto (sem Provider) pois o dado é exclusivo
+              // desta tela e não precisa ser compartilhado globalmente.
+              const _PendingRenewalsSection(),
+
               // Lista de receitas emitidas (stream em tempo real)
               const Text(
                 'Receitas Emitidas',
@@ -106,7 +115,7 @@ class DoctorHomeScreen extends StatelessWidget {
                   }
 
                   if (snapshot.hasError) {
-                    return _EmptyState(
+                    return const _EmptyState(
                       icon: Icons.cloud_off,
                       message:
                           'Não foi possível carregar as receitas.\nVerifique sua conexão.',
@@ -115,7 +124,7 @@ class DoctorHomeScreen extends StatelessWidget {
                   }
 
                   if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return _EmptyState(
+                    return const _EmptyState(
                       icon: Icons.receipt_long_outlined,
                       message:
                           'Nenhuma receita emitida ainda.\nToque em "Nova Receita" para começar.',
@@ -130,8 +139,7 @@ class DoctorHomeScreen extends StatelessWidget {
                     itemCount: list.length,
                     itemBuilder: (context, index) {
                       final item = list[index];
-                      final prescription =
-                          PrescriptionModel.fromJson(item);
+                      final prescription = PrescriptionModel.fromJson(item);
                       return _PrescriptionListTile(
                         prescription: prescription,
                         onTap: () => Navigator.push(
@@ -209,14 +217,13 @@ class _DoctorWelcomeCard extends StatelessWidget {
                   ),
                   Text(
                     professionalType,
-                    style: const TextStyle(
-                        fontSize: 13, color: Colors.white70),
+                    style: const TextStyle(fontSize: 13, color: Colors.white70),
                   ),
                   if (specialty != null)
                     Text(
                       specialty!,
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.white60),
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.white60),
                     ),
                   if (councilInfo != null)
                     Text(
@@ -291,16 +298,14 @@ class _PrescriptionListTile extends StatelessWidget {
         ),
       ),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         leading: Container(
           width: 44,
           height: 44,
           decoration: BoxDecoration(
             color: _typeColor,
             shape: BoxShape.circle,
-            border: Border.all(
-                color: type.foregroundColor.withOpacity(0.3)),
+            border: Border.all(color: type.foregroundColor.withOpacity(0.3)),
           ),
           child: Icon(type.icon, color: type.foregroundColor, size: 20),
         ),
@@ -326,8 +331,7 @@ class _PrescriptionListTile extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: statusColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(4),
@@ -387,5 +391,178 @@ class _EmptyState extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+// =============================================================================
+// Seção de Renovações Pendentes
+// =============================================================================
+
+/// Seção que exibe os pedidos de renovação TRIAGED designados ao médico logado.
+///
+/// Usa [RenewalService.streamTriagedForDoctor] para receber atualizações em
+/// tempo real via Supabase Realtime. A seção é invisível (`SizedBox.shrink`)
+/// quando não há pedidos, evitando espaço em branco desnecessário na tela.
+class _PendingRenewalsSection extends StatelessWidget {
+  const _PendingRenewalsSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<List<RenewalRequestModel>>(
+      stream: RenewalService().streamTriagedForDoctor(),
+      builder: (context, snapshot) {
+        final requests = snapshot.data ?? [];
+
+        // Oculta a seção completamente quando não há pedidos pendentes —
+        // critério de aceite: "Seção não aparece quando lista está vazia".
+        if (requests.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Cabeçalho com título e badge de contagem
+            Row(
+              children: [
+                const Text(
+                  'Renovações Pendentes',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // Badge com o número de pedidos aguardando atendimento
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    // Cor de alerta suave para destacar a fila sem alarmar
+                    color: const Color(0xFFE65100),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    '${requests.length}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            // Lista de cards tocáveis — cada um navega para RenewalPrescriptionScreen
+            ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: requests.length,
+              itemBuilder: (context, index) {
+                final request = requests[index];
+                return _RenewalRequestCard(
+                  request: request,
+                  onTap: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) =>
+                          RenewalPrescriptionScreen(request: request),
+                    ),
+                  ),
+                );
+              },
+            ),
+            const SizedBox(height: 24),
+          ],
+        );
+      },
+    );
+  }
+}
+
+// =============================================================================
+// Card de pedido de renovação
+// =============================================================================
+
+/// Card que representa um pedido de renovação TRIAGED na fila do médico.
+///
+/// Exibe medicamento, data do pedido e notas do enfermeiro (truncadas em
+/// 2 linhas para manter o layout compacto). O tap navega para a tela
+/// de emissão da renovação.
+class _RenewalRequestCard extends StatelessWidget {
+  const _RenewalRequestCard({
+    required this.request,
+    required this.onTap,
+  });
+
+  final RenewalRequestModel request;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 10),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(10),
+        side: BorderSide(
+          color: const Color(0xFFE65100).withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        leading: Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            // Cor laranja suave para diferenciar visualmente das receitas emitidas
+            color: const Color(0xFFFFF3E0),
+            shape: BoxShape.circle,
+            border: Border.all(
+              color: const Color(0xFFE65100).withOpacity(0.4),
+            ),
+          ),
+          child: const Icon(
+            Icons.assignment_outlined,
+            color: Color(0xFFE65100),
+            size: 20,
+          ),
+        ),
+        title: Text(
+          request.medicineName ?? 'Medicamento não informado',
+          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Solicitado em: ${_formatDate(request.createdAt)}',
+              style: const TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            // Notas do enfermeiro (resumidas) — presentes obrigatoriamente
+            // após a triagem, conforme regra de rejeição do IRenewalService
+            if (request.nurseNotes != null)
+              Text(
+                request.nurseNotes!,
+                style: const TextStyle(fontSize: 12),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+          ],
+        ),
+        trailing: const Icon(
+          Icons.chevron_right,
+          color: Color(0xFFE65100),
+        ),
+        onTap: onTap,
+      ),
+    );
+  }
+
+  /// Formata um [DateTime] para o padrão DD/MM/AAAA.
+  /// Não usa o pacote `intl` — formatação manual conforme convenção do projeto.
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
   }
 }

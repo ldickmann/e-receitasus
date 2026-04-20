@@ -1,4 +1,4 @@
-import type { User } from '@prisma/client';
+import type { PublicProfile } from '../repositories/user.repository.js';
 import { findPublicUserById } from '../repositories/user.repository.js';
 
 /**
@@ -15,42 +15,20 @@ export class AuthServiceError extends Error {
 }
 
 /**
- * Normaliza e valida userId recebido do middleware.
- *
- * @param userId ID vindo do token validado.
- * @returns ID normalizado.
- * @throws AuthServiceError quando invalido.
- */
-function normalizeUserId(userId: string): string {
-  if (typeof userId !== 'string') {
-    throw new AuthServiceError('ID de usuario invalido.', 400);
-  }
-
-  const normalized = userId.trim();
-
-  if (normalized.length === 0) {
-    throw new AuthServiceError('ID de usuario vazio.', 400);
-  }
-
-  return normalized;
-}
-
-/**
  * Retorna perfil publico do usuario autenticado.
- * Este servico nao autentica senha e nao emite token.
+ * O middleware ja garante que userId é string não vazia validada via JWKS,
+ * portanto não repetimos normalização aqui (boundary validation).
  *
- * @param userId Claim sub injetada no request.
- * @returns Usuario da tabela publica.
- * @throws AuthServiceError quando usuario nao estiver espelhado na public.User.
+ * @param userId Claim sub injetada no request pelo authenticateToken.
+ * @returns Perfil normalizado com professionalType sempre presente.
+ * @throws AuthServiceError 404 quando usuario nao estiver espelhado em nenhuma tabela publica.
  */
-export async function getAuthenticatedUserProfile(userId: string): Promise<User> {
-  const normalizedUserId = normalizeUserId(userId);
-
-  const user = await findPublicUserById(normalizedUserId);
+export async function getAuthenticatedUserProfile(userId: string): Promise<PublicProfile> {
+  const user = await findPublicUserById(userId);
 
   if (!user) {
     throw new AuthServiceError(
-      'Usuario autenticado nao encontrado na tabela publica. Verifique a trigger de sincronizacao auth.users -> public.User.',
+      'Usuario autenticado nao encontrado nas tabelas publicas. Verifique a trigger de sincronizacao auth.users -> patients/professionals.',
       404
     );
   }

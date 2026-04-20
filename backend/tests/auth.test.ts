@@ -39,9 +39,11 @@ describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
   beforeAll(async () => {
     process.env.SUPABASE_URL = 'https://pofzorepizdcefvodwln.supabase.co';
 
-    await prisma.user.deleteMany();
+    // Limpa apenas o profissional de teste (ADMINISTRATIVO → tabela professionals)
+    await prisma.professional.deleteMany({ where: { id: user.id } });
 
-    await prisma.user.create({
+    // Cria o profissional de teste para os asserts do endpoint GET /user/me
+    await prisma.professional.create({
       data: user,
     });
   });

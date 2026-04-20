@@ -21,12 +21,6 @@ enum ProfessionalType {
   PACIENTE
 }
 
-enum PrescriptionStatus {
-  ACTIVE
-  EXPIRED
-  CANCELLED
-}
-
 /// Espelha o ciclo de vida de um pedido de renovação de prescrição.
 /// Fluxo: PENDING_TRIAGE → TRIAGED → PRESCRIBED ou REJECTED.
 /// Deve ser sincronizado com o enum RenewalStatus no Dart (frontend/lib/models/renewal_request_model.dart).
@@ -37,97 +31,143 @@ enum RenewalStatus {
   REJECTED
 }
 
-model User {
-  id                    String           @id @default(uuid())
-  firstName             String?
-  lastName              String?
-  name                  String
-  birthDate             DateTime?        @db.Date
-  email                 String           @unique
-  professionalType      ProfessionalType @default(ADMINISTRATIVO)
-  professionalId        String?
-  professionalState     String?
-  specialty             String?
-
-  /// Campos exclusivos do tipo PACIENTE — preenchidos apenas no cadastro de pacientes SUS
+/// Usuário SUS — receptor de prescrições médicas.
+/// Contém campos sensíveis de saúde (CPF, CNS) isolados aqui por LGPD.
+/// Roteado pelo trigger `handle_new_user` quando professionalType = 'PACIENTE'.
+model Patient {
+  id               String    @id
+  firstName        String?
+  lastName         String?
+  name             String
+  email            String    @unique
+  birthDate        DateTime? @db.Date
 
   /// Cartão Nacional de Saúde — máximo 15 caracteres
-  cns                   String?
+  cns              String?
   /// CPF do paciente — 11 dígitos sem formatação
-  cpf                   String?          @unique
-  /// Nome Social — opcional, não substitui o nome civil nos documentos
-  socialName            String?
+  cpf              String?   @unique
+  /// Nome Social — prevalece sobre o civil nas interações clínicas
+  socialName       String?
   /// Nome completo da mãe ou, na ausência, do pai/responsável legal
-  motherParentName      String?
-  /// Cidade onde o paciente nasceu
-  birthCity             String?
-  /// UF de nascimento — 2 caracteres (ex: SC)
-  birthState            String?          @db.Char(2)
+  motherParentName String?
   /// Sexo conforme declarado pelo paciente
-  gender                String?
+  gender           String?
   /// Raça/Cor conforme classificação IBGE
-  ethnicity             String?
+  ethnicity        String?
   /// Estado civil do paciente
-  maritalStatus         String?
-  /// Celular com DDD — 11 dígitos (ex: 47988420692)
-  phone                 String?
+  maritalStatus    String?
+  /// Celular com DDD — 11 dígitos
+  phone            String?
   /// Escolaridade do paciente
-  education             String?
+  education        String?
+  /// Município de nascimento
+  birthCity        String?
+  /// UF de nascimento — 2 caracteres (ex: SC)
+  birthState       String?   @db.Char(2)
   /// CEP do endereço — 8 dígitos sem hífen
-  zipCode               String?          @db.Char(8)
-  /// Logradouro (rua, avenida etc.)
-  street                String?
+  zipCode          String?   @db.Char(8)
+  /// Logradouro
+  street           String?
   /// Número do endereço
-  streetNumber          String?
-  /// Complemento opcional (apto, bloco etc.)
-  complement            String?
-  /// Bairro
-  district              String?
+  streetNumber     String?
+  /// Complemento opcional
+  complement       String?
+  /// Bairro — usado para auto-vincular UBS via trigger
+  district         String?
   /// Cidade do endereço atual
-  addressCity           String?
-  /// UF do endereço atual — 2 caracteres
-  addressState          String?          @db.Char(2)
+  addressCity      String?
+  /// UF do endereço — 2 caracteres
+  addressState     String?   @db.Char(2)
 
-  createdAt             DateTime         @default(now())
-  updatedAt             DateTime         @updatedAt
+  /// UBS vinculada — atribuição automática pelo bairro via trigger
+  /// `auto_assign_patient_health_unit` ao inserir/atualizar bairro+cidade.
+  healthUnitId     String?   @db.Uuid
+  healthUnit       HealthUnit? @relation("PatientHealthUnit", fields: [healthUnitId], references: [id], onDelete: SetNull)
 
-  prescriptionsCreated  Prescription[]   @relation("PrescribedBy")
-  prescriptionsReceived Prescription[]   @relation("PatientPrescriptions")
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
 
-  /// Pedidos de renovação onde este usuário é o paciente solicitante
+  /// Pedidos de renovação onde este paciente é o solicitante
   renewalRequestsAsPatient RenewalRequest[] @relation("PatientRenewalRequests")
-  /// Pedidos de renovação atribuídos a este médico para emissão
-  renewalRequestsAsDoctor  RenewalRequest[] @relation("DoctorRenewalRequests")
-  /// Pedidos de renovação triados por este enfermeiro
-  renewalRequestsAsNurse   RenewalRequest[] @relation("NurseRenewalRequests")
 
-  @@index([professionalType])
-  @@index([createdAt])
+  @@index([healthUnitId])
   @@index([cpf])
+  @@index([createdAt])
+  @@map("patients")
 }
 
-model Prescription {
-  id          String             @id @default(uuid())
-  medicine    String
-  description String?
-  doctorName  String?
-  status      PrescriptionStatus @default(ACTIVE)
+/// Profissional de saúde ou administrativo vinculado à UBS.
+/// Nunca contém professionalType = PACIENTE — roteado pelo trigger `handle_new_user`.
+/// Limite de 3 profissionais por UBS garantido por trigger `enforce_max_professionals_per_unit`.
+model Professional {
+  id                 String           @id
+  firstName          String?
+  lastName           String?
+  name               String
+  email              String           @unique
+  birthDate          DateTime?        @db.Date
+  /// Tipo do profissional — nunca PACIENTE nesta tabela (invariante do domínio)
+  professionalType   ProfessionalType @default(ADMINISTRATIVO)
+  /// Número de registro no conselho (CRM, COREN, CRF, etc.)
+  professionalId     String?
+  /// UF do conselho de classe (ex: SC)
+  professionalState  String?
+  /// Especialidade clínica (ex: Clínica Geral, Pediatria)
+  specialty          String?
+  /// CEP do endereço — 8 dígitos sem hífen
+  zipCode            String?          @db.Char(8)
+  street             String?
+  streetNumber       String?
+  complement         String?
+  district           String?
+  addressCity        String?
+  addressState       String?          @db.Char(2)
 
-  patientId   String
-  doctorId    String?
+  /// UBS vinculada — máx. 3 por UBS (garantido por trigger)
+  healthUnitId       String?          @db.Uuid
+  healthUnit         HealthUnit?      @relation("ProfessionalHealthUnit", fields: [healthUnitId], references: [id], onDelete: SetNull)
 
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
 
-  patient          User               @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Cascade)
-  doctor           User?              @relation("PrescribedBy", fields: [doctorId], references: [id], onDelete: SetNull)
+  /// Pedidos de renovação atribuídos a este médico para emissão
+  renewalRequestsAsDoctor RenewalRequest[] @relation("DoctorRenewalRequests")
+  /// Pedidos de renovação triados por este enfermeiro
+  renewalRequestsAsNurse  RenewalRequest[] @relation("NurseRenewalRequests")
 
-  /// Pedidos de renovação originados desta prescrição
-  renewalRequests  RenewalRequest[]
-
-  @@index([patientId])
-  @@index([status])
+  @@index([healthUnitId])
+  @@index([professionalType])
   @@index([createdAt])
+  @@map("professionals")
+}
+
+/// Unidade Básica de Saúde — atende exatamente UM bairro de uma cidade.
+/// Profissionais e pacientes são vinculados a uma única UBS.
+/// Regra MVP: máximo de 3 profissionais por UBS (garantido por trigger
+/// `enforce_max_professionals_per_unit` no banco).
+model HealthUnit {
+  id                String   @id @default(uuid()) @db.Uuid
+  /// Nome humano da UBS (ex: "UBS Centro")
+  name              String
+  /// Bairro atendido — único dentro da mesma cidade
+  district          String
+  /// Cidade da UBS (MVP: sempre "Navegantes")
+  city              String
+  /// UF com 2 caracteres (MVP: sempre "SC")
+  state             String   @db.Char(2)
+  /// Limite máximo de profissionais vinculados (1–3)
+  maxProfessionals  Int      @default(3) @map("max_professionals")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt       @map("updated_at")
+
+  /// Pacientes SUS vinculados — atribuídos automaticamente pelo bairro
+  patients          Patient[]      @relation("PatientHealthUnit")
+  /// Profissionais de saúde/administrativos vinculados (máx. 3)
+  professionals     Professional[] @relation("ProfessionalHealthUnit")
+
+  @@unique([district, city], name: "health_units_district_city_unique")
+  @@index([district, city], map: "idx_health_units_district_city")
+  @@map("health_units")
 }
 
 /// Representa um pedido de renovação de prescrição feito por um paciente.
@@ -137,8 +177,10 @@ model Prescription {
 model RenewalRequest {
   id String @id @default(uuid())
 
-  /// FK para a prescrição original que será renovada
-  prescriptionId String
+  /// FK para a prescrição original que será renovada.
+  /// Aponta para a tabela BaaS `prescriptions` (lowercase) — FK
+  /// gerenciada via SQL raw porque essa tabela não é modelada pelo Prisma.
+  prescriptionId String @db.Uuid
   /// FK para o paciente solicitante (User.id = auth.users.id em texto)
   patientUserId  String
   /// Médico designado pelo enfermeiro; preenchido na transição TRIAGED
@@ -155,15 +197,19 @@ model RenewalRequest {
 
   /// ID da nova prescrição emitida ao concluir o fluxo (soft ref, sem FK,
   /// pois a prescrição renovada pode ainda não existir no momento do update)
-  renewedPrescriptionId String?
+  renewedPrescriptionId String? @db.Uuid
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  prescription Prescription @relation(fields: [prescriptionId], references: [id])
-  patient      User         @relation("PatientRenewalRequests", fields: [patientUserId], references: [id], onDelete: Cascade)
-  doctor       User?        @relation("DoctorRenewalRequests", fields: [doctorUserId], references: [id], onDelete: SetNull)
-  nurse        User?        @relation("NurseRenewalRequests", fields: [nurseUserId], references: [id], onDelete: SetNull)
+  // Sem relação Prisma para a prescrição original — a tabela `prescriptions`
+  // (BaaS) não é modelada aqui. A FK existe no banco via migration SQL.
+  /// Paciente solicitante — CASCADE: remover pedidos ao remover paciente
+  patient      Patient      @relation("PatientRenewalRequests", fields: [patientUserId], references: [id], onDelete: Cascade)
+  /// Médico designado — SET NULL ao remover profissional
+  doctor       Professional? @relation("DoctorRenewalRequests", fields: [doctorUserId], references: [id], onDelete: SetNull)
+  /// Enfermeiro triador — SET NULL ao remover profissional
+  nurse        Professional? @relation("NurseRenewalRequests", fields: [nurseUserId], references: [id], onDelete: SetNull)
 
   @@index([patientUserId])
   @@index([status])

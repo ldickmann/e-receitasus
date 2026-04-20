@@ -139,7 +139,7 @@ class RenewalRequestModel {
         json['prescription'] as Map<String, dynamic>?;
 
     final String? rawMedicineName = json['medicineName'] as String? ??
-        nestedPrescription?['medicine'] as String?;
+        nestedPrescription?['medicine_name'] as String?;
 
     // Converte o tipo de prescrição de string para o enum PrescriptionType;
     // usa null quando o campo não está presente na resposta.
