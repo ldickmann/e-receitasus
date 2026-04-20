@@ -522,8 +522,9 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                         final dateFromText = _parseDateText(text);
                         final effective = _selectedBirthDate ?? dateFromText;
                         if (effective == null) {
-                          if (text.isEmpty)
+                          if (text.isEmpty) {
                             return 'Informe a data de nascimento.';
+                          }
                           // Data com 10 chars mas inválida (ex: 31/02)
                           return 'Data inválida';
                         }
