@@ -37,6 +37,8 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
   final _lastNameController = TextEditingController();
   final _socialNameController = TextEditingController();
   final _cpfController = TextEditingController();
+  // Controller do campo de texto de data — sincronizado com _selectedBirthDate
+  final _birthDateController = TextEditingController();
   DateTime? _selectedBirthDate;
   String? _gender;
   String? _ethnicity;
@@ -280,6 +282,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
     _lastNameController.dispose();
     _socialNameController.dispose();
     _cpfController.dispose();
+    _birthDateController.dispose();
     _motherParentNameController.dispose();
     _birthCityController.dispose();
     _emailController.dispose();
@@ -296,10 +299,35 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
     super.dispose();
   }
 
+  /// Parseia o texto digitado no formato DD/MM/AAAA em um [DateTime].
+  ///
+  /// Retorna null se incompleto ou se a data não existir (ex: 31/02).
+  /// Compara campos de volta porque o Flutter normaliza datas inválidas.
+  DateTime? _parseDateText(String text) {
+    if (text.length != 10) return null;
+    final parts = text.split('/');
+    if (parts.length != 3) return null;
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (day == null || month == null || year == null) return null;
+    try {
+      final date = DateTime(year, month, day);
+      // Garante que a data não foi normalizada (ex: 31/02 → 03/03)
+      if (date.day != day || date.month != month || date.year != year) {
+        return null;
+      }
+      return date;
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Abre o seletor de data de nascimento.
   ///
   /// Sem restrição de idade mínima — o SUS atende desde recém-nascidos.
   /// Limite superior é hoje para evitar datas futuras inválidas.
+  /// Também atualiza o campo de texto para manter os dois sincronizados.
   Future<void> _selectBirthDate() async {
     final picked = await showDatePicker(
       context: context,
@@ -310,7 +338,15 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
       cancelText: 'Cancelar',
       confirmText: 'Confirmar',
     );
-    if (picked != null) setState(() => _selectedBirthDate = picked);
+    if (picked != null) {
+      setState(() {
+        _selectedBirthDate = picked;
+        // Popula o campo de texto para refletir a seleção do calendário
+        final dd = picked.day.toString().padLeft(2, '0');
+        final mm = picked.month.toString().padLeft(2, '0');
+        _birthDateController.text = '$dd/$mm/${picked.year}';
+      });
+    }
   }
 
   /// Envia o formulário ao provider e reage ao resultado.
@@ -320,9 +356,14 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
   /// de acessar o app dependendo da configuração do Supabase.
   Future<void> _handleSubmit() async {
     if (!_formKey.currentState!.validate()) return;
-    if (_selectedBirthDate == null) {
+
+    // Aceita data proveniente do calendário ou digitada manualmente
+    final effectiveBirthDate =
+        _selectedBirthDate ?? _parseDateText(_birthDateController.text);
+
+    if (effectiveBirthDate == null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Informe a data de nascimento.')),
+        const SnackBar(content: Text('Informe uma data de nascimento válida.')),
       );
       return;
     }
@@ -333,7 +374,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
       firstName: _firstNameController.text.trim(),
       lastName: _lastNameController.text.trim(),
       email: _emailController.text.trim(),
-      birthDate: _selectedBirthDate!,
+      birthDate: effectiveBirthDate,
       password: _passwordController.text,
       // Telefone é obrigatório — o validator já garante preenchimento
       phone: _phoneController.text.trim(),
@@ -387,15 +428,6 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
   String? _nullIfEmpty(String value) {
     final trimmed = value.trim();
     return trimmed.isEmpty ? null : trimmed;
-  }
-
-  /// Formata a data de nascimento selecionada para exibição no botão.
-  String get _formattedBirthDate {
-    if (_selectedBirthDate == null) return 'Selecionar data de nascimento *';
-    final d = _selectedBirthDate!;
-    return '${d.day.toString().padLeft(2, '0')}/'
-        '${d.month.toString().padLeft(2, '0')}/'
-        '${d.year}';
   }
 
   @override
@@ -457,38 +489,47 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Data de nascimento — obrigatória
-                    Semantics(
-                      label: 'Data de nascimento: $_formattedBirthDate',
-                      button: true,
-                      // OutlinedButton puro com Row evita overflow do ícone
-                      // que ocorria com OutlinedButton.icon + alignment.centerLeft
-                      child: OutlinedButton(
-                        onPressed: _selectBirthDate,
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 16),
-                          alignment: Alignment.centerLeft,
-                        ),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.calendar_today,
-                              size: 20,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              _formattedBirthDate,
-                              style: TextStyle(
-                                color: _selectedBirthDate == null
-                                    ? Theme.of(context).colorScheme.primary
-                                    : Theme.of(context).colorScheme.onSurface,
-                              ),
-                            ),
-                          ],
+                    // Data de nascimento — aceita digitação direta ou calendário
+                    TextFormField(
+                      controller: _birthDateController,
+                      keyboardType: TextInputType.number,
+                      inputFormatters: [_DateMaskFormatter()],
+                      onChanged: (text) {
+                        // Ao completar 10 chars (DD/MM/AAAA), parseia e mantém
+                        // _selectedBirthDate sincronizado para o envio do form
+                        if (text.length == 10) {
+                          setState(
+                              () => _selectedBirthDate = _parseDateText(text));
+                        } else {
+                          setState(() => _selectedBirthDate = null);
+                        }
+                      },
+                      decoration: InputDecoration(
+                        labelText: 'Data de nascimento *',
+                        hintText: 'DD/MM/AAAA',
+                        border: const OutlineInputBorder(),
+                        prefixIcon: const Icon(Icons.cake_outlined),
+                        // Ícone de calendário mantido para abrir DatePicker
+                        suffixIcon: IconButton(
+                          icon: const Icon(Icons.calendar_today),
+                          tooltip: 'Selecionar data no calendário',
+                          onPressed: _selectBirthDate,
                         ),
                       ),
+                      validator: (v) {
+                        // Verifica se foi preenchido por texto ou pelo calendário
+                        final text = v ?? '';
+                        final dateFromText = _parseDateText(text);
+                        final effective = _selectedBirthDate ?? dateFromText;
+                        if (effective == null) {
+                          if (text.isEmpty)
+                            return 'Informe a data de nascimento.';
+                          // Data com 10 chars mas inválida (ex: 31/02)
+                          return 'Data inválida';
+                        }
+                        // Sem restrição de idade para pacientes — SUS atende todas as idades
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 12),
 
@@ -966,6 +1007,37 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
 ///
 /// Separa visualmente grupos de campos relacionados sem criar
 /// hierarquia de navegação extra — mantém o formulário em uma única tela.
+/// Formata automaticamente o campo de data de nascimento no padrão DD/MM/AAAA.
+///
+/// Extrai apenas os dígitos do input, limita a 8 dígitos e insere '/' nas
+/// posições corretas para não forçar o usuário a digitá-las manualmente.
+class _DateMaskFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Remove qualquer '/' já existente para trabalhar só com dígitos
+    final digits = newValue.text.replaceAll('/', '');
+
+    // Limita a 8 dígitos numéricos (DDMMAAAA)
+    final limited = digits.length > 8 ? digits.substring(0, 8) : digits;
+
+    // Reconstrói a string inserindo '/' após dia (pos 2) e mês (pos 4)
+    final buffer = StringBuffer();
+    for (var i = 0; i < limited.length; i++) {
+      if (i == 2 || i == 4) buffer.write('/');
+      buffer.write(limited[i]);
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
+
 class _SectionHeader extends StatelessWidget {
   final String title;
 

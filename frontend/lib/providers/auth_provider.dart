@@ -93,6 +93,14 @@ class AuthProvider with ChangeNotifier {
     String? professionalId,
     String? professionalState,
     String? specialty,
+    // Campos de endereço — opcionais, preenchidos via ViaCEP ou manual
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
   }) async {
     _setLoading(true);
     _clearError();
@@ -108,6 +116,13 @@ class AuthProvider with ChangeNotifier {
         professionalId: professionalId,
         professionalState: professionalState,
         specialty: specialty,
+        zipCode: zipCode,
+        street: street,
+        streetNumber: streetNumber,
+        complement: complement,
+        district: district,
+        addressCity: addressCity,
+        addressState: addressState,
       );
 
       _setLoading(false);
