@@ -14,6 +14,9 @@ import 'screens/prescription_type_screen.dart';
 import 'screens/prescription_form_screen.dart';
 import 'screens/patient_register_screen.dart';
 import 'models/prescription_type.dart';
+import 'services/renewal_service.dart';
+import 'providers/renewal_provider.dart';
+import 'providers/triage_provider.dart';
 
 /// Ponto de entrada da aplicação E-ReceitaSUS
 ///
@@ -51,7 +54,11 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => AuthProvider(AuthService()),
         ),
-        // Providers adicionais para a Etapa 2 (ex: Prescrições) devem ser inseridos aqui
+        // Provider de renovação: utilizado pelo paciente para solicitar renovação de receitas
+        ChangeNotifierProvider(
+            create: (_) => RenewalProvider(RenewalService())),
+        // Provider de triagem: utilizado pelo enfermeiro para aprovar ou rejeitar pedidos
+        ChangeNotifierProvider(create: (_) => TriageProvider(RenewalService())),
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
