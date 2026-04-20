@@ -99,7 +99,8 @@ class RenewalProvider with ChangeNotifier {
             'Não foi possível enviar o pedido de renovação. Tente novamente.';
       }
       // Loga apenas o código do erro — sem dados sensíveis do paciente (LGPD)
-      debugPrint('RenewalProvider.requestRenewal: PostgrestException ${e.code}');
+      debugPrint(
+          'RenewalProvider.requestRenewal: PostgrestException ${e.code}');
       _setSubmitting(false);
       return false;
     } on StateError catch (_) {
