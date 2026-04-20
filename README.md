@@ -37,10 +37,13 @@ Elimina papéis físicos e filas desnecessárias, garante rastreabilidade das pr
   - [🔐 Autenticação](#-autenticação)
   - [🌐 API — Endpoints](#-api--endpoints)
   - [🧩 Modelagem de Dados](#-modelagem-de-dados)
-    - [Entidade `User`](#entidade-user)
-    - [Entidade `Prescription`](#entidade-prescription)
+    - [Entidade `Patient`](#entidade-patient)
+    - [Entidade `Professional`](#entidade-professional)
+    - [Entidade `HealthUnit`](#entidade-healthunit)
+    - [Entidade `Prescription` (BaaS)](#entidade-prescription-baas)
+    - [Entidade `RenewalRequest`](#entidade-renewalrequest)
     - [Enums](#enums)
-    - [Histórico de Migrations (11)](#histórico-de-migrations-11)
+    - [Histórico de Migrations (20)](#histórico-de-migrations-20)
   - [⚙️ CI/CD Pipeline](#️-cicd-pipeline)
     - [`ci.yml` — Integração Contínua](#ciyml--integração-contínua)
     - [`main.yml` — Entrega Contínua](#mainyml--entrega-contínua)
@@ -110,25 +113,26 @@ Paciente                 Enfermeiro (UBS)              Médico (UBS)
    │                           │                            │
    │                  [Não necessário]                       │
    │◄──────────────── Rejeita ─┤                            │
+   │   (status REJECTED)       │                            │
    │                           │                            │
    │                  [Necessário]                           │
    │                           │── Encaminha ao médico ────►│
-   │                           │                            │── Analisa e decide
+   │                           │   (status TRIAGED)         │── Analisa e decide
    │                           │                            │
-   │                           │             [Rejeita] ─────►│ RENEWAL_REJECTED
+   │                           │             [Rejeita] ─────►│ REJECTED
    │                           │                            │
-   │                           │             [Aprova] ──────►│ Nova receita ACTIVE
-   │◄─────────────────────────────────────── Notifica ──────│
+   │                           │             [Aprova] ──────►│ PRESCRIBED
+   │◄─────────────────────────────────────── Notifica ──────│ Nova prescrição criada
 ```
 
 ### 📊 Status do Fluxo de Renovação
 
-| Status             | Descrição                                                                       | Próxima Ação               |
-| ------------------ | ------------------------------------------------------------------------------- | -------------------------- |
-| `PENDING_TRIAGE`   | Solicitação enviada pelo paciente, aguardando avaliação do enfermeiro           | Enfermeiro avalia          |
-| `PENDING_RENEWAL`  | Triagem aprovada pelo enfermeiro, aguardando autorização do médico              | Médico autoriza ou rejeita |
-| `RENEWAL_REJECTED` | Solicitação rejeitada (pelo enfermeiro ou pelo médico)                          | Paciente é notificado      |
-| `ACTIVE`           | Médico autorizou — nova prescrição criada com dados idênticos e data atualizada | —                          |
+| Status           | Descrição                                                                       | Próxima Ação               |
+| ---------------- | ------------------------------------------------------------------------------- | -------------------------- |
+| `PENDING_TRIAGE` | Solicitação enviada pelo paciente, aguardando avaliação do enfermeiro           | Enfermeiro avalia          |
+| `TRIAGED`        | Triagem aprovada pelo enfermeiro, aguardando autorização do médico              | Médico autoriza ou rejeita |
+| `PRESCRIBED`     | Médico autorizou — nova prescrição criada com dados idênticos e data atualizada | —                          |
+| `REJECTED`       | Solicitação rejeitada pelo enfermeiro ou pelo médico                            | Paciente é notificado      |
 
 > **Regras de negócio:**
 >
@@ -159,22 +163,21 @@ Paciente                 Enfermeiro (UBS)              Médico (UBS)
 
 ### Frontend
 
-| Tecnologia                     | Versão      | Papel                          |
-| ------------------------------ | ----------- | ------------------------------ |
-| **Flutter** + **Dart**         | SDK ≥ 3.4.0 | Framework mobile               |
-| **supabase_flutter**           | ^2.0.0      | Autenticação BaaS              |
-| **Provider**                   | 6.1.1       | Gerenciamento de estado        |
-| **http**                       | ^1.6.0      | Requisições HTTP à API         |
-| **flutter_secure_storage**     | ^4.2.1      | Armazenamento seguro de tokens |
-| **shared_preferences**         | 2.2.2       | Preferências locais            |
-| **jwt_decoder**                | 2.0.1       | Decodificação de payload JWT   |
-| **mockito** + **build_runner** | ^5.4 / ^2.4 | Mocks para TDD                 |
+| Tecnologia                     | Versão      | Papel                              |
+| ------------------------------ | ----------- | ---------------------------------- |
+| **Flutter** + **Dart**         | SDK ≥ 3.4.0 | Framework mobile                   |
+| **supabase_flutter**           | ^2.0.0      | Autenticação BaaS + Realtime       |
+| **Provider**                   | 6.1.1       | Gerenciamento de estado            |
+| **http**                       | ^1.6.0      | Requisições HTTP à API             |
+| **flutter_secure_storage**     | ^9.2.2      | Armazenamento seguro de tokens JWT |
+| **cupertino_icons**            | ^1.0.6      | Ícones no estilo iOS               |
+| **mockito** + **build_runner** | ^5.4 / ^2.4 | Mocks para TDD                     |
 
 ### Qualidade e Engenharia
 
 - **TDD** (Test-Driven Development) no backend e no frontend
 - **TypeScript strict mode** com `noUncheckedIndexedAccess` e `exactOptionalPropertyTypes`
-- **Migrations versionadas** com Prisma (11 migrations)
+- **Migrations versionadas** com Prisma (20 migrations)
 - **Arquitetura em camadas** (Presentation → Business → Data → Database)
 - **GitHub Actions** com pipelines de CI e CD separados
 
@@ -204,17 +207,18 @@ Flutter App
 
 **Telas por perfil de acesso:**
 
-| Perfil                | Telas disponíveis                                                                                            |
-| --------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Médico / Dentista** | Splash → Login → DoctorHomeScreen → PrescriptionTypeScreen → PrescriptionFormScreen → PrescriptionViewScreen |
-| **Enfermeiro**        | Splash → Login → NurseHomeScreen (triagem de renovações)                                                     |
-| **Paciente**          | Splash → Login / Register → HomeScreen → HistoryScreen → PrescriptionViewScreen                              |
+| Perfil                | Telas disponíveis                                                                                                                        |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| **Médico / Dentista** | Splash → Login → DoctorHomeScreen → PrescriptionTypeScreen → PrescriptionFormScreen → RenewalPrescriptionScreen → PrescriptionViewScreen |
+| **Enfermeiro**        | Splash → Login → NurseHomeScreen → TriageDetailScreen                                                                                    |
+| **Paciente**          | Splash → Login / Register → HomeScreen → RequestRenewalScreen → HistoryScreen → PrescriptionViewScreen                                   |
 
 ---
 
 ## 🔐 Autenticação
 
 - O frontend autentica o usuário via **Supabase Auth** e recebe um access token JWT.
+- O token é armazenado com **`flutter_secure_storage`** (Keychain no iOS, Keystore no Android) — nunca em `SharedPreferences`.
 - O backend **não armazena** segredos de sessão — valida o token consultando o endpoint público JWKS do Supabase (`/auth/v1/.well-known/jwks.json`).
 - O resolver JWKS é **cacheado em memória** para evitar requisições redundantes.
 - O middleware injeta `req.userId` (claim `sub` do token) para uso nos controllers.
@@ -240,36 +244,89 @@ Flutter App
 | `PATCH` | `/prescriptions/:id/cancel`       |      ✅      | Cancela receita (apenas médico prescritor) |
 | `GET`   | `/history`                        |      ❌      | Histórico de prescrições                   |
 
-> **Status válidos para filtro:** `ACTIVE` · `EXPIRED` · `CANCELLED` · `PENDING_TRIAGE` · `PENDING_RENEWAL` · `RENEWAL_REJECTED`
+> **Status válidos para filtro:** `ACTIVE` · `EXPIRED` · `CANCELLED`
+> **Nota:** O fluxo de renovação (solicitação, triagem, emissão) é gerenciado diretamente via **Supabase PostgREST + RLS**, sem passar pelo backend Express.
 
 ---
 
 ## 🧩 Modelagem de Dados
 
-### Entidade `User`
+O banco separa **pacientes SUS** e **profissionais de saúde** em tabelas distintas, roteados automaticamente por trigger ao cadastro via Supabase Auth. A tabela `prescriptions` é gerenciada como **tabela BaaS** via SQL direto (PostgREST + RLS), fora do escopo do Prisma.
 
-Concentra profissionais de saúde e pacientes SUS em uma única tabela, diferenciados pelo campo `professionalType`.
+### Entidade `Patient`
 
-| Grupo                   | Campos                                                                                                       |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------ |
-| **Identificação**       | `id`, `firstName`, `lastName`, `name`, `email`, `birthDate`                                                  |
-| **Dados profissionais** | `professionalType`, `professionalId`, `professionalState`, `specialty`                                       |
-| **Dados do paciente**   | `cns`, `cpf`, `socialName`, `motherParentName`, `gender`, `ethnicity`, `maritalStatus`, `phone`, `education` |
-| **Endereço**            | `zipCode`, `street`, `streetNumber`, `complement`, `district`, `addressCity`, `addressState`                 |
-| **Metadados**           | `createdAt`, `updatedAt`                                                                                     |
+Usuário SUS receptor de prescrições. Contém dados sensíveis de saúde (CPF, CNS) isolados por LGPD.
 
-### Entidade `Prescription`
+| Grupo              | Campos                                                                                                       |
+| ------------------ | ------------------------------------------------------------------------------------------------------------ |
+| **Identificação**  | `id`, `firstName`, `lastName`, `name`, `email`, `birthDate`                                                  |
+| **Dados de saúde** | `cns`, `cpf`, `socialName`, `motherParentName`, `gender`, `ethnicity`, `maritalStatus`, `phone`, `education` |
+| **Nascimento**     | `birthCity`, `birthState`                                                                                    |
+| **Endereço**       | `zipCode`, `street`, `streetNumber`, `complement`, `district`, `addressCity`, `addressState`                 |
+| **Vínculo**        | `healthUnitId` — FK para `HealthUnit`, atribuída automaticamente pelo bairro via trigger                     |
+| **Metadados**      | `createdAt`, `updatedAt`                                                                                     |
 
-| Campo                     | Tipo                 | Descrição                           |
-| ------------------------- | -------------------- | ----------------------------------- |
-| `id`                      | `UUID`               | Identificador único                 |
-| `medicine`                | `String`             | Nome do medicamento                 |
-| `description`             | `String?`            | Posologia / instruções              |
-| `doctorName`              | `String?`            | Nome formatado do médico prescritor |
-| `status`                  | `PrescriptionStatus` | Estado atual da receita             |
-| `patientId`               | `UUID`               | FK → User (paciente)                |
-| `doctorId`                | `UUID?`              | FK → User (médico)                  |
-| `createdAt` / `updatedAt` | `DateTime`           | Metadados de auditoria              |
+### Entidade `Professional`
+
+Profissional de saúde ou administrativo vinculado à UBS. Nunca contém `professionalType = PACIENTE`.
+
+| Grupo                   | Campos                                                                                       |
+| ----------------------- | -------------------------------------------------------------------------------------------- |
+| **Identificação**       | `id`, `firstName`, `lastName`, `name`, `email`, `birthDate`                                  |
+| **Dados profissionais** | `professionalType`, `professionalId`, `professionalState`, `specialty`                       |
+| **Endereço**            | `zipCode`, `street`, `streetNumber`, `complement`, `district`, `addressCity`, `addressState` |
+| **Vínculo**             | `healthUnitId` — FK para `HealthUnit` (máx. 3 profissionais por UBS, garantido por trigger)  |
+| **Metadados**           | `createdAt`, `updatedAt`                                                                     |
+
+### Entidade `HealthUnit`
+
+Unidade Básica de Saúde — atende exatamente um bairro de uma cidade. Pacientes e profissionais são vinculados automaticamente ao cadastro.
+
+| Campo              | Tipo      | Descrição                                      |
+| ------------------ | --------- | ---------------------------------------------- |
+| `id`               | `UUID`    | Identificador único                            |
+| `name`             | `String`  | Nome da UBS (ex: "UBS Centro")                 |
+| `district`         | `String`  | Bairro atendido — único dentro da mesma cidade |
+| `city`             | `String`  | Cidade da UBS                                  |
+| `state`            | `Char(2)` | UF (ex: "SC")                                  |
+| `maxProfessionals` | `Int`     | Limite de profissionais vinculados (padrão: 3) |
+
+### Entidade `Prescription` (BaaS)
+
+Gerenciada diretamente via SQL e exposta pelo **PostgREST do Supabase** com RLS. Não é modelada pelo Prisma ORM.
+
+| Campo           | Tipo                 | Descrição                           |
+| --------------- | -------------------- | ----------------------------------- |
+| `id`            | `UUID`               | Identificador único                 |
+| `medicine_name` | `String`             | Nome do medicamento                 |
+| `description`   | `String?`            | Posologia / instruções              |
+| `type`          | `PrescriptionType`   | Tipo ANVISA da receita              |
+| `doctor_name`   | `String?`            | Nome formatado do médico prescritor |
+| `status`        | `PrescriptionStatus` | Estado atual da receita             |
+| `patient_id`    | `UUID`               | FK → `patients.id`                  |
+| `doctor_id`     | `UUID?`              | FK → `professionals.id`             |
+| `issued_at`     | `Timestamptz`        | Data de emissão                     |
+| `valid_until`   | `Timestamptz?`       | Data de validade                    |
+| `created_at`    | `Timestamptz`        | Metadado de auditoria               |
+| `updated_at`    | `Timestamptz`        | Metadado de auditoria               |
+
+### Entidade `RenewalRequest`
+
+Pedido de renovação de prescrição. Percorre o ciclo `PENDING_TRIAGE → TRIAGED → PRESCRIBED` (ou `REJECTED`).
+
+| Campo                   | Tipo            | Descrição                                                |
+| ----------------------- | --------------- | -------------------------------------------------------- |
+| `id`                    | `UUID`          | Identificador único                                      |
+| `prescriptionId`        | `UUID`          | FK para a prescrição original (`prescriptions.id`)       |
+| `patientUserId`         | `String`        | FK → `patients.id` — paciente solicitante                |
+| `doctorUserId`          | `String?`       | FK → `professionals.id` — médico designado               |
+| `nurseUserId`           | `String?`       | FK → `professionals.id` — enfermeiro responsável         |
+| `status`                | `RenewalStatus` | Estado atual do pedido                                   |
+| `patientNotes`          | `String?`       | Observações opcionais do paciente                        |
+| `nurseNotes`            | `String?`       | Notas do enfermeiro (obrigatórias ao rejeitar)           |
+| `renewedPrescriptionId` | `UUID?`         | ID da nova prescrição emitida (preenchido em PRESCRIBED) |
+| `createdAt`             | `DateTime`      | Metadado de auditoria                                    |
+| `updatedAt`             | `DateTime`      | Metadado de auditoria                                    |
 
 ### Enums
 
@@ -277,34 +334,49 @@ Concentra profissionais de saúde e pacientes SUS em uma única tabela, diferenc
 
 `MEDICO` · `DENTISTA` · `ENFERMEIRO` · `FARMACEUTICO` · `PSICOLOGO` · `NUTRICIONISTA` · `FISIOTERAPEUTA` · `ASSISTENTE_SOCIAL` · `ADMINISTRATIVO` · `OUTROS` · `PACIENTE`
 
-> Apenas `MEDICO` e `DENTISTA` têm permissão legal para emitir e renovar prescrições.
+> Apenas `MEDICO` e `DENTISTA` têm permissão legal para emitir e renovar prescrições. `PACIENTE` nunca aparece na tabela `professionals` — o roteamento é feito por trigger.
 
-**`PrescriptionStatus`**
+**`RenewalStatus`**
 
-| Valor              | Contexto   | Descrição                                                           |
-| ------------------ | ---------- | ------------------------------------------------------------------- |
-| `ACTIVE`           | Prescrição | Receita ativa e dentro da validade                                  |
-| `EXPIRED`          | Prescrição | Receita com prazo de validade vencido                               |
-| `CANCELLED`        | Prescrição | Receita cancelada pelo médico prescritor                            |
-| `PENDING_TRIAGE`   | Renovação  | Solicitação enviada pelo paciente, aguardando triagem do enfermeiro |
-| `PENDING_RENEWAL`  | Renovação  | Triagem aprovada, aguardando autorização do médico                  |
-| `RENEWAL_REJECTED` | Renovação  | Solicitação rejeitada pelo enfermeiro ou pelo médico                |
+| Valor            | Descrição                                            |
+| ---------------- | ---------------------------------------------------- |
+| `PENDING_TRIAGE` | Aguardando avaliação do enfermeiro                   |
+| `TRIAGED`        | Triagem aprovada pelo enfermeiro; aguardando médico  |
+| `PRESCRIBED`     | Médico emitiu a nova prescrição                      |
+| `REJECTED`       | Solicitação rejeitada pelo enfermeiro ou pelo médico |
 
-### Histórico de Migrations (11)
+**`PrescriptionStatus`** _(tabela BaaS)_
 
-| #   | Migration                           |
-| --- | ----------------------------------- |
-| 1   | `init`                              |
-| 2   | `create_prescription_table`         |
-| 3   | `add_crm_specialty_to_user`         |
-| 4   | `add_professional_type`             |
-| 5   | `add_prescription_patient_relation` |
-| 6   | `auth_transition`                   |
-| 7   | `add_user_identity_fields`          |
-| 8   | `add_patient_type_and_fields`       |
-| 9   | `supabase_baas_trigger_and_rls`     |
-| 10  | `fix_trigger_professional_type_key` |
-| 11  | `fix_trigger_include_updated_at`    |
+| Valor       | Descrição                                |
+| ----------- | ---------------------------------------- |
+| `ACTIVE`    | Receita ativa e dentro da validade       |
+| `EXPIRED`   | Receita com prazo de validade vencido    |
+| `CANCELLED` | Receita cancelada pelo médico prescritor |
+
+### Histórico de Migrations (20)
+
+| #   | Migration                                       |
+| --- | ----------------------------------------------- |
+| 1   | `init`                                          |
+| 2   | `create_prescription_table`                     |
+| 3   | `add_crm_specialty_to_user`                     |
+| 4   | `add_professional_type`                         |
+| 5   | `add_prescription_patient_relation`             |
+| 6   | `auth_transition`                               |
+| 7   | `add_user_identity_fields`                      |
+| 8   | `add_patient_type_and_fields`                   |
+| 9   | `supabase_baas_trigger_and_rls`                 |
+| 10  | `fix_trigger_professional_type_key`             |
+| 11  | `fix_trigger_include_updated_at`                |
+| 12  | `add_renewal_requests`                          |
+| 13  | `rls_renewal_request`                           |
+| 14  | `search_patients_rpc`                           |
+| 15  | `create_prescriptions_baas_table`               |
+| 16  | `rls_prescriptions_baas`                        |
+| 17  | `drop_prescription_table_unify_baas`            |
+| 18  | `add_health_units_and_backfill_users`           |
+| 19  | `split_user_patients_professionals`             |
+| 20  | `rls_update_own_profile_patients_professionals` |
 
 ---
 
@@ -389,6 +461,9 @@ docs: atualizar README com seção de CI/CD e padrão de commits AB#87
 ```text
 e-receitasus/
 ├── .github/
+│   ├── instructions/               # Regras de código por camada (TS, Dart, Prisma, testes, LGPD)
+│   ├── skills/                     # Skills do Copilot (prescription-feature, supabase-jwt-debug)
+│   ├── agents/                     # Persona do agente senior-dev
 │   └── workflows/
 │       ├── ci.yml                  # Pipeline CI: testes backend + frontend
 │       └── main.yml                # Pipeline CD: sync banco + deploy functions
@@ -416,8 +491,8 @@ e-receitasus/
 │   │   ├── app.ts                  # Configuração do Express
 │   │   └── server.ts               # Ponto de entrada
 │   ├── prisma/
-│   │   ├── schema.prisma
-│   │   └── migrations/             # 11 migrations versionadas
+│   │   ├── schema.prisma           # Patient, Professional, HealthUnit, RenewalRequest
+│   │   └── migrations/             # 20 migrations versionadas
 │   ├── tests/
 │   │   ├── auth.test.ts
 │   │   └── prescription.test.ts
@@ -429,27 +504,38 @@ e-receitasus/
 └── frontend/
     ├── lib/
     │   ├── models/
+    │   │   ├── health_unit_model.dart
+    │   │   ├── patient_model.dart
+    │   │   ├── patient_search_result.dart
     │   │   ├── prescription_model.dart
     │   │   ├── prescription_type.dart
+    │   │   ├── professional_model.dart
     │   │   ├── professional_type.dart
+    │   │   ├── renewal_request_model.dart
     │   │   └── user_model.dart
     │   ├── providers/
-    │   │   └── auth_provider.dart
+    │   │   ├── auth_provider.dart
+    │   │   ├── renewal_provider.dart
+    │   │   └── triage_provider.dart
     │   ├── screens/
     │   │   ├── splash_screen.dart
     │   │   ├── login_screen.dart
     │   │   ├── register_screen.dart
     │   │   ├── patient_register_screen.dart
-    │   │   ├── home_screen.dart
-    │   │   ├── doctor_home_screen.dart
-    │   │   ├── nurse_home_screen.dart
+    │   │   ├── home_screen.dart              # Paciente: prescrições + pedidos de renovação
+    │   │   ├── doctor_home_screen.dart       # Médico: emissão + autorização de renovações
+    │   │   ├── nurse_home_screen.dart        # Enfermeiro: fila de triagem em tempo real
     │   │   ├── history_screen.dart
     │   │   ├── prescription_type_screen.dart
     │   │   ├── prescription_form_screen.dart
-    │   │   └── prescription_view_screen.dart
+    │   │   ├── prescription_view_screen.dart
+    │   │   ├── request_renewal_screen.dart   # Paciente solicita renovação
+    │   │   ├── renewal_prescription_screen.dart # Médico emite a renovação
+    │   │   └── triage_detail_screen.dart     # Enfermeiro realiza triagem
     │   ├── services/
     │   │   ├── auth_service.dart
-    │   │   └── prescription_service.dart
+    │   │   ├── prescription_service.dart
+    │   │   └── renewal_service.dart          # Streams de renovação com join PostgREST + Realtime
     │   ├── theme/
     │   │   ├── app_colors.dart
     │   │   ├── app_text_styles.dart
@@ -457,7 +543,7 @@ e-receitasus/
     │   ├── widgets/
     │   │   └── prescription_card.dart
     │   └── main.dart
-    ├── test/                        # 9 arquivos de teste (TDD)
+    ├── test/                        # 10 arquivos de teste (TDD) + 4 arquivos de mocks gerados
     └── pubspec.yaml
 ```
 
@@ -526,7 +612,11 @@ cd frontend
 flutter test
 ```
 
-O frontend possui **9 arquivos de teste** cobrindo: `AuthProvider`, `AuthService`, `LoginScreen`, cadastro de paciente (CEP e validações), `PrescriptionCard` e `ProfessionalType`. Os mocks são gerados com `mockito` + `build_runner`.
+O frontend possui **10 arquivos de teste** cobrindo: `AuthProvider`, `AuthService`, `LoginScreen`, cadastro de paciente (CEP e validações), `PrescriptionCard`, `PrescriptionModel`, `ProfessionalType`, `RenewalProvider` e `TriageProvider`. Os mocks são gerados com `mockito` + `build_runner`:
+
+```bash
+flutter pub run build_runner build --delete-conflicting-outputs
+```
 
 ---
 
