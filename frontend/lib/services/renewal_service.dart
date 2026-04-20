@@ -112,7 +112,8 @@ class RenewalService implements IRenewalService {
   static const String _table = 'RenewalRequest';
 
   /// Nome da tabela de usuários — também criada via Prisma com quoted identifier.
-  static const String _userTable = 'User';
+  /// Tabela de profissionais — alterada na migration split_user_patients_professionals.
+  static const String _userTable = 'professionals';
 
   /// Construtor que aceita [SupabaseClient] opcional para facilitar injeção
   /// em testes unitários sem precisar instanciar o Supabase real.
@@ -183,7 +184,8 @@ class RenewalService implements IRenewalService {
         .from(_table)
         .stream(primaryKey: ['id'])
         .eq('status', RenewalStatus.pendingTriage.value)
-        .order('createdAt', ascending: true) // FIFO — pedido mais antigo tem prioridade
+        .order('createdAt',
+            ascending: true) // FIFO — pedido mais antigo tem prioridade
         .map(_mapToModels);
   }
 
@@ -234,7 +236,8 @@ class RenewalService implements IRenewalService {
         .from(_table)
         .stream(primaryKey: ['id'])
         .eq('doctorUserId', userId)
-        .order('createdAt', ascending: true) // FIFO — pedido mais antigo tem prioridade
+        .order('createdAt',
+            ascending: true) // FIFO — pedido mais antigo tem prioridade
         .map(_mapToModels);
   }
 

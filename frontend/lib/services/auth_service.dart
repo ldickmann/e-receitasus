@@ -166,9 +166,9 @@ class AuthService implements IAuthService {
           if (_notEmpty(addressState))
             'addressState': addressState!.trim().toUpperCase(),
         };
-        // Usa o nome canônico da tabela com aspas — PostgREST exige o nome
-        // exato conforme definido no schema Prisma ('User' com U maiúsculo)
-        await _supabase.from('User').update(updates).eq('id', user.id);
+        // Tabela separada por domínio: profissionais → public.professionals
+        // (migration 20260421000000_split_user_patients_professionals)
+        await _supabase.from('professionals').update(updates).eq('id', user.id);
       }
 
       return UserModel(
@@ -281,9 +281,9 @@ class AuthService implements IAuthService {
           if (_notEmpty(addressState))
             'addressState': addressState!.trim().toUpperCase(),
         };
-        // Usa o nome canônico da tabela com aspas — PostgREST do Supabase requer
-        // o nome exato conforme definido no schema Prisma ('User' com U maiúsculo)
-        await _supabase.from('User').update(updates).eq('id', user.id);
+        // Tabela separada por domínio: pacientes → public.patients
+        // (migration 20260421000000_split_user_patients_professionals)
+        await _supabase.from('patients').update(updates).eq('id', user.id);
       }
 
       return UserModel(
