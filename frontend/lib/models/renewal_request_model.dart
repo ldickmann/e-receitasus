@@ -138,19 +138,16 @@ class RenewalRequestModel {
     final Map<String, dynamic>? nestedPrescription =
         json['prescription'] as Map<String, dynamic>?;
 
-    final String? rawMedicineName =
-        json['medicineName'] as String? ??
+    final String? rawMedicineName = json['medicineName'] as String? ??
         nestedPrescription?['medicine'] as String?;
 
     // Converte o tipo de prescrição de string para o enum PrescriptionType;
     // usa null quando o campo não está presente na resposta.
-    final String? rawType =
-        json['prescriptionType'] as String? ??
+    final String? rawType = json['prescriptionType'] as String? ??
         nestedPrescription?['type'] as String?;
 
-    final PrescriptionType? resolvedType = rawType != null
-        ? _parsePrescriptionType(rawType)
-        : null;
+    final PrescriptionType? resolvedType =
+        rawType != null ? _parsePrescriptionType(rawType) : null;
 
     return RenewalRequestModel(
       id: json['id'] as String,
