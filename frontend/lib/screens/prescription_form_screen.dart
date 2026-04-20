@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/patient_search_result.dart';
 import '../models/prescription_model.dart';
 import '../models/prescription_type.dart';
 import '../providers/auth_provider.dart';
@@ -99,6 +100,10 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
   bool _isContinuousUse = false;
   int _continuousMonths = 6;
 
+  /// ID do paciente selecionado via autocomplete — null quando o médico digita
+  /// o nome manualmente sem selecionar da lista (paciente não cadastrado no sistema).
+  String? _selectedPatientUserId;
+
   // Controladores — Médico
   late final TextEditingController _doctorNameCtrl;
   late final TextEditingController _doctorCouncilCtrl;
@@ -190,8 +195,23 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
     super.dispose();
   }
 
+  /// Preenche os campos do paciente ao selecionar uma sugestão do autocomplete.
+  ///
+  /// Armazena o [PatientSearchResult.id] em [_selectedPatientUserId] para que
+  /// a prescrição seja vinculada ao perfil real do paciente no Supabase.
+  /// Respeita LGPD: apenas campos já cadastrados são preenchidos, sem inferência.
+  void _onPatientSelected(PatientSearchResult patient) {
+    setState(() {
+      _selectedPatientUserId = patient.id;
+      _patientNameCtrl.text = patient.fullName;
+      if (patient.cpf != null) _patientCpfCtrl.text = patient.cpf!;
+      if (patient.address != null) _patientAddressCtrl.text = patient.address!;
+      if (patient.city != null) _patientCityCtrl.text = patient.city!;
+      if (patient.ageText != null) _patientAgeCtrl.text = patient.ageText!;
+    });
+  }
+
   Future<void> _handleSubmit() async {
-    if (!_formKey.currentState!.validate()) return;
     setState(() => _isSaving = true);
 
     try {
@@ -249,15 +269,14 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
         isContinuousUse: _isContinuousUse,
         continuousValidityMonths: _isContinuousUse ? _continuousMonths : null,
         doctorUserId: userId,
+        // Vincula ao perfil do paciente quando selecionado via autocomplete;
+        // null é aceito para pacientes não cadastrados no sistema.
+        patientUserId: _selectedPatientUserId,
       );
 
-      // Tenta salvar no Supabase; se falhar (ex: tabela ainda não existe), prossegue
-      PrescriptionModel saved;
-      try {
-        saved = await PrescriptionService().savePrescription(prescription);
-      } catch (_) {
-        saved = prescription;
-      }
+      // Salva no Supabase — qualquer erro propaga para o catch externo
+      // que exibe o SnackBar com a mensagem real da falha.
+      final saved = await PrescriptionService().savePrescription(prescription);
 
       if (!mounted) return;
 
@@ -384,6 +403,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
                 requireCpf: widget.type.isNotification ||
                     widget.type == PrescriptionType.controlada,
                 requireAddress: widget.type.isNotification,
+                onPatientSelected: _onPatientSelected,
               ),
               const SizedBox(height: 20),
 
@@ -792,7 +812,13 @@ class _DoctorSection extends StatelessWidget {
 // Seção: Dados do Paciente
 // ---------------------------------------------------------------------------
 
-class _PatientSection extends StatelessWidget {
+/// Seção do formulário com os dados do paciente.
+///
+/// O campo de nome usa [RawAutocomplete] para sugerir pacientes cadastrados
+/// no banco enquanto o médico digita. Ao selecionar, os demais campos são
+/// preenchidos automaticamente via [onPatientSelected].
+/// O médico pode também digitar livremente quando o paciente não está cadastrado.
+class _PatientSection extends StatefulWidget {
   const _PatientSection({
     required this.nameCtrl,
     required this.cpfCtrl,
@@ -801,6 +827,7 @@ class _PatientSection extends StatelessWidget {
     required this.ageCtrl,
     required this.requireCpf,
     required this.requireAddress,
+    required this.onPatientSelected,
   });
 
   final TextEditingController nameCtrl;
@@ -811,39 +838,113 @@ class _PatientSection extends StatelessWidget {
   final bool requireCpf;
   final bool requireAddress;
 
+  /// Chamado quando o médico seleciona um paciente da lista de sugestões.
+  final void Function(PatientSearchResult) onPatientSelected;
+
+  @override
+  State<_PatientSection> createState() => _PatientSectionState();
+}
+
+class _PatientSectionState extends State<_PatientSection> {
+  /// FocusNode obrigatório para uso com [RawAutocomplete] e controller externo.
+  final _nameFocusNode = FocusNode();
+
+  @override
+  void dispose() {
+    _nameFocusNode.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Column(
       children: [
-        TextFormField(
-          controller: nameCtrl,
-          textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
-            labelText: 'Nome Completo do Paciente *',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.people),
-          ),
-          validator: (v) =>
-              (v ?? '').trim().isEmpty ? 'Informe o nome do paciente' : null,
+        // Campo de nome com autocomplete: busca pacientes cadastrados em tempo real.
+        // Requer mínimo de 2 caracteres para acionar a RPC e evitar consultas ruidosas.
+        RawAutocomplete<PatientSearchResult>(
+          textEditingController: widget.nameCtrl,
+          focusNode: _nameFocusNode,
+          displayStringForOption: (patient) => patient.fullName,
+          optionsBuilder: (textEditingValue) async {
+            final query = textEditingValue.text;
+            if (query.trim().length < 2) return const [];
+            try {
+              return await PrescriptionService().searchPatients(query.trim());
+            } catch (_) {
+              // Falha silenciosa no autocomplete: o médico ainda pode digitar manualmente.
+              return const [];
+            }
+          },
+          onSelected: widget.onPatientSelected,
+          fieldViewBuilder: (context, controller, focusNode, onFieldSubmitted) {
+            return TextFormField(
+              controller: controller,
+              focusNode: focusNode,
+              textCapitalization: TextCapitalization.words,
+              decoration: const InputDecoration(
+                labelText: 'Nome Completo do Paciente *',
+                hintText: 'Digite para buscar pacientes cadastrados',
+                border: OutlineInputBorder(),
+                prefixIcon: Icon(Icons.people),
+                suffixIcon: Icon(Icons.search, color: Colors.grey),
+              ),
+              validator: (v) => (v ?? '').trim().isEmpty
+                  ? 'Informe o nome do paciente'
+                  : null,
+              onFieldSubmitted: (_) => onFieldSubmitted(),
+            );
+          },
+          optionsViewBuilder: (context, onSelected, options) {
+            return Align(
+              alignment: Alignment.topLeft,
+              child: Material(
+                elevation: 8,
+                borderRadius: BorderRadius.circular(8),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxHeight: 240),
+                  child: ListView.separated(
+                    padding: EdgeInsets.zero,
+                    shrinkWrap: true,
+                    itemCount: options.length,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      final patient = options.elementAt(index);
+                      return ListTile(
+                        leading: const CircleAvatar(
+                          child: Icon(Icons.person, size: 20),
+                        ),
+                        title: Text(patient.fullName),
+                        subtitle: patient.cpf != null
+                            ? Text('CPF: ${patient.cpf}')
+                            : null,
+                        onTap: () => onSelected(patient),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            );
+          },
         ),
         const SizedBox(height: 10),
         TextFormField(
-          controller: cpfCtrl,
+          controller: widget.cpfCtrl,
           keyboardType: TextInputType.number,
           decoration: InputDecoration(
-            labelText: requireCpf ? 'CPF do Paciente *' : 'CPF do Paciente',
+            labelText:
+                widget.requireCpf ? 'CPF do Paciente *' : 'CPF do Paciente',
             hintText: '000.000.000-00',
             border: const OutlineInputBorder(),
             prefixIcon: const Icon(Icons.credit_card),
           ),
-          validator: requireCpf
+          validator: widget.requireCpf
               ? (v) =>
                   (v ?? '').trim().isEmpty ? 'Informe o CPF do paciente' : null
               : null,
         ),
         const SizedBox(height: 10),
         TextFormField(
-          controller: ageCtrl,
+          controller: widget.ageCtrl,
           keyboardType: TextInputType.text,
           decoration: const InputDecoration(
             labelText: 'Idade / Data de Nascimento',
@@ -854,17 +955,17 @@ class _PatientSection extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         TextFormField(
-          controller: addressCtrl,
+          controller: widget.addressCtrl,
           textCapitalization: TextCapitalization.words,
           decoration: InputDecoration(
-            labelText: requireAddress
+            labelText: widget.requireAddress
                 ? 'Endereço do Paciente *'
                 : 'Endereço do Paciente',
             hintText: 'Rua, número, bairro',
             border: const OutlineInputBorder(),
             prefixIcon: const Icon(Icons.home),
           ),
-          validator: requireAddress
+          validator: widget.requireAddress
               ? (v) => (v ?? '').trim().isEmpty
                   ? 'Endereço obrigatório para este tipo de receita'
                   : null
@@ -872,7 +973,7 @@ class _PatientSection extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         TextFormField(
-          controller: cityCtrl,
+          controller: widget.cityCtrl,
           textCapitalization: TextCapitalization.words,
           decoration: const InputDecoration(
             labelText: 'Cidade do Paciente',

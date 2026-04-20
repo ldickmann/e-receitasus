@@ -21,12 +21,6 @@ enum ProfessionalType {
   PACIENTE
 }
 
-enum PrescriptionStatus {
-  ACTIVE
-  EXPIRED
-  CANCELLED
-}
-
 /// Espelha o ciclo de vida de um pedido de renovação de prescrição.
 /// Fluxo: PENDING_TRIAGE → TRIAGED → PRESCRIBED ou REJECTED.
 /// Deve ser sincronizado com o enum RenewalStatus no Dart (frontend/lib/models/renewal_request_model.dart).
@@ -88,11 +82,19 @@ model User {
   /// UF do endereço atual — 2 caracteres
   addressState          String?          @db.Char(2)
 
+  /// UBS (Unidade Básica de Saúde) à qual o usuário está vinculado.
+  /// - Profissionais: vinculados manualmente (máx. 3 por UBS, regra de negócio).
+  /// - Pacientes: atribuição automática pelo bairro via trigger
+  ///   `auto_assign_patient_health_unit` no banco.
+  healthUnitId          String?          @db.Uuid
+  healthUnit            HealthUnit?      @relation(fields: [healthUnitId], references: [id], onDelete: SetNull)
+
   createdAt             DateTime         @default(now())
   updatedAt             DateTime         @updatedAt
 
-  prescriptionsCreated  Prescription[]   @relation("PrescribedBy")
-  prescriptionsReceived Prescription[]   @relation("PatientPrescriptions")
+  // Receitas em si vivem na tabela BaaS `prescriptions` (snake_case),
+  // acessada diretamente pelo Flutter via Supabase SDK. Sem relação Prisma
+  // porque essa tabela usa FKs para `auth.users` (fora do schema Prisma).
 
   /// Pedidos de renovação onde este usuário é o paciente solicitante
   renewalRequestsAsPatient RenewalRequest[] @relation("PatientRenewalRequests")
@@ -104,30 +106,34 @@ model User {
   @@index([professionalType])
   @@index([createdAt])
   @@index([cpf])
+  @@index([healthUnitId])
 }
 
-model Prescription {
-  id          String             @id @default(uuid())
-  medicine    String
-  description String?
-  doctorName  String?
-  status      PrescriptionStatus @default(ACTIVE)
+/// Unidade Básica de Saúde — atende exatamente UM bairro de uma cidade.
+/// Profissionais e pacientes são vinculados a uma única UBS.
+/// Regra MVP: máximo de 3 profissionais por UBS (garantido por trigger
+/// `enforce_max_professionals_per_unit` no banco).
+model HealthUnit {
+  id                String   @id @default(uuid()) @db.Uuid
+  /// Nome humano da UBS (ex: "UBS Centro")
+  name              String
+  /// Bairro atendido — único dentro da mesma cidade
+  district          String
+  /// Cidade da UBS (MVP: sempre "Navegantes")
+  city              String
+  /// UF com 2 caracteres (MVP: sempre "SC")
+  state             String   @db.Char(2)
+  /// Limite máximo de profissionais vinculados (1–3)
+  maxProfessionals  Int      @default(3) @map("max_professionals")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt       @map("updated_at")
 
-  patientId   String
-  doctorId    String?
+  /// Usuários vinculados (profissionais e pacientes)
+  users             User[]
 
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
-
-  patient          User               @relation("PatientPrescriptions", fields: [patientId], references: [id], onDelete: Cascade)
-  doctor           User?              @relation("PrescribedBy", fields: [doctorId], references: [id], onDelete: SetNull)
-
-  /// Pedidos de renovação originados desta prescrição
-  renewalRequests  RenewalRequest[]
-
-  @@index([patientId])
-  @@index([status])
-  @@index([createdAt])
+  @@unique([district, city], name: "health_units_district_city_unique")
+  @@index([district, city], map: "idx_health_units_district_city")
+  @@map("health_units")
 }
 
 /// Representa um pedido de renovação de prescrição feito por um paciente.
@@ -137,8 +143,10 @@ model Prescription {
 model RenewalRequest {
   id String @id @default(uuid())
 
-  /// FK para a prescrição original que será renovada
-  prescriptionId String
+  /// FK para a prescrição original que será renovada.
+  /// Aponta para a tabela BaaS `prescriptions` (lowercase) — FK
+  /// gerenciada via SQL raw porque essa tabela não é modelada pelo Prisma.
+  prescriptionId String @db.Uuid
   /// FK para o paciente solicitante (User.id = auth.users.id em texto)
   patientUserId  String
   /// Médico designado pelo enfermeiro; preenchido na transição TRIAGED
@@ -155,12 +163,13 @@ model RenewalRequest {
 
   /// ID da nova prescrição emitida ao concluir o fluxo (soft ref, sem FK,
   /// pois a prescrição renovada pode ainda não existir no momento do update)
-  renewedPrescriptionId String?
+  renewedPrescriptionId String? @db.Uuid
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  prescription Prescription @relation(fields: [prescriptionId], references: [id])
+  // Sem relação Prisma para a prescrição original — a tabela `prescriptions`
+  // (BaaS) não é modelada aqui. A FK existe no banco via migration SQL.
   patient      User         @relation("PatientRenewalRequests", fields: [patientUserId], references: [id], onDelete: Cascade)
   doctor       User?        @relation("DoctorRenewalRequests", fields: [doctorUserId], references: [id], onDelete: SetNull)
   nurse        User?        @relation("NurseRenewalRequests", fields: [nurseUserId], references: [id], onDelete: SetNull)
