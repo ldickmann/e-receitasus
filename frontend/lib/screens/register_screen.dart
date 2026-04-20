@@ -1,5 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/professional_type.dart';
@@ -35,8 +39,16 @@ class _DateMaskFormatter extends TextInputFormatter {
   }
 }
 
+/// Tela de cadastro para profissionais de saúde (médico, enfermeiro, dentista, etc.).
+///
+/// O parâmetro [httpClient] é opcional e destinado exclusivamente a testes —
+/// permite injetar um cliente HTTP fake para simular respostas da ViaCEP
+/// sem abrir sockets reais.
 class RegisterScreen extends StatefulWidget {
-  const RegisterScreen({super.key});
+  /// Cliente HTTP customizado; `null` usa o cliente padrão do pacote `http`.
+  final http.Client? httpClient;
+
+  const RegisterScreen({super.key, this.httpClient});
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -54,11 +66,34 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
 
+  // --- Endereço ---
+  final _zipCodeController = TextEditingController();
+  final _streetController = TextEditingController();
+  final _streetNumberController = TextEditingController();
+  final _complementController = TextEditingController();
+  final _districtController = TextEditingController();
+  final _addressCityController = TextEditingController();
+  String? _addressState;
+
+  // Controla estado de busca ViaCEP para exibir loading no ícone do CEP
+  bool _isSearchingCep = false;
+  // Evita chamadas duplicadas para o mesmo CEP já consultado
+  String? _lastFetchedCep;
+
   ProfessionalType? _selectedProfessionalType;
   DateTime? _selectedBirthDate;
 
+  // 26 UFs + DF ordenados alfabeticamente
+  static const _ufOptions = [
+    'AC', 'AL', 'AP', 'AM', 'BA', 'CE', 'DF', 'ES', 'GO',
+    'MA', 'MT', 'MS', 'MG', 'PA', 'PB', 'PR', 'PE', 'PI',
+    'RJ', 'RN', 'RS', 'RO', 'RR', 'SC', 'SP', 'SE', 'TO',
+  ];
+
   @override
   void dispose() {
+    // Remove o listener antes de descartar o controller para evitar memory leak
+    _zipCodeController.removeListener(_onCepChanged);
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
@@ -67,7 +102,110 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _birthDateController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _zipCodeController.dispose();
+    _streetController.dispose();
+    _streetNumberController.dispose();
+    _complementController.dispose();
+    _districtController.dispose();
+    _addressCityController.dispose();
     super.dispose();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    // Registra listener para disparar busca ViaCEP assim que 8 dígitos forem digitados
+    _zipCodeController.addListener(_onCepChanged);
+  }
+
+  /// Callback do listener do campo CEP.
+  ///
+  /// Dispara a busca apenas quando exatamente 8 dígitos são digitados
+  /// e o CEP é diferente do último já consultado — evita chamadas repetidas.
+  void _onCepChanged() {
+    final cep = _zipCodeController.text.trim();
+    if (cep.length == 8 && cep != _lastFetchedCep) {
+      _fetchAddressFromCep(cep);
+    }
+  }
+
+  /// Consulta a API pública ViaCEP e preenche automaticamente os campos de endereço.
+  ///
+  /// A ViaCEP (viacep.com.br) é um serviço gratuito do governo brasileiro —
+  /// não envia dados do usuário, apenas consulta logradouros pelo CEP informado.
+  /// CEP inválido retorna `{"erro": true}` com status 200 — tratado separadamente.
+  Future<void> _fetchAddressFromCep(String cep) async {
+    // Impede chamada paralela se uma busca já está em andamento
+    if (_isSearchingCep) return;
+
+    // Registra o CEP consultado antes de iniciar para evitar reentrada
+    _lastFetchedCep = cep;
+    setState(() => _isSearchingCep = true);
+
+    try {
+      final uri = Uri.parse('https://viacep.com.br/ws/$cep/json/');
+      // Usa cliente injetado (testes) ou o cliente global padrão (produção).
+      // O timeout de 10s é aplicado apenas ao cliente padrão — em testes,
+      // o MockClient retorna imediatamente e o Timer causaria comportamento
+      // indefinido no scheduler sintético do flutter_test.
+      final client = widget.httpClient;
+      final responseFuture = client != null
+          ? client.get(uri)
+          : http.get(uri).timeout(const Duration(seconds: 10));
+      final response = await responseFuture;
+
+      if (!mounted) return;
+
+      if (response.statusCode == 200) {
+        // Decodifica explicitamente como UTF-8 — evita corrupção de caracteres
+        // especiais (ç, ã, é…) quando o Content-Type não declara charset.
+        final data =
+            jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+
+        // ViaCEP responde com {"erro": true} para CEPs inexistentes (status 200)
+        if (data.containsKey('erro')) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content:
+                  Text('CEP não encontrado. Preencha o endereço manualmente.'),
+            ),
+          );
+          return;
+        }
+
+        // Preenche todos os campos — sobrescreve valores anteriores porque
+        // o usuário acabou de digitar um novo CEP e espera ver o endereço atualizado
+        setState(() {
+          _streetController.text = (data['logradouro'] as String?) ?? '';
+          _districtController.text = (data['bairro'] as String?) ?? '';
+          _addressCityController.text = (data['localidade'] as String?) ?? '';
+
+          // UF vem como sigla em maiúsculas — compatível com _ufOptions
+          final uf = (data['uf'] as String?)?.toUpperCase();
+          if (uf != null && _ufOptions.contains(uf)) {
+            _addressState = uf;
+          }
+        });
+      }
+    } on TimeoutException {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Tempo esgotado ao consultar o CEP. Tente novamente.'),
+        ),
+      );
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content:
+              Text('Não foi possível consultar o CEP. Verifique a conexão.'),
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSearchingCep = false);
+    }
   }
 
   Future<void> _pickBirthDate() async {
@@ -218,6 +356,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       specialty: _specialtyController.text.trim().isNotEmpty
           ? _specialtyController.text.trim()
           : null,
+      // Campos de endereço — todos opcionais conforme descrição da task
+      zipCode: _zipCodeController.text.trim().isNotEmpty
+          ? _zipCodeController.text.trim()
+          : null,
+      street: _streetController.text.trim().isNotEmpty
+          ? _streetController.text.trim()
+          : null,
+      streetNumber: _streetNumberController.text.trim().isNotEmpty
+          ? _streetNumberController.text.trim()
+          : null,
+      complement: _complementController.text.trim().isNotEmpty
+          ? _complementController.text.trim()
+          : null,
+      district: _districtController.text.trim().isNotEmpty
+          ? _districtController.text.trim()
+          : null,
+      addressCity: _addressCityController.text.trim().isNotEmpty
+          ? _addressCityController.text.trim()
+          : null,
+      addressState: _addressState,
     );
 
     if (!mounted) return;
@@ -441,6 +599,132 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     }
                     return null;
                   },
+                ),
+                const SizedBox(height: 20),
+                // --- Seção Endereço ---
+                // Campos opcionais. CEP dispara ViaCEP automaticamente ao
+                // completar 8 dígitos; logradouro, bairro e cidade são
+                // preenchidos automaticamente e ficam somente-leitura.
+                Text(
+                  'Endereço (opcional)',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: Theme.of(context).colorScheme.primary,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _zipCodeController,
+                  keyboardType: TextInputType.number,
+                  maxLength: 8,
+                  // Contador de caracteres desnecessário para CEP — remove-se
+                  // o sufixo de "X/8" que polui o campo visualmente
+                  decoration: InputDecoration(
+                    labelText: 'CEP',
+                    hintText: '00000000',
+                    border: const OutlineInputBorder(),
+                    counterText: '',
+                    prefixIcon: _isSearchingCep
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: Padding(
+                              padding: EdgeInsets.all(12),
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          )
+                        : const Icon(Icons.location_on_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _streetController,
+                  // readOnly: preenchido automaticamente via ViaCEP —
+                  // bloqueia edição acidental; o usuário pode ainda limpar
+                  // e redigitar se o logradouro vier incompleto da API
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Logradouro',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.signpost_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Flexible(
+                      flex: 2,
+                      child: TextFormField(
+                        controller: _streetNumberController,
+                        keyboardType: TextInputType.streetAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Número',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      flex: 3,
+                      child: TextFormField(
+                        controller: _complementController,
+                        decoration: const InputDecoration(
+                          labelText: 'Complemento',
+                          hintText: 'Apto, sala…',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _districtController,
+                  readOnly: true,
+                  decoration: const InputDecoration(
+                    labelText: 'Bairro',
+                    border: OutlineInputBorder(),
+                    prefixIcon: Icon(Icons.map_outlined),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Flexible(
+                      flex: 3,
+                      child: TextFormField(
+                        controller: _addressCityController,
+                        readOnly: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Cidade',
+                          border: OutlineInputBorder(),
+                          prefixIcon: Icon(Icons.location_city_outlined),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Flexible(
+                      flex: 2,
+                      child: DropdownButtonFormField<String>(
+                        value: _addressState,
+                        decoration: const InputDecoration(
+                          labelText: 'UF',
+                          border: OutlineInputBorder(),
+                        ),
+                        items: _ufOptions
+                            .map(
+                              (uf) => DropdownMenuItem<String>(
+                                value: uf,
+                                child: Text(uf),
+                              ),
+                            )
+                            .toList(),
+                        onChanged: (value) =>
+                            setState(() => _addressState = value),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 20),
                 authProvider.isLoading

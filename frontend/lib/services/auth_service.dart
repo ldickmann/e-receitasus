@@ -5,7 +5,7 @@ import '../models/professional_type.dart';
 abstract class IAuthService {
   Future<UserModel> login(String email, String password);
 
-  /// Cadastra profissional de saúde com dados do conselho.
+  /// Cadastra profissional de saúde com dados do conselho e endereço opcional.
   /// Utilizado pela RegisterScreen (médicos, enfermeiros, dentistas, etc.).
   Future<UserModel> registerWithProfessionalInfo({
     required String firstName,
@@ -17,6 +17,14 @@ abstract class IAuthService {
     String? professionalId,
     String? professionalState,
     String? specialty,
+    // Campos de endereço — opcionais, preenchidos via ViaCEP ou manual
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
   });
 
   /// Cadastra paciente com todos os dados pessoais, de saúde e endereço.
@@ -108,6 +116,14 @@ class AuthService implements IAuthService {
     String? professionalId,
     String? professionalState,
     String? specialty,
+    // Campos de endereço — opcionais
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
   }) async {
     try {
       final cleanFirstName = firstName.trim();
@@ -135,6 +151,26 @@ class AuthService implements IAuthService {
         throw Exception('Erro ao criar conta no Supabase Auth.');
       }
 
+      // Atualiza campos de endereço via PostgREST quando há sessão imediata.
+      // Sem sessão (e-mail pendente de confirmação), o profissional poderá
+      // preencher o endereço via tela de perfil após confirmar o e-mail.
+      if (response.session != null) {
+        final updates = <String, dynamic>{
+          'birthDate': _formatBirthDate(birthDate),
+          if (_notEmpty(zipCode)) 'zipCode': zipCode!.trim(),
+          if (_notEmpty(street)) 'street': street!.trim(),
+          if (_notEmpty(streetNumber)) 'streetNumber': streetNumber!.trim(),
+          if (_notEmpty(complement)) 'complement': complement!.trim(),
+          if (_notEmpty(district)) 'district': district!.trim(),
+          if (_notEmpty(addressCity)) 'addressCity': addressCity!.trim(),
+          if (_notEmpty(addressState))
+            'addressState': addressState!.trim().toUpperCase(),
+        };
+        // Usa o nome canônico da tabela com aspas — PostgREST exige o nome
+        // exato conforme definido no schema Prisma ('User' com U maiúsculo)
+        await _supabase.from('User').update(updates).eq('id', user.id);
+      }
+
       return UserModel(
         id: user.id,
         firstName: cleanFirstName,
@@ -145,6 +181,14 @@ class AuthService implements IAuthService {
         professionalId: cleanProfessionalId,
         professionalState: professionalState?.trim().toUpperCase(),
         specialty: specialty?.trim(),
+        zipCode: _notEmpty(zipCode) ? zipCode!.trim() : null,
+        street: _notEmpty(street) ? street!.trim() : null,
+        streetNumber: _notEmpty(streetNumber) ? streetNumber!.trim() : null,
+        complement: _notEmpty(complement) ? complement!.trim() : null,
+        district: _notEmpty(district) ? district!.trim() : null,
+        addressCity: _notEmpty(addressCity) ? addressCity!.trim() : null,
+        addressState:
+            _notEmpty(addressState) ? addressState!.trim().toUpperCase() : null,
       );
     } on AuthException catch (e) {
       throw Exception(e.message);

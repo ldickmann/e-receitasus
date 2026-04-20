@@ -97,6 +97,9 @@ void main() {
       ).thenAnswer((_) async => mockAuthResponse);
 
       when(mockAuthResponse.user).thenReturn(mockUser);
+      // Session null simula confirmação de e-mail pendente — o bloco PostgREST
+      // não é executado, evitando chamadas extras ao Supabase durante o teste
+      when(mockAuthResponse.session).thenReturn(null);
       when(mockUser.id).thenReturn('22222222-2222-2222-2222-222222222222');
 
       final result = await authService.registerWithProfessionalInfo(
