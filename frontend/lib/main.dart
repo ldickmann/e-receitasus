@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'config/supabase_config.dart';
+import 'package:supabase_flutter/supabase_flutter.dart'; // Importação para a nova infraestrutura
 import 'providers/auth_provider.dart';
 import 'services/auth_service.dart';
 import 'screens/splash_screen.dart';
@@ -27,10 +27,12 @@ void main() async {
   // 1. Garante que os bindings do Flutter estejam prontos para operações assíncronas
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. Inicializa o Supabase via configuração centralizada (Fase 3 da
-  // refatoração AB#129). URL e anonKey vivem em SupabaseConfig para evitar
-  // duplicação e facilitar troca de ambiente.
-  await SupabaseConfig.initialize();
+  // 2. Inicializa o Supabase com as credenciais do seu projeto
+  // Esta configuração conecta o app diretamente ao backend-as-a-service na nuvem
+  await Supabase.initialize(
+    url: 'https://shnahlongybxxilworck.supabase.co',
+    anonKey: 'sb_publishable_NMJeKsT7rEJ8-l7vefZcDA_ggy3EKAj',
+  );
 
   runApp(const MyApp());
 }

@@ -26,8 +26,3 @@ ios/.symlinks/
 android/.gradle/
 android/local.properties
 /.github/
-
-# Variáveis de ambiente (Fase 3.1 AB#129) — nunca commitar credenciais
-.env
-.env.local
-.env.*.local
