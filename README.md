@@ -460,10 +460,7 @@ docs: atualizar README com seção de CI/CD e padrão de commits AB#87
 
 ```text
 e-receitasus/
-├── .github/
-│   ├── instructions/               # Regras de código por camada (TS, Dart, Prisma, testes, LGPD)
-│   ├── skills/                     # Skills do Copilot (prescription-feature, supabase-jwt-debug)
-│   ├── agents/                     # Persona do agente senior-dev
+├── .github/                  # Persona do agente senior-dev
 │   └── workflows/
 │       ├── ci.yml                  # Pipeline CI: testes backend + frontend
 │       └── main.yml                # Pipeline CD: sync banco + deploy functions
