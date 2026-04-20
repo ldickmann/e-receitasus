@@ -104,8 +104,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
     setState(() => _isSaving = true);
 
     try {
-      final authProvider =
-          Provider.of<AuthProvider>(context, listen: false);
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
       final userId = authProvider.user?.id;
 
       final prescription = PrescriptionModel.create(
@@ -143,24 +142,21 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
         pharmaceuticalForm: _pharmaceuticalFormCtrl.text.trim().isNotEmpty
             ? _pharmaceuticalFormCtrl.text.trim()
             : null,
-        route: _routeCtrl.text.trim().isNotEmpty
-            ? _routeCtrl.text.trim()
-            : null,
+        route:
+            _routeCtrl.text.trim().isNotEmpty ? _routeCtrl.text.trim() : null,
         quantity: _quantityCtrl.text.trim(),
         quantityWords: _quantityWordsCtrl.text.trim().isNotEmpty
             ? _quantityWordsCtrl.text.trim()
             : null,
         instructions: _instructionsCtrl.text.trim(),
-        notificationNumber:
-            _notificationNumberCtrl.text.trim().isNotEmpty
-                ? _notificationNumberCtrl.text.trim()
-                : null,
+        notificationNumber: _notificationNumberCtrl.text.trim().isNotEmpty
+            ? _notificationNumberCtrl.text.trim()
+            : null,
         notificationUf: _notificationUfCtrl.text.trim().isNotEmpty
             ? _notificationUfCtrl.text.trim().toUpperCase()
             : null,
         isContinuousUse: _isContinuousUse,
-        continuousValidityMonths:
-            _isContinuousUse ? _continuousMonths : null,
+        continuousValidityMonths: _isContinuousUse ? _continuousMonths : null,
         doctorUserId: userId,
       );
 
@@ -251,10 +247,10 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
               ],
 
               // Seção Estabelecimento / Médico
-              _SectionHeader(
+              const _SectionHeader(
                 title: 'Dados do Prescritor',
                 icon: Icons.person,
-                color: const Color(0xFF009B3A),
+                color: Color(0xFF009B3A),
               ),
               const SizedBox(height: 8),
               _DoctorSection(
@@ -271,10 +267,10 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
               const SizedBox(height: 20),
 
               // Seção Paciente
-              _SectionHeader(
+              const _SectionHeader(
                 title: 'Dados do Paciente',
                 icon: Icons.people,
-                color: const Color(0xFF009B3A),
+                color: Color(0xFF009B3A),
               ),
               const SizedBox(height: 8),
               _PatientSection(
@@ -290,10 +286,10 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
               const SizedBox(height: 20),
 
               // Seção Medicamento
-              _SectionHeader(
+              const _SectionHeader(
                 title: 'Prescrição',
                 icon: Icons.medication,
-                color: const Color(0xFF009B3A),
+                color: Color(0xFF009B3A),
               ),
               const SizedBox(height: 8),
               _MedicineSection(
@@ -310,10 +306,10 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
 
               // Receita Contínua (apenas Branca)
               if (widget.type == PrescriptionType.branca) ...[
-                _SectionHeader(
+                const _SectionHeader(
                   title: 'Uso Contínuo (RDC 471/2021)',
                   icon: Icons.repeat,
-                  color: const Color(0xFF009B3A),
+                  color: Color(0xFF009B3A),
                 ),
                 const SizedBox(height: 8),
                 _ContinuousUseSection(
@@ -1018,7 +1014,8 @@ class _LegalWarning extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             type.legalFooter,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF5D4037), height: 1.5),
+            style: const TextStyle(
+                fontSize: 11, color: Color(0xFF5D4037), height: 1.5),
           ),
         ],
       ),

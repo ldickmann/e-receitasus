@@ -106,7 +106,7 @@ class DoctorHomeScreen extends StatelessWidget {
                   }
 
                   if (snapshot.hasError) {
-                    return _EmptyState(
+                    return const _EmptyState(
                       icon: Icons.cloud_off,
                       message:
                           'Não foi possível carregar as receitas.\nVerifique sua conexão.',
@@ -115,7 +115,7 @@ class DoctorHomeScreen extends StatelessWidget {
                   }
 
                   if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return _EmptyState(
+                    return const _EmptyState(
                       icon: Icons.receipt_long_outlined,
                       message:
                           'Nenhuma receita emitida ainda.\nToque em "Nova Receita" para começar.',
@@ -130,8 +130,7 @@ class DoctorHomeScreen extends StatelessWidget {
                     itemCount: list.length,
                     itemBuilder: (context, index) {
                       final item = list[index];
-                      final prescription =
-                          PrescriptionModel.fromJson(item);
+                      final prescription = PrescriptionModel.fromJson(item);
                       return _PrescriptionListTile(
                         prescription: prescription,
                         onTap: () => Navigator.push(
@@ -209,14 +208,13 @@ class _DoctorWelcomeCard extends StatelessWidget {
                   ),
                   Text(
                     professionalType,
-                    style: const TextStyle(
-                        fontSize: 13, color: Colors.white70),
+                    style: const TextStyle(fontSize: 13, color: Colors.white70),
                   ),
                   if (specialty != null)
                     Text(
                       specialty!,
-                      style: const TextStyle(
-                          fontSize: 12, color: Colors.white60),
+                      style:
+                          const TextStyle(fontSize: 12, color: Colors.white60),
                     ),
                   if (councilInfo != null)
                     Text(
@@ -291,16 +289,14 @@ class _PrescriptionListTile extends StatelessWidget {
         ),
       ),
       child: ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         leading: Container(
           width: 44,
           height: 44,
           decoration: BoxDecoration(
             color: _typeColor,
             shape: BoxShape.circle,
-            border: Border.all(
-                color: type.foregroundColor.withOpacity(0.3)),
+            border: Border.all(color: type.foregroundColor.withOpacity(0.3)),
           ),
           child: Icon(type.icon, color: type.foregroundColor, size: 20),
         ),
@@ -326,8 +322,7 @@ class _PrescriptionListTile extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
                 color: statusColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(4),
