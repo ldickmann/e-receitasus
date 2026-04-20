@@ -55,7 +55,8 @@ class MyApp extends StatelessWidget {
           create: (_) => AuthProvider(AuthService()),
         ),
         // Provider de renovação: utilizado pelo paciente para solicitar renovação de receitas
-        ChangeNotifierProvider(create: (_) => RenewalProvider(RenewalService())),
+        ChangeNotifierProvider(
+            create: (_) => RenewalProvider(RenewalService())),
         // Provider de triagem: utilizado pelo enfermeiro para aprovar ou rejeitar pedidos
         ChangeNotifierProvider(create: (_) => TriageProvider(RenewalService())),
       ],
