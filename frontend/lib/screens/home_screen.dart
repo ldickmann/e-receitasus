@@ -6,6 +6,7 @@ import '../services/prescription_service.dart'; // Importação do novo serviço
 import '../widgets/prescription_card.dart';
 import 'history_screen.dart';
 import 'prescription_view_screen.dart';
+import 'request_renewal_screen.dart';
 
 /// Tela Inicial do Paciente
 ///
@@ -23,8 +24,13 @@ class HomeScreen extends StatelessWidget {
     Navigator.pushReplacementNamed(context, '/login');
   }
 
-  void _handleSolicitation() {
-    debugPrint('Ação de Solicitar Receita acionada');
+  /// Navega para a tela de solicitação de renovação de prescrição.
+  /// Usa [MaterialPageRoute] para empilhar a tela mantendo o botão de voltar.
+  void _handleSolicitation(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RequestRenewalScreen()),
+    );
   }
 
   void _handleTrack() {
@@ -91,7 +97,7 @@ class HomeScreen extends StatelessWidget {
 
               // Ações Principais
               ElevatedButton.icon(
-                onPressed: _handleSolicitation,
+                onPressed: () => _handleSolicitation(context),
                 icon: const Icon(Icons.medical_services_outlined, size: 24),
                 label: const Text('Solicitar Renovação'),
               ),
