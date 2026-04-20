@@ -50,6 +50,15 @@ class FakeAuthService implements IAuthService {
     String? professionalId,
     String? professionalState,
     String? specialty,
+    // Parâmetros de endereço — não usados na LoginScreen, fake inclui
+    // para manter o contrato completo de IAuthService
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
   }) async {
     return UserModel(
       id: '33333333-3333-3333-3333-333333333333',

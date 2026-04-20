@@ -77,6 +77,14 @@ class MockIAuthService extends _i1.Mock implements _i3.IAuthService {
     String? professionalId,
     String? professionalState,
     String? specialty,
+    // Parâmetros de endereço adicionados na Task 124
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
   }) =>
       (super.noSuchMethod(
         Invocation.method(
@@ -92,6 +100,13 @@ class MockIAuthService extends _i1.Mock implements _i3.IAuthService {
             #professionalId: professionalId,
             #professionalState: professionalState,
             #specialty: specialty,
+            #zipCode: zipCode,
+            #street: street,
+            #streetNumber: streetNumber,
+            #complement: complement,
+            #district: district,
+            #addressCity: addressCity,
+            #addressState: addressState,
           },
         ),
         returnValue: _i4.Future<_i2.UserModel>.value(_FakeUserModel_0(
@@ -109,6 +124,13 @@ class MockIAuthService extends _i1.Mock implements _i3.IAuthService {
               #professionalId: professionalId,
               #professionalState: professionalState,
               #specialty: specialty,
+              #zipCode: zipCode,
+              #street: street,
+              #streetNumber: streetNumber,
+              #complement: complement,
+              #district: district,
+              #addressCity: addressCity,
+              #addressState: addressState,
             },
           ),
         )),

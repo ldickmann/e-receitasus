@@ -36,6 +36,14 @@ class _FakeAuthService implements IAuthService {
     String? professionalId,
     String? professionalState,
     String? specialty,
+    // Parâmetros de endereço — não usados neste fake de CEP
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
   }) async =>
       throw UnimplementedError();
 
