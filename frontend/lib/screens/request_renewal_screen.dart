@@ -215,8 +215,7 @@ class _PrescriptionTile extends StatelessWidget {
 
     return Semantics(
       // Acessibilidade: descreve ação e estado para leitores de tela
-      label:
-          '${prescription.medicineName}, ${prescription.type.displayName}. '
+      label: '${prescription.medicineName}, ${prescription.type.displayName}. '
           '${isSelected ? "Selecionada." : "Toque para selecionar."}',
       button: true,
       selected: isSelected,
@@ -242,10 +241,9 @@ class _PrescriptionTile extends StatelessWidget {
                   children: [
                     Text(
                       prescription.medicineName,
-                      style:
-                          Theme.of(context).textTheme.titleSmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
                     ),
                     const SizedBox(height: 4),
                     Text(
@@ -270,7 +268,9 @@ class _PrescriptionTile extends StatelessWidget {
               Padding(
                 padding: const EdgeInsets.only(left: 8),
                 child: Icon(
-                  isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+                  isSelected
+                      ? Icons.check_circle
+                      : Icons.radio_button_unchecked,
                   color: isSelected ? scheme.primary : Colors.grey.shade400,
                   size: 24,
                 ),
