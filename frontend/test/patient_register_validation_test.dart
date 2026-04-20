@@ -93,8 +93,8 @@ Widget _buildTestApp({http.Client? httpClient}) {
     ],
     child: MaterialApp(
       home: PatientRegisterScreen(
-        httpClient: httpClient ??
-            MockClient((_) async => http.Response('{}', 200)),
+        httpClient:
+            httpClient ?? MockClient((_) async => http.Response('{}', 200)),
       ),
       routes: {
         '/login': (_) => const Scaffold(body: Text('LOGIN_SCREEN')),
@@ -127,8 +127,8 @@ Future<void> _preencherCamposObrigatorios(WidgetTester tester) async {
   await tester.enterText(
       find.widgetWithText(TextFormField, 'Confirmar senha *'), '123456');
   // Telefone — rola até o campo antes de preencher pois pode estar fora do viewport
-  await tester.ensureVisible(
-      find.widgetWithText(TextFormField, 'Telefone celular *'));
+  await tester
+      .ensureVisible(find.widgetWithText(TextFormField, 'Telefone celular *'));
   await tester.enterText(
       find.widgetWithText(TextFormField, 'Telefone celular *'), '11999999999');
 }
@@ -147,7 +147,8 @@ void main() {
         await tester.pumpAndSettle();
 
         // ACT — rola até o botão Cadastrar e clica sem preencher nenhum campo
-        await tester.ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -186,8 +187,8 @@ void main() {
         await tester.pumpAndSettle();
 
         // Preenche senhas diferentes
-        await tester.ensureVisible(
-            find.widgetWithText(TextFormField, 'Senha *'));
+        await tester
+            .ensureVisible(find.widgetWithText(TextFormField, 'Senha *'));
         await tester.enterText(
             find.widgetWithText(TextFormField, 'Senha *'), 'senha123');
         await tester.ensureVisible(
@@ -197,8 +198,8 @@ void main() {
             'senha_diferente');
 
         // ACT — tenta submeter
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -220,12 +221,12 @@ void main() {
         await tester.pumpAndSettle();
 
         // ACT — preenche senha curta
-        await tester.ensureVisible(
-            find.widgetWithText(TextFormField, 'Senha *'));
+        await tester
+            .ensureVisible(find.widgetWithText(TextFormField, 'Senha *'));
         await tester.enterText(
             find.widgetWithText(TextFormField, 'Senha *'), '123');
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -246,12 +247,12 @@ void main() {
         await tester.pumpAndSettle();
 
         // ACT — e-mail sem domínio válido
-        await tester.ensureVisible(
-            find.widgetWithText(TextFormField, 'E-mail *'));
-        await tester.enterText(
-            find.widgetWithText(TextFormField, 'E-mail *'), 'emailsemarrobaeponto');
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(TextFormField, 'E-mail *'));
+        await tester.enterText(find.widgetWithText(TextFormField, 'E-mail *'),
+            'emailsemarrobaeponto');
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -274,8 +275,8 @@ void main() {
         await tester.pumpAndSettle();
 
         // ACT — submete sem preencher CPF (campo fica vazio)
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -301,8 +302,8 @@ void main() {
 
         // ACT — CPF com apenas 10 dígitos
         await tester.enterText(cpfFinder, '1234567890');
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -329,8 +330,8 @@ void main() {
         // ACT — CPF com 11 dígitos (formato correto — verificação de dígito
         // é feita no backend)
         await tester.enterText(cpfFinder, '12345678901');
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -352,8 +353,8 @@ void main() {
         await tester.pumpWidget(_buildTestApp());
         await tester.pumpAndSettle();
 
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -380,8 +381,8 @@ void main() {
 
         // ACT — CNS com apenas 14 dígitos
         await tester.enterText(cnsFinder, '12345678901234');
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -389,7 +390,8 @@ void main() {
         expect(
           find.text('CNS deve ter 15 dígitos.'),
           findsOneWidget,
-          reason: 'CNS do SUS tem exatamente 15 dígitos — comprimento menor é inválido',
+          reason:
+              'CNS do SUS tem exatamente 15 dígitos — comprimento menor é inválido',
         );
       },
     );
@@ -407,8 +409,8 @@ void main() {
 
         // ACT — CNS com 15 dígitos (formato correto)
         await tester.enterText(cnsFinder, '123456789012345');
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -430,8 +432,8 @@ void main() {
         await tester.pumpWidget(_buildTestApp());
         await tester.pumpAndSettle();
 
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -457,8 +459,8 @@ void main() {
 
         // ACT — número sem DDD (apenas 9 dígitos)
         await tester.enterText(phoneFinder, '999999999');
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -484,8 +486,8 @@ void main() {
 
         // ACT — DDD + celular com 9 dígitos = 11 total
         await tester.enterText(phoneFinder, '11987654321');
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -512,8 +514,8 @@ void main() {
         await tester.pumpWidget(_buildTestApp());
         await tester.pumpAndSettle();
 
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -537,8 +539,8 @@ void main() {
 
         // ACT — CEP incompleto (7 dígitos)
         await tester.enterText(cepFinder, '0100100');
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
@@ -546,7 +548,8 @@ void main() {
         expect(
           find.text('CEP deve ter 8 dígitos.'),
           findsOneWidget,
-          reason: 'CEP incompleto deve ser rejeitado antes de consultar a ViaCEP',
+          reason:
+              'CEP incompleto deve ser rejeitado antes de consultar a ViaCEP',
         );
       },
     );
@@ -557,47 +560,55 @@ void main() {
       'deve bloquear submit e exibir aviso quando data de nascimento não foi selecionada',
       (tester) async {
         // ARRANGE — todos os campos de texto obrigatórios preenchidos,
-        // mas a data de nascimento (via DatePicker) não foi selecionada.
-        // O botão de data exibe placeholder "Selecionar data de nascimento *"
-        // enquanto _selectedBirthDate == null.
+        // mas o campo de data de nascimento fica vazio (não digitado nem
+        // selecionado via DatePicker).
         await tester.pumpWidget(_buildTestApp());
         await tester.pumpAndSettle();
 
         await _preencherCamposObrigatorios(tester);
 
-        // ACT — tenta submeter sem selecionar a data de nascimento
-        await tester.ensureVisible(
-            find.widgetWithText(FilledButton, 'Cadastrar'));
+        // ACT — tenta submeter sem preencher a data de nascimento
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 
-        // ASSERT — verificação de negócio: data de nascimento é obrigatória
-        // O SnackBar é exibido diretamente pelo _handleSubmit sem passar pelo Form
-        // pois o DatePicker não é um TextFormField validável via _formKey
+        // ASSERT — validação inline do TextFormField exibe o erro
+        // (não mais SnackBar — agora o campo é TextFormField validável via _formKey)
         expect(
           find.text('Informe a data de nascimento.'),
           findsOneWidget,
           reason:
-              'Data de nascimento é obrigatória e verificada fora do FormKey',
+              'Data de nascimento é obrigatória — erro inline deve aparecer no campo',
         );
       },
     );
 
     testWidgets(
-      'deve exibir botão de data com texto placeholder enquanto data não foi selecionada',
+      'deve exibir campo de data com hint DD/MM/AAAA e ícone de calendário',
       (tester) async {
-        // Verifica a presença do campo de data com o texto correto de placeholder
-        // — confirma que o widget de data está renderizado e acessível
+        // Verifica que o TextFormField de data está renderizado com o hint
+        // correto — substitui o OutlinedButton removido na Task 125.
         await tester.pumpWidget(_buildTestApp());
         await tester.pumpAndSettle();
 
-        // O botão existe e exibe o placeholder correto
+        // Rola até o campo de data (pode estar fora do viewport inicial)
+        await tester.ensureVisible(
+            find.widgetWithText(TextFormField, 'Data de nascimento *'));
+
+        // Campo existe e exibe o label correto
         expect(
-          find.widgetWithText(
-              OutlinedButton, 'Selecionar data de nascimento *'),
+          find.widgetWithText(TextFormField, 'Data de nascimento *'),
           findsOneWidget,
           reason:
-              'Campo de data deve exibir placeholder enquanto nenhuma data foi selecionada',
+              'TextFormField de data deve estar visível com o label correto',
+        );
+
+        // Ícone de calendário deve estar presente para o DatePicker
+        expect(
+          find.byIcon(Icons.calendar_today),
+          findsOneWidget,
+          reason: 'Ícone de calendário deve manter acesso ao DatePicker',
         );
       },
     );

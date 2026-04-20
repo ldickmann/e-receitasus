@@ -1,7 +1,39 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
 import '../models/professional_type.dart';
+
+/// Formata automaticamente o campo de data de nascimento no padrão DD/MM/AAAA.
+///
+/// Extrai apenas os dígitos do input, limita a 8 dígitos e insere '/' nas
+/// posições corretas para não forçar o usuário a digitá-las manualmente.
+class _DateMaskFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(
+    TextEditingValue oldValue,
+    TextEditingValue newValue,
+  ) {
+    // Remove qualquer '/' já existente para trabalhar só com dígitos
+    final digits = newValue.text.replaceAll('/', '');
+
+    // Limita a 8 dígitos numéricos (DDMMAAAA)
+    final limited = digits.length > 8 ? digits.substring(0, 8) : digits;
+
+    // Reconstrói a string inserindo '/' após dia (pos 2) e mês (pos 4)
+    final buffer = StringBuffer();
+    for (var i = 0; i < limited.length; i++) {
+      if (i == 2 || i == 4) buffer.write('/');
+      buffer.write(limited[i]);
+    }
+
+    final formatted = buffer.toString();
+    return TextEditingValue(
+      text: formatted,
+      selection: TextSelection.collapsed(offset: formatted.length),
+    );
+  }
+}
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -99,12 +131,48 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return null;
   }
 
+  /// Parseia o texto digitado no formato DD/MM/AAAA em um [DateTime].
+  ///
+  /// Retorna null se o texto estiver incompleto ou representar uma data
+  /// inexistente (ex: 31/02/2000). O Flutter normaliza datas inválidas
+  /// (ex: DateTime(2000,2,31) → 2000-03-02), então comparamos os campos
+  /// de volta para garantir que a data existe de verdade.
+  DateTime? _parseDateText(String text) {
+    if (text.length != 10) return null;
+    final parts = text.split('/');
+    if (parts.length != 3) return null;
+    final day = int.tryParse(parts[0]);
+    final month = int.tryParse(parts[1]);
+    final year = int.tryParse(parts[2]);
+    if (day == null || month == null || year == null) return null;
+    try {
+      final date = DateTime(year, month, day);
+      // Garante que a data não foi normalizada (ex: 31/02 → 03/03)
+      if (date.day != day || date.month != month || date.year != year) {
+        return null;
+      }
+      return date;
+    } catch (_) {
+      return null;
+    }
+  }
+
   String? _validateBirthDate() {
-    if (_selectedBirthDate == null) {
-      return 'Informe a data de nascimento';
+    // Tenta parsear o texto digitado se _selectedBirthDate ainda não foi
+    // populado via DatePicker — permite ambas as formas de entrada
+    final textDate = _parseDateText(_birthDateController.text);
+    final effective = _selectedBirthDate ?? textDate;
+
+    if (effective == null) {
+      // Feedback diferenciado: campo vazio vs. data inválida
+      if (_birthDateController.text.isEmpty) {
+        return 'Informe a data de nascimento';
+      }
+      return 'Data inválida';
     }
 
-    final age = _calculateAge(_selectedBirthDate!);
+    // Valida ≥ 18 anos apenas para profissionais de saúde (não para pacientes)
+    final age = _calculateAge(effective);
     if (age < 18) {
       return 'Cadastro permitido apenas para maiores de 18 anos';
     }
@@ -259,8 +327,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     });
                   },
                   validator: (value) {
-                    if (value == null)
+                    if (value == null) {
                       return 'Selecione o tipo de profissional';
+                    }
                     return null;
                   },
                 ),
@@ -294,13 +363,30 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _birthDateController,
-                  readOnly: true,
-                  onTap: _pickBirthDate,
-                  decoration: const InputDecoration(
+                  // readOnly removido — permite digitação direta com máscara
+                  keyboardType: TextInputType.number,
+                  inputFormatters: [_DateMaskFormatter()],
+                  onChanged: (text) {
+                    // Ao completar 10 caracteres (DD/MM/AAAA), parseia e
+                    // atualiza _selectedBirthDate para validação e envio
+                    if (text.length == 10) {
+                      setState(() => _selectedBirthDate = _parseDateText(text));
+                    } else {
+                      // Reseta para forçar nova validação ao limpar o campo
+                      setState(() => _selectedBirthDate = null);
+                    }
+                  },
+                  decoration: InputDecoration(
                     labelText: 'Data de Nascimento',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.cake_outlined),
-                    suffixIcon: Icon(Icons.calendar_today),
+                    hintText: 'DD/MM/AAAA',
+                    border: const OutlineInputBorder(),
+                    prefixIcon: const Icon(Icons.cake_outlined),
+                    // Ícone de calendário mantido para abrir DatePicker
+                    suffixIcon: IconButton(
+                      icon: const Icon(Icons.calendar_today),
+                      tooltip: 'Selecionar data no calendário',
+                      onPressed: _pickBirthDate,
+                    ),
                   ),
                   validator: (_) => _validateBirthDate(),
                 ),
@@ -350,8 +436,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   ),
                   validator: (value) {
                     if ((value ?? '').isEmpty) return 'Confirme sua senha';
-                    if (value != _passwordController.text)
+                    if (value != _passwordController.text) {
                       return 'As senhas nao coincidem';
+                    }
                     return null;
                   },
                 ),
