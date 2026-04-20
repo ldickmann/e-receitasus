@@ -77,7 +77,6 @@ class MockIAuthService extends _i1.Mock implements _i3.IAuthService {
     String? professionalId,
     String? professionalState,
     String? specialty,
-    // Parâmetros de endereço adicionados na Task 124
     String? zipCode,
     String? street,
     String? streetNumber,

@@ -161,3 +161,10 @@ backend/**/*.d.ts.map
 .github/skills/
 .github/hooks/
 .github/mvp-implementation-plan.md
+
+# -----------------------------------------
+# AGENT SKILLS INSTALADAS VIA `npx skills add` (locais, não versionadas)
+# Cada dev reinstala conforme necessidade: `npx skills add supabase/agent-skills`
+# -----------------------------------------
+.agents/
+skills-lock.json

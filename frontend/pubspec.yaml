@@ -36,14 +36,15 @@ dependencies:
   http: ^1.6.0
   # Para gerenciamento de estado
   provider: 6.1.1
-  # Para armazenamento seguro de token (requisito de segurança)
-  flutter_secure_storage: ^4.2.1
-  #Para os icones
-  # The following adds the Cupertino Icons font to your application.
-  # Use with the CupertinoIcons class for iOS style icons.
+  # Armazenamento seguro de token JWT do Supabase (Keychain/Keystore).
+  # Versão 9.x oferece suporte a Encrypted SharedPreferences (Android) e
+  # melhor compatibilidade com iOS 17+ — alinhado às diretrizes LGPD do projeto.
+  flutter_secure_storage: ^9.2.2
+  # Ícones no estilo iOS — usado em widgets que adotam Cupertino design.
   cupertino_icons: ^1.0.6
-  shared_preferences: 2.2.2
-  jwt_decoder: 2.0.1
+  # Removidos na Fase 2 da refatoração (AB#129):
+  #   - shared_preferences: substituído por flutter_secure_storage para tokens
+  #   - jwt_decoder: validação de JWT é responsabilidade do backend (JWKS)
 
 dev_dependencies:
   flutter_test:

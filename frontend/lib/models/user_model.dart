@@ -76,6 +76,11 @@ class UserModel {
   /// UF do endereço atual — 2 caracteres
   final String? addressState;
 
+  /// UBS (Unidade Básica de Saúde) à qual o usuário está vinculado.
+  /// Para profissionais é atribuído manualmente; para pacientes o trigger
+  /// `auto_assign_patient_health_unit` no banco define com base no bairro.
+  final String? healthUnitId;
+
   UserModel({
     required this.id,
     required this.firstName,
@@ -107,6 +112,7 @@ class UserModel {
     this.district,
     this.addressCity,
     this.addressState,
+    this.healthUnitId,
   });
 
   String get name {
@@ -163,6 +169,9 @@ class UserModel {
       district: json['district'] as String?,
       addressCity: json['addressCity'] as String?,
       addressState: json['addressState'] as String?,
+      // PostgREST devolve healthUnitId quando selecionado explicitamente
+      healthUnitId:
+          json['healthUnitId'] as String? ?? json['health_unit_id'] as String?,
     );
   }
 
@@ -199,6 +208,7 @@ class UserModel {
       if (district != null) 'district': district,
       if (addressCity != null) 'addressCity': addressCity,
       if (addressState != null) 'addressState': addressState,
+      if (healthUnitId != null) 'healthUnitId': healthUnitId,
     };
   }
 
