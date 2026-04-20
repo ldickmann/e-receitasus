@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../models/renewal_request_model.dart';
 import '../providers/auth_provider.dart';
 import '../models/prescription_model.dart';
+import '../providers/renewal_provider.dart';
 import '../services/prescription_service.dart'; // Importação do novo serviço
 import '../widgets/prescription_card.dart';
 import 'history_screen.dart';
@@ -110,6 +112,10 @@ class HomeScreen extends StatelessWidget {
               ),
               const SizedBox(height: 30),
 
+              // Seção de acompanhamento dos pedidos de renovação em tempo real
+              const _RenewalSection(),
+              const SizedBox(height: 10),
+
               // Seção de Prescrições Ativas (Real-time)
               const Text(
                 'Prescrições Recentes',
@@ -188,6 +194,193 @@ class HomeScreen extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _RenewalSection — seção de pedidos de renovação (StatefulWidget)
+// ---------------------------------------------------------------------------
+
+/// Seção que exibe em tempo real os pedidos de renovação do paciente.
+///
+/// Implementada como [StatefulWidget] para inicializar o stream uma única
+/// vez no [initState], evitando recriação a cada rebuild da [HomeScreen].
+class _RenewalSection extends StatefulWidget {
+  const _RenewalSection();
+
+  @override
+  State<_RenewalSection> createState() => _RenewalSectionState();
+}
+
+class _RenewalSectionState extends State<_RenewalSection> {
+  /// Stream inicializado uma única vez para não recriar a conexão Supabase
+  /// a cada rebuild da tela pai.
+  late final Stream<List<RenewalRequestModel>> _stream;
+
+  @override
+  void initState() {
+    super.initState();
+    // Captura o provider no initState — seguro pois o contexto já está montado
+    _stream = context.read<RenewalProvider>().streamMyRenewals();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        const Text(
+          'Meus Pedidos de Renovação',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        const SizedBox(height: 10),
+        StreamBuilder<List<RenewalRequestModel>>(
+          stream: _stream,
+          builder: (context, snapshot) {
+            // Estado de carregamento inicial do stream
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 20),
+                child: Center(child: CircularProgressIndicator()),
+              );
+            }
+
+            // Erro ao conectar ou ao processar os dados do Supabase
+            if (snapshot.hasError) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text(
+                  'Não foi possível carregar seus pedidos. Tente novamente.',
+                  style: TextStyle(color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+              );
+            }
+
+            final renewals = snapshot.data ?? [];
+
+            // Estado vazio — nenhum pedido enviado ainda
+            if (renewals.isEmpty) {
+              return const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Text(
+                  'Nenhum pedido de renovação enviado ainda.',
+                  style: TextStyle(color: Colors.grey),
+                  textAlign: TextAlign.center,
+                ),
+              );
+            }
+
+            // Lista de pedidos recebidos em tempo real
+            return ListView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              itemCount: renewals.length,
+              itemBuilder: (_, index) => _RenewalCard(renewal: renewals[index]),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// _RenewalCard — card individual de pedido de renovação
+// ---------------------------------------------------------------------------
+
+/// Card que exibe as informações resumidas de um pedido de renovação.
+///
+/// Mostra: nome do medicamento, data do pedido e chip colorido de status.
+class _RenewalCard extends StatelessWidget {
+  final RenewalRequestModel renewal;
+
+  const _RenewalCard({required this.renewal});
+
+  /// Retorna a cor de fundo do chip conforme o status do pedido.
+  ///
+  /// Mapeamento visual definido no PBI 130:
+  /// - PENDING_TRIAGE → cinza (aguardando)
+  /// - TRIAGED        → amarelo (em andamento)
+  /// - PRESCRIBED     → verde (concluído com sucesso)
+  /// - REJECTED       → vermelho (encerrado sem renovação)
+  Color _chipColor(RenewalStatus status) {
+    return switch (status) {
+      RenewalStatus.pendingTriage => Colors.grey.shade300,
+      RenewalStatus.triaged => Colors.amber.shade200,
+      RenewalStatus.prescribed => Colors.green.shade200,
+      RenewalStatus.rejected => Colors.red.shade200,
+    };
+  }
+
+  /// Retorna a cor do texto do chip para manter contraste mínimo AA.
+  Color _chipTextColor(RenewalStatus status) {
+    return switch (status) {
+      RenewalStatus.pendingTriage => Colors.grey.shade800,
+      RenewalStatus.triaged => Colors.amber.shade900,
+      RenewalStatus.prescribed => Colors.green.shade900,
+      RenewalStatus.rejected => Colors.red.shade900,
+    };
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Formata a data de criação do pedido para exibição amigável em PT-BR
+    final date = renewal.createdAt.toLocal();
+    final dateStr =
+        '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
+
+    final medicine = renewal.medicineName ?? 'Medicamento não informado';
+
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 6),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: [
+            // Ícone de renovação para identificação visual rápida
+            const Icon(Icons.autorenew, size: 28, color: Colors.blueGrey),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    medicine,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    'Solicitado em $dateStr',
+                    style: const TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // Chip colorido de status com semântica para acessibilidade
+            Semantics(
+              label: 'Status do pedido: ${renewal.status.label}',
+              child: Chip(
+                label: Text(
+                  renewal.status.label,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: _chipTextColor(renewal.status),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                backgroundColor: _chipColor(renewal.status),
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                visualDensity: VisualDensity.compact,
+              ),
+            ),
+          ],
         ),
       ),
     );
