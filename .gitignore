@@ -36,6 +36,7 @@ coverage/
 **/android/.idea/
 **/android/*.iml
 **/android/build/
+**/android/**/*.jks
 
 # -----------------------------------------
 # IOS & ARQUIVOS GERADOS
