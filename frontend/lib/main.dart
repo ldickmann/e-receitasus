@@ -34,6 +34,7 @@ void main() async {
     anonKey: 'sb_publishable_NMJeKsT7rEJ8-l7vefZcDA_ggy3EKAj',
   );
 
+  // 3. Executa a aplicação Flutter
   runApp(const MyApp());
 }
 
