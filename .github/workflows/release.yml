@@ -1,0 +1,85 @@
+# ============================================================
+# PIPELINE RELEASE — E-ReceitaSUS
+# ============================================================
+# Responsabilidade: Build do APK Android assinado e publicação
+# automática como asset de uma GitHub Release.
+#
+# TRIGGER: push de tag no padrão v*.*.* (ex: v1.0.0)
+#   git tag v1.0.0 && git push origin v1.0.0
+#
+# SECRETS NECESSÁRIOS (Settings → Secrets → Actions):
+#   KEYSTORE_BASE64   → Keystore .jks codificado em base64
+#   KEY_ALIAS         → Alias da chave (ex: ereceitasus)
+#   STORE_PASSWORD    → Senha do keystore
+#   KEY_PASSWORD      → Senha da chave privada
+# ============================================================
+name: E-ReceitaSUS Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
+jobs:
+  build-and-release:
+    name: Build APK e Publicar Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      # Instala o Flutter SDK na versão estável
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "stable"
+          channel: "stable"
+          cache: true
+
+      # Instala as dependências do projeto Flutter
+      - name: Instalar Dependências Flutter
+        run: flutter pub get
+        working-directory: ./frontend
+
+      # Recria o key.properties a partir dos secrets — nunca
+      # versionado no repositório por conter credenciais sensíveis
+      - name: Criar key.properties a partir dos Secrets
+        run: |
+          echo "keyAlias=${{ secrets.KEY_ALIAS }}" > frontend/android/key.properties
+          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> frontend/android/key.properties
+          echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> frontend/android/key.properties
+          echo "storeFile=keystore.jks" >> frontend/android/key.properties
+
+      # Decodifica o keystore (armazenado em base64 no secret)
+      # e o salva no caminho esperado pelo build.gradle
+      - name: Decodificar Keystore
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > frontend/android/keystore.jks
+
+      # Gera o APK release assinado com as credenciais do keystore
+      - name: Build APK Release
+        run: flutter build apk --release
+        working-directory: ./frontend
+
+      # Extrai o nome da tag (ex: v1.0.0) para usar no nome da Release
+      - name: Extrair Versão da Tag
+        id: version
+        run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
+
+      # Renomeia o APK incluindo a versão para rastreabilidade
+      - name: Renomear APK com Versão
+        run: |
+          mv frontend/build/app/outputs/flutter-apk/app-release.apk \
+             frontend/build/app/outputs/flutter-apk/e-receitasus-${{ steps.version.outputs.VERSION }}.apk
+
+      # Cria a GitHub Release e faz upload do APK como asset
+      - name: Criar GitHub Release e Upload do APK
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "E-ReceitaSUS ${{ steps.version.outputs.VERSION }}"
+          generate_release_notes: true
+          files: frontend/build/app/outputs/flutter-apk/e-receitasus-${{ steps.version.outputs.VERSION }}.apk
