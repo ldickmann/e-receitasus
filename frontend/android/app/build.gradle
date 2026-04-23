@@ -33,11 +33,10 @@ if (keyPropertiesFile.exists()) {
 
 android {
     namespace = "br.com.e_receitasus"
-    // Fixado explicitamente em 35: supabase_flutter e flutter_secure_storage puxam
-    // dependências AndroidX transitivas que exigem compileSdk >= 35. Delegar a
-    // flutter.compileSdkVersion pode resolver para 34 no CI e causar falha em
-    // :app:checkReleaseAarMetadata com Flutter 3.41+.
-    compileSdk = 35
+    // Fixado explicitamente em 36: androidx.browser:1.9.0 e androidx.core:1.17.0 exigem
+    // compileSdk >= 36. AGP 8.10.1 é o primeiro a suportar SDK 36 (max API 36).
+    // AGP 8.9.x suportava apenas até SDK 35, por isso o upgrade foi necessário.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -61,9 +60,10 @@ android {
         // que exige minSdk 23. Sobrescrevemos o default do Flutter (21) para evitar
         // falha em :app:checkReleaseAarMetadata durante o build de release.
         minSdk = 23
-        // Alinhado com compileSdk = 35 para evitar warnings de API e
-        // garantir consistência com as dependências transitivas do supabase_flutter.
-        targetSdk = 35
+        // Alinhado com compileSdk = 36 — targetSdk pode ser mantido em 35
+        // por enquanto se quiser evitar mudanças de comportamento em runtime,
+        // mas 36 garante consistência com o compileSdk e evita novos warnings.
+        targetSdk = 36
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
     }
