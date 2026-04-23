@@ -33,7 +33,11 @@ if (keyPropertiesFile.exists()) {
 
 android {
     namespace = "br.com.e_receitasus"
-    compileSdk = flutter.compileSdkVersion
+    // Fixado explicitamente em 35: supabase_flutter e flutter_secure_storage puxam
+    // dependências AndroidX transitivas que exigem compileSdk >= 35. Delegar a
+    // flutter.compileSdkVersion pode resolver para 34 no CI e causar falha em
+    // :app:checkReleaseAarMetadata com Flutter 3.41+.
+    compileSdk = 35
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -57,7 +61,9 @@ android {
         // que exige minSdk 23. Sobrescrevemos o default do Flutter (21) para evitar
         // falha em :app:checkReleaseAarMetadata durante o build de release.
         minSdk = 23
-        targetSdk = flutter.targetSdkVersion
+        // Alinhado com compileSdk = 35 para evitar warnings de API e
+        // garantir consistência com as dependências transitivas do supabase_flutter.
+        targetSdk = 35
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
     }
