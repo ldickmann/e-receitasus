@@ -40,8 +40,17 @@ android {
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        // Java 17 alinhado com kotlinOptions abaixo. AGP 8.10.x + Gradle 8.11.1
+        // usam JDK 17 no CI (setup-java temurin 17), e misturar 1.8 com Kotlin 17
+        // causa "Inconsistent JVM-target compatibility" e falha em compileReleaseKotlin.
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        // Deve ser igual ao targetCompatibility acima para evitar incompatibilidade
+        // entre compileReleaseJavaWithJavac e compileReleaseKotlin.
+        jvmTarget = "17"
     }
 
     // Define a configuração de assinatura para o build de release
