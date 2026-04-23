@@ -30,9 +30,17 @@ jobs:
 
     steps:
       - name: Checkout Repository
-        uses: actions/checkout@v4
+        uses:
+          actions/checkout@v4
 
-      # Instala o Flutter SDK na versão estável
+          # Java 17 é obrigatório para Android Gradle Plugin 8.x
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: "temurin"
+          java-version: "17"
+
+        # Instala o Flutter SDK na versão estável
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
