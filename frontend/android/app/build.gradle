@@ -53,7 +53,10 @@ android {
 
     defaultConfig {
         applicationId = "br.com.e_receitasus"
-        minSdk = flutter.minSdkVersion
+        // flutter_secure_storage 9.x usa EncryptedSharedPreferences (Android Keystore),
+        // que exige minSdk 23. Sobrescrevemos o default do Flutter (21) para evitar
+        // falha em :app:checkReleaseAarMetadata durante o build de release.
+        minSdk = 23
         targetSdk = flutter.targetSdkVersion
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
