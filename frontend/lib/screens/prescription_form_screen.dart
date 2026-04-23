@@ -1146,7 +1146,8 @@ class _ContinuousUseSection extends StatelessWidget {
           ),
           value: isContinuousUse,
           onChanged: onChanged,
-          activeColor: const Color(0xFF009B3A),
+          // activeThumbColor: substitui activeColor (depreciado no Flutter 3.0+)
+          activeThumbColor: const Color(0xFF009B3A),
         ),
         if (isContinuousUse) ...[
           const SizedBox(height: 8),
