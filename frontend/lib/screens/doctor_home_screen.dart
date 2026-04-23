@@ -259,7 +259,7 @@ class _PrescriptionTypeLegend extends StatelessWidget {
             style: TextStyle(fontSize: 11, color: type.foregroundColor),
           ),
           backgroundColor: type.backgroundColor,
-          side: BorderSide(color: type.foregroundColor.withOpacity(0.3)),
+          side: BorderSide(color: type.foregroundColor.withValues(alpha: 0.3)),
           padding: const EdgeInsets.symmetric(horizontal: 4),
         );
       }).toList(),
@@ -293,7 +293,7 @@ class _PrescriptionListTile extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-          color: type.foregroundColor.withOpacity(0.25),
+          color: type.foregroundColor.withValues(alpha: 0.25),
           width: 1,
         ),
       ),
@@ -303,10 +303,10 @@ class _PrescriptionListTile extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            color: _typeColor,
-            shape: BoxShape.circle,
-            border: Border.all(color: type.foregroundColor.withOpacity(0.3)),
-          ),
+              color: _typeColor,
+              shape: BoxShape.circle,
+              border: Border.all(color: type.foregroundColor.withValues(alpha: 0.3)),
+            ),
           child: Icon(type.icon, color: type.foregroundColor, size: 20),
         ),
         title: Text(
@@ -333,7 +333,7 @@ class _PrescriptionListTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
+                color: statusColor.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(4),
                 border: Border.all(color: statusColor),
               ),
@@ -381,12 +381,12 @@ class _EmptyState extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 32),
       child: Column(
         children: [
-          Icon(icon, size: 64, color: color.withOpacity(0.4)),
+          Icon(icon, size: 64, color: color.withValues(alpha: 0.4)),
           const SizedBox(height: 12),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: TextStyle(color: color.withOpacity(0.7), fontSize: 14),
+            style: TextStyle(color: color.withValues(alpha: 0.7), fontSize: 14),
           ),
         ],
       ),
@@ -504,7 +504,7 @@ class _RenewalRequestCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-          color: const Color(0xFFE65100).withOpacity(0.3),
+          color: const Color(0xFFE65100).withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -518,7 +518,7 @@ class _RenewalRequestCard extends StatelessWidget {
             color: const Color(0xFFFFF3E0),
             shape: BoxShape.circle,
             border: Border.all(
-              color: const Color(0xFFE65100).withOpacity(0.4),
+              color: const Color(0xFFE65100).withValues(alpha: 0.4),
             ),
           ),
           child: const Icon(

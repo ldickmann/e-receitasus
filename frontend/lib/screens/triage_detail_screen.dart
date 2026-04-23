@@ -493,7 +493,7 @@ class _DoctorSelectionSection extends StatelessWidget {
                 }
 
                 return DropdownButtonFormField<UserModel>(
-                  value: selectedDoctor,
+                  initialValue: selectedDoctor,
                   decoration: const InputDecoration(
                     labelText: 'Selecione o médico responsável',
                     border: OutlineInputBorder(),

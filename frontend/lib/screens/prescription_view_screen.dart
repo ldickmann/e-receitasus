@@ -190,7 +190,7 @@ class _DocumentHeader extends StatelessWidget {
                         'UF: ${prescription.notificationUf}',
                         style: TextStyle(
                           fontSize: 11,
-                          color: type.foregroundColor.withOpacity(0.8),
+                          color: type.foregroundColor.withValues(alpha: 0.8),
                         ),
                       ),
                   ],
@@ -223,7 +223,7 @@ class _DocumentHeader extends StatelessWidget {
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 12,
-              color: type.foregroundColor.withOpacity(0.75),
+              color: type.foregroundColor.withValues(alpha: 0.75),
             ),
           ),
 
@@ -234,7 +234,7 @@ class _DocumentHeader extends StatelessWidget {
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 12,
-                color: type.foregroundColor.withOpacity(0.75),
+                color: type.foregroundColor.withValues(alpha: 0.75),
               ),
             ),
           ],
@@ -247,7 +247,7 @@ class _DocumentHeader extends StatelessWidget {
             decoration: BoxDecoration(
               border: Border.symmetric(
                 horizontal:
-                    BorderSide(color: type.foregroundColor.withOpacity(0.4)),
+                    BorderSide(color: type.foregroundColor.withValues(alpha: 0.4)),
               ),
             ),
             child: Text(
@@ -269,7 +269,7 @@ class _DocumentHeader extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 40),
               padding: const EdgeInsets.symmetric(vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFFD32F2F).withOpacity(0.08),
+                color: const Color(0xFFD32F2F).withValues(alpha: 0.08),
                 border: Border.all(color: const Color(0xFFD32F2F)),
                 borderRadius: BorderRadius.circular(4),
               ),
@@ -300,7 +300,7 @@ class _HorizontalDivider extends StatelessWidget {
     return Divider(
       height: 1,
       thickness: 1,
-      color: type.foregroundColor.withOpacity(0.25),
+      color: type.foregroundColor.withValues(alpha: 0.25),
     );
   }
 }
@@ -362,7 +362,7 @@ class _BodySection extends StatelessWidget {
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.bold,
-              color: type.foregroundColor.withOpacity(0.6),
+              color: type.foregroundColor.withValues(alpha: 0.6),
             ),
           ),
           const SizedBox(height: 8),
@@ -373,9 +373,9 @@ class _BodySection extends StatelessWidget {
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               border: Border.all(
-                  color: type.foregroundColor.withOpacity(0.3)),
+                  color: type.foregroundColor.withValues(alpha: 0.3)),
               borderRadius: BorderRadius.circular(4),
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -396,7 +396,7 @@ class _BodySection extends StatelessWidget {
                             : ''),
                     style: TextStyle(
                       fontSize: 13,
-                      color: type.foregroundColor.withOpacity(0.85),
+                      color: type.foregroundColor.withValues(alpha: 0.85),
                     ),
                   ),
                 if (prescription.route != null) ...[
@@ -405,12 +405,12 @@ class _BodySection extends StatelessWidget {
                     'Via: ${prescription.route}',
                     style: TextStyle(
                       fontSize: 12,
-                      color: type.foregroundColor.withOpacity(0.7),
+                      color: type.foregroundColor.withValues(alpha: 0.7),
                     ),
                   ),
                 ],
                 const SizedBox(height: 6),
-                _DashedDivider(color: type.foregroundColor.withOpacity(0.2)),
+                _DashedDivider(color: type.foregroundColor.withValues(alpha: 0.2)),
                 const SizedBox(height: 6),
                 Text(
                   'Quantidade: ${prescription.quantity}',
@@ -425,7 +425,7 @@ class _BodySection extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 12,
                       fontStyle: FontStyle.italic,
-                      color: type.foregroundColor.withOpacity(0.7),
+                      color: type.foregroundColor.withValues(alpha: 0.7),
                     ),
                   ),
                 const SizedBox(height: 8),
@@ -443,10 +443,10 @@ class _BodySection extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF009B3A).withOpacity(0.1),
+                      color: const Color(0xFF009B3A).withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                          color: const Color(0xFF009B3A).withOpacity(0.4)),
+                          color: const Color(0xFF009B3A).withValues(alpha: 0.4)),
                     ),
                     child: const Text(
                       'USO CONTÍNUO — RDC ANVISA 471/2021',
@@ -503,17 +503,17 @@ class _SignatureSection extends StatelessWidget {
                     ),
                     Text(
                       '${prescription.doctorCouncil} — ${prescription.doctorCouncilState}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: type.foregroundColor.withOpacity(0.8),
-                      ),
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: type.foregroundColor.withValues(alpha: 0.8),
+                        ),
                     ),
                     if (prescription.doctorSpecialty != null)
                       Text(
                         prescription.doctorSpecialty!,
                         style: TextStyle(
                           fontSize: 11,
-                          color: type.foregroundColor.withOpacity(0.65),
+                          color: type.foregroundColor.withValues(alpha: 0.65),
                         ),
                       ),
                   ],
@@ -529,7 +529,7 @@ class _SignatureSection extends StatelessWidget {
                     decoration: BoxDecoration(
                       border: Border(
                         bottom: BorderSide(
-                            color: type.foregroundColor.withOpacity(0.5)),
+                            color: type.foregroundColor.withValues(alpha: 0.5)),
                       ),
                     ),
                   ),
@@ -538,7 +538,7 @@ class _SignatureSection extends StatelessWidget {
                     'Assinatura e Carimbo',
                     style: TextStyle(
                       fontSize: 10,
-                      color: type.foregroundColor.withOpacity(0.5),
+                      color: type.foregroundColor.withValues(alpha: 0.5),
                     ),
                   ),
                 ],
@@ -551,7 +551,7 @@ class _SignatureSection extends StatelessWidget {
               Text(
                 'Data de Emissão: ${formatDate(prescription.issuedAt)}',
                 style: TextStyle(
-                    fontSize: 12, color: type.foregroundColor.withOpacity(0.8)),
+                    fontSize: 12, color: type.foregroundColor.withValues(alpha: 0.8)),
               ),
               const Spacer(),
               Text(
@@ -583,7 +583,7 @@ class _LegalFooterSection extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: type.foregroundColor.withOpacity(0.05),
+        color: type.foregroundColor.withValues(alpha: 0.05),
         borderRadius: const BorderRadius.only(
           bottomLeft: Radius.circular(4),
           bottomRight: Radius.circular(4),
@@ -594,7 +594,7 @@ class _LegalFooterSection extends StatelessWidget {
         textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: 10,
-          color: type.foregroundColor.withOpacity(0.55),
+          color: type.foregroundColor.withValues(alpha: 0.55),
           height: 1.5,
         ),
       ),
@@ -657,15 +657,15 @@ class _LabeledRow extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 80,
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: textColor.withOpacity(0.65),
-              ),
+          width: 80,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+              color: textColor.withValues(alpha: 0.65),
             ),
+          ),
           ),
           Expanded(
             child: Text(

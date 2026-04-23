@@ -113,7 +113,8 @@ class _HistoryTile extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-          color: type.foregroundColor.withOpacity(0.2),
+          // withValues evita perda de precisão na conversão de canal alpha
+          color: type.foregroundColor.withValues(alpha: 0.2),
         ),
       ),
       child: ListTile(
@@ -124,7 +125,8 @@ class _HistoryTile extends StatelessWidget {
           decoration: BoxDecoration(
             color: type.backgroundColor,
             shape: BoxShape.circle,
-            border: Border.all(color: type.foregroundColor.withOpacity(0.3)),
+            // withValues evita perda de precisão na conversão de canal alpha
+            border: Border.all(color: type.foregroundColor.withValues(alpha: 0.3)),
           ),
           child: Icon(type.icon, color: type.foregroundColor, size: 20),
         ),
@@ -150,7 +152,8 @@ class _HistoryTile extends StatelessWidget {
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: _statusColor.withOpacity(0.1),
+            // withValues evita perda de precisão na conversão de canal alpha
+            color: _statusColor.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(4),
             border: Border.all(color: _statusColor),
           ),
