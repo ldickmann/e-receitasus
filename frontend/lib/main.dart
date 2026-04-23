@@ -103,7 +103,8 @@ class MyApp extends StatelessWidget {
             fillColor: Colors.grey[100],
           ),
 
-          cardTheme: CardTheme(
+          // Flutter 3.41+ exige CardThemeData (antes era CardTheme) na propriedade cardTheme do ThemeData
+          cardTheme: CardThemeData(
             elevation: 2,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
