@@ -62,10 +62,12 @@ jobs:
           echo "storeFile=keystore.jks" >> frontend/android/key.properties
 
       # Decodifica o keystore (armazenado em base64 no secret)
-      # e o salva no caminho esperado pelo build.gradle
+      # e o salva em android/app/ — Gradle resolve file() em signingConfigs
+      # relativo ao módulo app, não ao rootProject. Salvar um nível acima
+      # causa "Keystore file not found" mesmo com storeFile=keystore.jks.
       - name: Decodificar Keystore
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > frontend/android/keystore.jks
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > frontend/android/app/keystore.jks
 
       # Gera o APK release assinado com as credenciais do keystore
       - name: Build APK Release
