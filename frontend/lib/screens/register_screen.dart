@@ -83,6 +83,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   ProfessionalType? _selectedProfessionalType;
   DateTime? _selectedBirthDate;
 
+  // PBI 157 / TASK 163 — UF do Conselho passou a ser um campo distinto do
+  // número de registro. Antes a UF era extraída do final da string digitada
+  // (ex: "123456-SP"), o que era frágil e gerava dado ambíguo no banco.
+  // Agora a UF é selecionada explicitamente em um Dropdown dedicado.
+  String? _selectedCouncilState;
+
   // 26 UFs + DF ordenados alfabeticamente
   static const _ufOptions = [
     'AC',
@@ -505,6 +511,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     setState(() {
                       _selectedProfessionalType = value;
                       _professionalIdController.clear();
+                      // Limpa UF do conselho ao trocar o tipo de profissional
+                      // para evitar combinações incoerentes (ex: CRM + UF
+                      // selecionada após mudar para ADMINISTRATIVO, que não
+                      // usa registro em conselho).
+                      _selectedCouncilState = null;
                     });
                   },
                   validator: (value) {
@@ -519,26 +530,89 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   duration: const Duration(milliseconds: 250),
                   child: _selectedProfessionalType == null
                       ? const SizedBox.shrink()
-                      : TextFormField(
+                      : Column(
                           key: ValueKey<String>(
                               _selectedProfessionalType!.value),
-                          controller: _professionalIdController,
-                          keyboardType: TextInputType.text,
-                          textCapitalization: TextCapitalization.characters,
-                          decoration: InputDecoration(
-                            labelText:
-                                _selectedProfessionalType!.registrationLabel,
-                            hintText:
-                                _selectedProfessionalType!.registrationHint,
-                            border: const OutlineInputBorder(),
-                            prefixIcon: const Icon(Icons.badge),
-                            helperText: 'Campo obrigatorio',
-                          ),
-                          validator: (value) {
-                            if (_selectedProfessionalType == null) return null;
-                            return _selectedProfessionalType!
-                                .validateRegistration(value);
-                          },
+                          children: [
+                            TextFormField(
+                              controller: _professionalIdController,
+                              keyboardType: TextInputType.text,
+                              textCapitalization:
+                                  TextCapitalization.characters,
+                              decoration: InputDecoration(
+                                // Label/hint deixam claro que o campo recebe
+                                // APENAS o número do registro. A UF é coletada
+                                // no Dropdown imediatamente abaixo (TASK 163).
+                                labelText:
+                                    'Número do ${_selectedProfessionalType!.councilName}',
+                                hintText: _selectedProfessionalType!
+                                        .requiresCouncil
+                                    ? 'Ex: 123456'
+                                    : 'Ex: MAT-2024-001',
+                                border: const OutlineInputBorder(),
+                                prefixIcon: const Icon(Icons.badge),
+                                helperText: 'Campo obrigatorio',
+                              ),
+                              // Validação local mínima: não-vazio e tamanho
+                              // mínimo. Validação de UF é responsabilidade do
+                              // Dropdown abaixo, o que evita parsing frágil
+                              // da string "123456-SP".
+                              validator: (value) {
+                                final input = value?.trim() ?? '';
+                                if (input.isEmpty) {
+                                  return 'Informe obrigatoriamente o seu '
+                                      '${_selectedProfessionalType!.councilName}';
+                                }
+                                if (input.length < 3) {
+                                  return '${_selectedProfessionalType!.councilName} '
+                                      'deve ter no minimo 3 caracteres';
+                                }
+                                return null;
+                              },
+                            ),
+                            // Só mostra UF para profissionais que possuem
+                            // registro em conselho (médico, enfermeiro etc.).
+                            // ADMINISTRATIVO/OUTROS usam matrícula interna,
+                            // que não tem UF.
+                            if (_selectedProfessionalType!.requiresCouncil) ...[
+                              const SizedBox(height: 12),
+                              DropdownButtonFormField<String>(
+                                initialValue: _selectedCouncilState,
+                                decoration: const InputDecoration(
+                                  labelText: 'UF do Conselho',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.flag_outlined),
+                                  helperText: 'Campo obrigatorio',
+                                ),
+                                items: _ufOptions
+                                    .map(
+                                      (uf) => DropdownMenuItem<String>(
+                                        value: uf,
+                                        child: Text(uf),
+                                      ),
+                                    )
+                                    .toList(),
+                                onChanged: (value) {
+                                  setState(() => _selectedCouncilState = value);
+                                },
+                                // Obrigatório apenas quando o tipo selecionado
+                                // exige registro em conselho. Em runtime o
+                                // dropdown nem é renderizado se !requiresCouncil,
+                                // mas a guarda extra protege contra mudanças
+                                // futuras de fluxo.
+                                validator: (value) {
+                                  if (_selectedProfessionalType?.requiresCouncil !=
+                                      true) {
+                                    return null;
+                                  }
+                                  if (value == null || value.isEmpty) {
+                                    return 'Selecione a UF do conselho';
+                                  }
+                                  return null;
+                                },
+                              ),
+                            ],
+                          ],
                         ),
                 ),
                 const SizedBox(height: 12),
