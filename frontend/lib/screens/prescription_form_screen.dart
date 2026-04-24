@@ -7,7 +7,6 @@ import '../models/prescription_type.dart';
 import '../providers/auth_provider.dart';
 import '../services/prescription_service.dart';
 import '../theme/app_colors.dart';
-import 'prescription_view_screen.dart';
 
 // ---------------------------------------------------------------------------
 // Dados opcionais para pré-preenchimento (modo renovação)
@@ -294,11 +293,11 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
       }
 
       // Modo normal (criação avulsa): navega para a visualização da receita emitida
-      Navigator.pushReplacement(
+      // pushReplacement garante que o formulário seja removido da pilha de navegação
+      Navigator.pushReplacementNamed(
         context,
-        MaterialPageRoute(
-          builder: (_) => PrescriptionViewScreen(prescription: saved),
-        ),
+        '/prescription_view',
+        arguments: saved,
       );
     } catch (e) {
       if (!mounted) return;
@@ -1269,9 +1268,7 @@ class _LegalWarning extends StatelessWidget {
             type.legalFooter,
             // onWarningContainer garante contraste sobre o fundo âmbar
             style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.onWarningContainer,
-                height: 1.5),
+                fontSize: 11, color: AppColors.onWarningContainer, height: 1.5),
           ),
         ],
       ),

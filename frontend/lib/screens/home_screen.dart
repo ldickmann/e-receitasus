@@ -7,7 +7,7 @@ import '../providers/renewal_provider.dart';
 import '../services/prescription_service.dart'; // Importação do novo serviço
 import '../widgets/prescription_card.dart';
 import 'history_screen.dart';
-import 'prescription_view_screen.dart';
+
 import 'renewal_tracking_screen.dart';
 import 'request_renewal_screen.dart';
 
@@ -182,13 +182,10 @@ class HomeScreen extends StatelessWidget {
                       final prescription = prescriptions[index];
                       return PrescriptionCard(
                         prescription: prescription,
-                        onTap: () => Navigator.push(
+                        onTap: () => Navigator.pushNamed(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => PrescriptionViewScreen(
-                              prescription: prescription,
-                            ),
-                          ),
+                          '/prescription_view',
+                          arguments: prescription,
                         ),
                       );
                     },

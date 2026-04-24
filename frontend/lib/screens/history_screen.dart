@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import '../models/prescription_model.dart';
 import '../providers/prescription_provider.dart';
 import '../theme/app_colors.dart';
-import 'prescription_view_screen.dart';
 
 class HistoryScreen extends StatelessWidget {
   const HistoryScreen({super.key});
@@ -176,11 +175,10 @@ class _HistoryTile extends StatelessWidget {
             ),
           ),
         ),
-        onTap: () => Navigator.push(
+        onTap: () => Navigator.pushNamed(
           context,
-          MaterialPageRoute(
-            builder: (_) => PrescriptionViewScreen(prescription: prescription),
-          ),
+          '/prescription_view',
+          arguments: prescription,
         ),
       ),
     );

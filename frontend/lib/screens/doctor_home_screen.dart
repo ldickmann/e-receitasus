@@ -8,8 +8,7 @@ import '../services/prescription_service.dart';
 import '../services/renewal_service.dart';
 import '../theme/app_colors.dart';
 import 'prescription_type_screen.dart';
-import 'prescription_view_screen.dart';
-import 'renewal_prescription_screen.dart';
+
 
 /// Tela principal para profissionais de saúde (médicos, dentistas, etc.).
 ///
@@ -145,13 +144,10 @@ class DoctorHomeScreen extends StatelessWidget {
                       final prescription = PrescriptionModel.fromJson(item);
                       return _PrescriptionListTile(
                         prescription: prescription,
-                        onTap: () => Navigator.push(
+                        onTap: () => Navigator.pushNamed(
                           context,
-                          MaterialPageRoute(
-                            builder: (_) => PrescriptionViewScreen(
-                              prescription: prescription,
-                            ),
-                          ),
+                          '/prescription_view',
+                          arguments: prescription,
                         ),
                       );
                     },
@@ -473,12 +469,10 @@ class _PendingRenewalsSection extends StatelessWidget {
                 final request = requests[index];
                 return _RenewalRequestCard(
                   request: request,
-                  onTap: () => Navigator.push(
+                  onTap: () => Navigator.pushNamed(
                     context,
-                    MaterialPageRoute(
-                      builder: (_) =>
-                          RenewalPrescriptionScreen(request: request),
-                    ),
+                    '/renewal_prescription',
+                    arguments: request,
                   ),
                 );
               },
