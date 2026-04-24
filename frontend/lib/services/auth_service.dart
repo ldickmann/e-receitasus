@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../models/professional_type.dart';
@@ -168,16 +169,18 @@ class AuthService implements IAuthService {
       // Sem sessão (e-mail pendente de confirmação), o profissional poderá
       // preencher o endereço via tela de perfil após confirmar o e-mail.
       if (response.session != null) {
+        // Chaves em snake_case para corresponder às colunas do Supabase PostgREST —
+        // camelCase causa falha silenciosa (PostgREST ignora chaves desconhecidas).
         final updates = <String, dynamic>{
-          'birthDate': _formatBirthDate(birthDate),
-          if (_notEmpty(zipCode)) 'zipCode': zipCode!.trim(),
+          'birth_date': _formatBirthDate(birthDate),
+          if (_notEmpty(zipCode)) 'zip_code': zipCode!.trim(),
           if (_notEmpty(street)) 'street': street!.trim(),
-          if (_notEmpty(streetNumber)) 'streetNumber': streetNumber!.trim(),
+          if (_notEmpty(streetNumber)) 'street_number': streetNumber!.trim(),
           if (_notEmpty(complement)) 'complement': complement!.trim(),
           if (_notEmpty(district)) 'district': district!.trim(),
-          if (_notEmpty(addressCity)) 'addressCity': addressCity!.trim(),
+          if (_notEmpty(addressCity)) 'address_city': addressCity!.trim(),
           if (_notEmpty(addressState))
-            'addressState': addressState!.trim().toUpperCase(),
+            'address_state': addressState!.trim().toUpperCase(),
         };
         // Tabela separada por domínio: profissionais → public.professionals
         // (migration 20260421000000_split_user_patients_professionals)
@@ -291,31 +294,31 @@ class AuthService implements IAuthService {
       // Sem sessão (e-mail pendente), o trigger já criou o User; campos opcionais
       // serão atualizados via tela de perfil quando o usuário confirmar o e-mail.
       if (response.session != null) {
-        // Monta o mapa apenas com valores não-nulos/não-vazios para evitar
-        // sobrescrever valores existentes no banco com null acidentalmente
+        // Chaves em snake_case para corresponder às colunas do Supabase PostgREST —
+        // camelCase causa falha silenciosa (PostgREST ignora chaves desconhecidas).
         final updates = <String, dynamic>{
-          'birthDate': _formatBirthDate(birthDate),
+          'birth_date': _formatBirthDate(birthDate),
           'phone': phone.trim(),
           if (_notEmpty(cns)) 'cns': cns!.trim(),
           if (_notEmpty(cpf)) 'cpf': cpf!.trim(),
-          if (_notEmpty(socialName)) 'socialName': socialName!.trim(),
+          if (_notEmpty(socialName)) 'social_name': socialName!.trim(),
           if (_notEmpty(motherParentName))
-            'motherParentName': motherParentName!.trim(),
-          if (_notEmpty(birthCity)) 'birthCity': birthCity!.trim(),
+            'mother_parent_name': motherParentName!.trim(),
+          if (_notEmpty(birthCity)) 'birth_city': birthCity!.trim(),
           if (_notEmpty(birthState))
-            'birthState': birthState!.trim().toUpperCase(),
+            'birth_state': birthState!.trim().toUpperCase(),
           if (_notEmpty(gender)) 'gender': gender!.trim(),
           if (_notEmpty(ethnicity)) 'ethnicity': ethnicity!.trim(),
-          if (_notEmpty(maritalStatus)) 'maritalStatus': maritalStatus!.trim(),
+          if (_notEmpty(maritalStatus)) 'marital_status': maritalStatus!.trim(),
           if (_notEmpty(education)) 'education': education!.trim(),
-          if (_notEmpty(zipCode)) 'zipCode': zipCode!.trim(),
+          if (_notEmpty(zipCode)) 'zip_code': zipCode!.trim(),
           if (_notEmpty(street)) 'street': street!.trim(),
-          if (_notEmpty(streetNumber)) 'streetNumber': streetNumber!.trim(),
+          if (_notEmpty(streetNumber)) 'street_number': streetNumber!.trim(),
           if (_notEmpty(complement)) 'complement': complement!.trim(),
           if (_notEmpty(district)) 'district': district!.trim(),
-          if (_notEmpty(addressCity)) 'addressCity': addressCity!.trim(),
+          if (_notEmpty(addressCity)) 'address_city': addressCity!.trim(),
           if (_notEmpty(addressState))
-            'addressState': addressState!.trim().toUpperCase(),
+            'address_state': addressState!.trim().toUpperCase(),
         };
         // Tabela separada por domínio: pacientes → public.patients
         // (migration 20260421000000_split_user_patients_professionals)
@@ -409,6 +412,88 @@ class AuthService implements IAuthService {
       (type) => type.value == value,
       orElse: () => ProfessionalType.administrativo,
     );
+  }
+
+  /// Constrói o mapa de atualização para a tabela 'professionals'.
+  ///
+  /// Exposto para testes via [@visibleForTesting] — permite verificar que todas
+  /// as chaves estão em snake_case sem precisar mockar a cadeia PostgREST
+  /// completa (PostgrestFilterBuilder não faz parte da API pública do postgrest).
+  @visibleForTesting
+  Map<String, dynamic> buildProfessionalsUpdateMap({
+    required DateTime birthDate,
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
+  }) {
+    return <String, dynamic>{
+      'birth_date': _formatBirthDate(birthDate),
+      if (_notEmpty(zipCode)) 'zip_code': zipCode!.trim(),
+      if (_notEmpty(street)) 'street': street!.trim(),
+      if (_notEmpty(streetNumber)) 'street_number': streetNumber!.trim(),
+      if (_notEmpty(complement)) 'complement': complement!.trim(),
+      if (_notEmpty(district)) 'district': district!.trim(),
+      if (_notEmpty(addressCity)) 'address_city': addressCity!.trim(),
+      if (_notEmpty(addressState))
+        'address_state': addressState!.trim().toUpperCase(),
+    };
+  }
+
+  /// Constrói o mapa de atualização para a tabela 'patients'.
+  ///
+  /// Exposto para testes via [@visibleForTesting] — permite verificar que todas
+  /// as chaves estão em snake_case sem precisar mockar a cadeia PostgREST
+  /// completa (PostgrestFilterBuilder não faz parte da API pública do postgrest).
+  @visibleForTesting
+  Map<String, dynamic> buildPatientsUpdateMap({
+    required DateTime birthDate,
+    required String phone,
+    String? cns,
+    String? cpf,
+    String? socialName,
+    String? motherParentName,
+    String? birthCity,
+    String? birthState,
+    String? gender,
+    String? ethnicity,
+    String? maritalStatus,
+    String? education,
+    String? zipCode,
+    String? street,
+    String? streetNumber,
+    String? complement,
+    String? district,
+    String? addressCity,
+    String? addressState,
+  }) {
+    return <String, dynamic>{
+      'birth_date': _formatBirthDate(birthDate),
+      'phone': phone.trim(),
+      if (_notEmpty(cns)) 'cns': cns!.trim(),
+      if (_notEmpty(cpf)) 'cpf': cpf!.trim(),
+      if (_notEmpty(socialName)) 'social_name': socialName!.trim(),
+      if (_notEmpty(motherParentName))
+        'mother_parent_name': motherParentName!.trim(),
+      if (_notEmpty(birthCity)) 'birth_city': birthCity!.trim(),
+      if (_notEmpty(birthState))
+        'birth_state': birthState!.trim().toUpperCase(),
+      if (_notEmpty(gender)) 'gender': gender!.trim(),
+      if (_notEmpty(ethnicity)) 'ethnicity': ethnicity!.trim(),
+      if (_notEmpty(maritalStatus)) 'marital_status': maritalStatus!.trim(),
+      if (_notEmpty(education)) 'education': education!.trim(),
+      if (_notEmpty(zipCode)) 'zip_code': zipCode!.trim(),
+      if (_notEmpty(street)) 'street': street!.trim(),
+      if (_notEmpty(streetNumber)) 'street_number': streetNumber!.trim(),
+      if (_notEmpty(complement)) 'complement': complement!.trim(),
+      if (_notEmpty(district)) 'district': district!.trim(),
+      if (_notEmpty(addressCity)) 'address_city': addressCity!.trim(),
+      if (_notEmpty(addressState))
+        'address_state': addressState!.trim().toUpperCase(),
+    };
   }
 
   /// Verifica se uma string opcional tem valor não-vazio.
