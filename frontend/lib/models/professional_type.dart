@@ -97,8 +97,7 @@ enum ProfessionalType {
       // Aceita número puro (ex: 123456) ou com UF opcional (ex: 123456-SP).
       // 4 a 10 dígitos seguidos de sufixo UF opcional separado por -, / ou espaço.
       // Fix PBI #180 / TASK #190 — anteriormente exigia UF obrigatória.
-      final isValid =
-          RegExp(r'^\d{4,10}([-/\s][A-Za-z]{2})?$').hasMatch(input);
+      final isValid = RegExp(r'^\d{4,10}([-/\s][A-Za-z]{2})?$').hasMatch(input);
       if (!isValid) {
         return 'Número de $councilName inválido (ex: 123456)';
       }
@@ -115,7 +114,6 @@ enum ProfessionalType {
 
     return null;
   }
-
 }
 
 const List<String> brazilianStates = [

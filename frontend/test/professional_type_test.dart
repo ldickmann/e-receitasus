@@ -89,7 +89,8 @@ void main() {
   });
 
   // ---------------------------------------------------------------------------
-  group('ProfessionalType.validateRegistration — profissionais com conselho', () {
+  group('ProfessionalType.validateRegistration — profissionais com conselho',
+      () {
     /// Após PBI #157, o campo de número aceita apenas o número puro;
     /// a UF é capturada no dropdown separado. Fix de regressão PBI #180.
 
@@ -165,7 +166,8 @@ void main() {
       expect(resultado, contains('UF inválida'));
     });
 
-    test('valida corretamente para tipos com conselho distintos (CRO, COREN)', () {
+    test('valida corretamente para tipos com conselho distintos (CRO, COREN)',
+        () {
       // Garante que o fix não é exclusivo do CRM — vale para todos os conselhos.
       expect(ProfessionalType.dentista.validateRegistration('98765'), isNull);
       expect(ProfessionalType.enfermeiro.validateRegistration('54321'), isNull);
