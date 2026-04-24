@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // Importação para a nova infraestrutura
 import 'providers/auth_provider.dart';
 import 'services/auth_service.dart';
+import 'services/prescription_service.dart';
+import 'providers/prescription_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -13,8 +15,14 @@ import 'screens/nurse_home_screen.dart';
 import 'screens/prescription_type_screen.dart';
 import 'screens/prescription_form_screen.dart';
 import 'screens/patient_register_screen.dart';
+import 'screens/renewal_tracking_screen.dart';
 import 'screens/request_renewal_screen.dart';
+import 'screens/prescription_view_screen.dart';
+import 'screens/renewal_prescription_screen.dart';
+import 'screens/triage_detail_screen.dart';
 import 'models/prescription_type.dart';
+import 'models/prescription_model.dart';
+import 'models/renewal_request_model.dart';
 import 'services/renewal_service.dart';
 import 'providers/renewal_provider.dart';
 import 'providers/triage_provider.dart';
@@ -57,6 +65,11 @@ class MyApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => AuthProvider(AuthService()),
         ),
+        // Provider de histórico de receitas do paciente: desacopla HistoryScreen
+        // da instanciação direta do PrescriptionService, permitindo mocks em testes.
+        ChangeNotifierProvider(
+          create: (_) => PrescriptionProvider(PrescriptionService()),
+        ),
         // Provider de renovação: utilizado pelo paciente para solicitar renovação de receitas
         ChangeNotifierProvider(
             create: (_) => RenewalProvider(RenewalService())),
@@ -98,6 +111,38 @@ class MyApp extends StatelessWidget {
               const PrescriptionFormScreen(type: PrescriptionType.azul),
           // Rota de solicitação de renovação de receita — perfil paciente
           '/request_renewal': (context) => const RequestRenewalScreen(),
+          // Rota de rastreamento de pedidos de renovação — perfil paciente
+          '/renewal_tracking': (context) => const RenewalTrackingScreen(),
+        },
+
+        // Rotas com argumentos obrigatórios não podem usar construtor vazio no mapa
+        // estático — usamos onGenerateRoute para extrair os argumentos em runtime
+        // e passá-los ao construtor correto de cada tela.
+        onGenerateRoute: (settings) {
+          switch (settings.name) {
+            case '/prescription_view':
+              // Recebe PrescriptionModel para renderizar a receita conforme modelo ANVISA
+              final prescription = settings.arguments as PrescriptionModel;
+              return MaterialPageRoute(
+                builder: (_) =>
+                    PrescriptionViewScreen(prescription: prescription),
+              );
+            case '/renewal_prescription':
+              // Recebe RenewalRequestModel para pré-preencher o formulário de renovação
+              final request = settings.arguments as RenewalRequestModel;
+              return MaterialPageRoute(
+                builder: (_) => RenewalPrescriptionScreen(request: request),
+              );
+            case '/triage_detail':
+              // Recebe RenewalRequestModel para exibir os detalhes do pedido ao enfermeiro
+              final request = settings.arguments as RenewalRequestModel;
+              return MaterialPageRoute(
+                builder: (_) => TriageDetailScreen(request: request),
+              );
+            default:
+              // Retorna null para delegar ao onUnknownRoute abaixo
+              return null;
+          }
         },
 
         // Fallback de segurança para rotas inexistentes

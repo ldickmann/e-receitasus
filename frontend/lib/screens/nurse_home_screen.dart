@@ -4,7 +4,6 @@ import '../models/renewal_request_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/triage_provider.dart';
 import '../theme/app_colors.dart';
-import 'triage_detail_screen.dart';
 
 /// Tela inicial do Enfermeiro — ponto de entrada para o fluxo de triagem
 /// de solicitações de renovação de receitas dos pacientes.
@@ -239,12 +238,11 @@ class _PendingRequestCard extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
         onTap: () {
-          // Navega para a tela de detalhes passando o pedido completo
-          Navigator.push(
+          // Navega para a tela de detalhes passando o pedido completo via rota nomeada
+          Navigator.pushNamed(
             context,
-            MaterialPageRoute(
-              builder: (_) => TriageDetailScreen(request: request),
-            ),
+            '/triage_detail',
+            arguments: request,
           );
         },
         child: Padding(
