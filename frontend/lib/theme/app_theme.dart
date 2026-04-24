@@ -89,7 +89,7 @@ class AppTheme {
         foregroundColor: AppColors.onPrimary,
         elevation: 2,
         scrolledUnderElevation: 4,
-        shadowColor: AppColors.shadow.withOpacity(0.2),
+        shadowColor: AppColors.shadow.withValues(alpha: 0.2),
         centerTitle: true,
         systemOverlayStyle:
             SystemUiOverlayStyle.light, // Ícones da status bar brancos
@@ -105,7 +105,7 @@ class AppTheme {
             .transparent, // Impede que o card seja "tingido" pela cor primária
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
-          side: BorderSide(color: AppColors.outline.withOpacity(0.5)),
+          side: BorderSide(color: AppColors.outline.withValues(alpha: 0.5)),
         ),
       ),
 
@@ -141,7 +141,8 @@ class AppTheme {
 
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.surfaceVariant.withOpacity(0.4),
+        // Opacidade reduzida para suavizar o fundo dos campos de texto
+        fillColor: AppColors.surfaceVariant.withValues(alpha: 0.4),
         contentPadding:
             const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(
