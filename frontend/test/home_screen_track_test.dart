@@ -58,7 +58,8 @@ class _FakeRenewalService extends Fake implements IRenewalService {
   }) async {}
 
   @override
-  Future<void> rejectTriage(String renewalId, {required String nurseNotes}) async {}
+  Future<void> rejectTriage(String renewalId,
+      {required String nurseNotes}) async {}
 
   @override
   Stream<List<RenewalRequestModel>> streamTriagedForDoctor() =>
@@ -179,7 +180,8 @@ void main() {
         // mas sem pumpAndSettle — o stream nunca fecha, então pumpAndSettle
         // poderia travar aguardando um estado estável que nunca chega.
         await tester.pump(); // inicia a transição do Navigator
-        await tester.pump(const Duration(milliseconds: 300)); // conclui animação
+        await tester
+            .pump(const Duration(milliseconds: 300)); // conclui animação
 
         // ASSERT — enquanto o stream não emitiu, exibe CircularProgressIndicator
         expect(find.byType(CircularProgressIndicator), findsOneWidget);
@@ -190,10 +192,10 @@ void main() {
       'RenewalTrackingScreen deve exibir mensagem de vazio quando stream emite lista vazia',
       (WidgetTester tester) async {
         // ARRANGE — stream controlada que emite lista vazia imediatamente
-        final emptyStream =
-            Stream<List<RenewalRequestModel>>.value(const []);
+        final emptyStream = Stream<List<RenewalRequestModel>>.value(const []);
 
-        await tester.pumpWidget(_buildTestableButton(renewalStream: emptyStream));
+        await tester
+            .pumpWidget(_buildTestableButton(renewalStream: emptyStream));
 
         await tester.tap(
           find.widgetWithText(OutlinedButton, 'Rastrear Status do Pedido'),

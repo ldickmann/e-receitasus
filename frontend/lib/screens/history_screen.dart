@@ -135,7 +135,8 @@ class _HistoryTile extends StatelessWidget {
             color: type.backgroundColor,
             shape: BoxShape.circle,
             // withValues evita perda de precisão na conversão de canal alpha
-            border: Border.all(color: type.foregroundColor.withValues(alpha: 0.3)),
+            border:
+                Border.all(color: type.foregroundColor.withValues(alpha: 0.3)),
           ),
           child: Icon(type.icon, color: type.foregroundColor, size: 20),
         ),
