@@ -492,7 +492,7 @@ class _TypeBadge extends StatelessWidget {
         color: type.backgroundColor,
         borderRadius: BorderRadius.circular(8),
         border: Border.all(
-          color: type.foregroundColor.withOpacity(0.3),
+          color: type.foregroundColor.withValues(alpha: 0.3),
           width: 1.5,
         ),
       ),
@@ -515,7 +515,7 @@ class _TypeBadge extends StatelessWidget {
                 Text(
                   '${type.copiesLabel} • Validade: ${type.validityDays} dias',
                   style: TextStyle(
-                    color: type.foregroundColor.withOpacity(0.7),
+                    color: type.foregroundColor.withValues(alpha: 0.7),
                     fontSize: 12,
                   ),
                 ),
@@ -553,7 +553,7 @@ class _SectionHeader extends StatelessWidget {
           ),
         ),
         const SizedBox(width: 8),
-        Expanded(child: Divider(color: color.withOpacity(0.3))),
+        Expanded(child: Divider(color: color.withValues(alpha: 0.3))),
       ],
     );
   }
@@ -582,7 +582,8 @@ class _NotificationSection extends StatelessWidget {
           decoration: BoxDecoration(
             color: type.backgroundColor,
             borderRadius: BorderRadius.circular(6),
-            border: Border.all(color: type.foregroundColor.withOpacity(0.3)),
+            border:
+                Border.all(color: type.foregroundColor.withValues(alpha: 0.3)),
           ),
           child: Text(
             'O número de notificação é pré-impresso e emitido pela '
@@ -590,7 +591,7 @@ class _NotificationSection extends StatelessWidget {
             'Informe o número constante no formulário oficial.',
             style: TextStyle(
               fontSize: 12,
-              color: type.foregroundColor.withOpacity(0.8),
+              color: type.foregroundColor.withValues(alpha: 0.8),
             ),
           ),
         ),
