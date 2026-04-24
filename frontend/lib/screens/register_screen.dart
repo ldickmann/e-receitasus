@@ -495,6 +495,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<ProfessionalType>(
+                  key: const Key('professional-type-dropdown'),
                   initialValue: _selectedProfessionalType,
                   decoration: const InputDecoration(
                     labelText: 'Tipo de Profissional',
@@ -580,6 +581,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             if (_selectedProfessionalType!.requiresCouncil) ...[
                               const SizedBox(height: 12),
                               DropdownButtonFormField<String>(
+                                key: const Key('council-state-dropdown'),
                                 initialValue: _selectedCouncilState,
                                 decoration: const InputDecoration(
                                   labelText: 'UF do Conselho',
