@@ -853,10 +853,32 @@ class _PatientSectionState extends State<_PatientSection> {
   /// FocusNode obrigatório para uso com [RawAutocomplete] e controller externo.
   final _nameFocusNode = FocusNode();
 
+  /// Evita exibir múltiplos SnackBars consecutivos quando o autocomplete
+  /// dispara várias buscas seguidas e todas falham (ex.: rede instável).
+  /// É reabilitado assim que ocorrer uma busca bem-sucedida.
+  bool _errorShown = false;
+
   @override
   void dispose() {
     _nameFocusNode.dispose();
     super.dispose();
+  }
+
+  /// Exibe SnackBar de erro de busca, agendado para o próximo frame para evitar
+  /// disparar UI durante o `optionsBuilder` do [RawAutocomplete].
+  void _showSearchError(String message) {
+    if (_errorShown) return;
+    _errorShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.orange.shade700,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    });
   }
 
   @override
@@ -873,9 +895,21 @@ class _PatientSectionState extends State<_PatientSection> {
             final query = textEditingValue.text;
             if (query.trim().length < 2) return const [];
             try {
-              return await PrescriptionService().searchPatients(query.trim());
+              final results =
+                  await PrescriptionService().searchPatients(query.trim());
+              // Sucesso → reabilita SnackBar para futuras falhas.
+              _errorShown = false;
+              return results;
+            } on PatientSearchException catch (e) {
+              // Falha controlada da RPC: feedback visual ao médico, mas o campo
+              // continua editável para preenchimento manual.
+              _showSearchError(e.message);
+              return const [];
             } catch (_) {
-              // Falha silenciosa no autocomplete: o médico ainda pode digitar manualmente.
+              // Qualquer outra falha: mensagem genérica (sem detalhes técnicos).
+              _showSearchError(
+                'Erro ao buscar pacientes. Você pode digitar manualmente.',
+              );
               return const [];
             }
           },
