@@ -52,7 +52,7 @@ class PrescriptionCard extends StatelessWidget {
     }
   }
 
-  Color get _statusBackgroundColor => _statusColor.withOpacity(0.12);
+  Color get _statusBackgroundColor => _statusColor.withValues(alpha: 0.12);
 
   /// Rótulo legível do status exibido no badge.
   String get _statusLabel {
@@ -89,7 +89,7 @@ class PrescriptionCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           // Borda sutil com a cor característica do tipo de receita ANVISA
           side: BorderSide(
-            color: type.foregroundColor.withOpacity(0.18),
+            color: type.foregroundColor.withValues(alpha: 0.18),
             width: 1.2,
           ),
         ),
@@ -198,12 +198,12 @@ class _TypeIcon extends StatelessWidget {
         color: type.backgroundColor,
         shape: BoxShape.circle,
         border: Border.all(
-          color: type.foregroundColor.withOpacity(0.25),
+          color: type.foregroundColor.withValues(alpha: 0.25),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: type.foregroundColor.withOpacity(0.08),
+            color: type.foregroundColor.withValues(alpha: 0.08),
             blurRadius: 4,
             offset: const Offset(0, 2),
           ),
