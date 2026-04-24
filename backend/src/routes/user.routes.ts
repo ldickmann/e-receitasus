@@ -31,7 +31,10 @@ router.get(
         });
       }
 
-      console.error('[UserRoutes] Erro inesperado ao buscar perfil:', error);
+      // Extrai apenas a mensagem para evitar vazar stack trace em produção —
+      // OWASP A05/LGPD: não expor estrutura interna nem caminhos de arquivo no log.
+      const message = error instanceof Error ? error.message : 'Erro desconhecido';
+      console.error('[UserRoutes] Erro inesperado ao buscar perfil:', message);
 
       return res.status(500).json({
         error: 'Erro interno',
