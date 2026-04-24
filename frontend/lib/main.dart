@@ -13,6 +13,7 @@ import 'screens/nurse_home_screen.dart';
 import 'screens/prescription_type_screen.dart';
 import 'screens/prescription_form_screen.dart';
 import 'screens/patient_register_screen.dart';
+import 'screens/renewal_tracking_screen.dart';
 import 'screens/request_renewal_screen.dart';
 import 'models/prescription_type.dart';
 import 'services/renewal_service.dart';
@@ -98,6 +99,8 @@ class MyApp extends StatelessWidget {
               const PrescriptionFormScreen(type: PrescriptionType.azul),
           // Rota de solicitação de renovação de receita — perfil paciente
           '/request_renewal': (context) => const RequestRenewalScreen(),
+          // Rota de rastreamento de pedidos de renovação — perfil paciente
+          '/renewal_tracking': (context) => const RenewalTrackingScreen(),
         },
 
         // Fallback de segurança para rotas inexistentes
