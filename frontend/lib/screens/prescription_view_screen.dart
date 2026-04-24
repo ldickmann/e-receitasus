@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/prescription_model.dart';
 import '../models/prescription_type.dart';
+import '../theme/app_colors.dart';
 
 /// Renderiza visualmente uma prescrição médica digital conforme
 /// layout baseado nos modelos oficiais da ANVISA.
@@ -104,7 +105,8 @@ class PrescriptionViewScreen extends StatelessWidget {
       case PrescriptionType.azul:
         return const Color(0xFF1565C0);
       default:
-        return const Color(0xFF009B3A);
+        // Default é a cor primária do tema (verde-menta) para receitas branca/controlada
+        return AppColors.primary;
     }
   }
 
@@ -443,10 +445,11 @@ class _BodySection extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF009B3A).withValues(alpha: 0.1),
+                      // Badge de uso contínuo: tom claro do verde primário (transparência 10%)
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                          color: const Color(0xFF009B3A).withValues(alpha: 0.4)),
+                          color: AppColors.primary.withValues(alpha: 0.4)),
                     ),
                     child: const Text(
                       'USO CONTÍNUO — RDC ANVISA 471/2021',

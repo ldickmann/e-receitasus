@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/prescription_model.dart';
 import '../services/prescription_service.dart';
+import '../theme/app_colors.dart';
 import 'prescription_view_screen.dart';
 
 class HistoryScreen extends StatelessWidget {
@@ -11,7 +12,8 @@ class HistoryScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Histórico de Receitas'),
-        backgroundColor: const Color(0xFF009B3A),
+        // Usa o token primário (verde-menta da nova identidade) para manter consistência visual com o resto do app
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
       body: FutureBuilder<List<PrescriptionModel>>(

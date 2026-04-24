@@ -6,6 +6,7 @@ import '../models/renewal_request_model.dart';
 import '../providers/auth_provider.dart';
 import '../services/prescription_service.dart';
 import '../services/renewal_service.dart';
+import '../theme/app_colors.dart';
 import 'prescription_type_screen.dart';
 import 'prescription_view_screen.dart';
 import 'renewal_prescription_screen.dart';
@@ -35,7 +36,8 @@ class DoctorHomeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('E-ReceitaSUS — Prescritor'),
-        backgroundColor: const Color(0xFF009B3A),
+        // Cor primária do tema (verde-menta da nova identidade visual)
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
@@ -77,7 +79,8 @@ class DoctorHomeScreen extends StatelessWidget {
                   style: TextStyle(fontSize: 16),
                 ),
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF009B3A),
+                  // Botão de ação principal usa a cor primária do tema
+                  backgroundColor: AppColors.primary,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 52),
                   shape: RoundedRectangleBorder(
@@ -191,7 +194,8 @@ class _DoctorWelcomeCard extends StatelessWidget {
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: [Color(0xFF009B3A), Color(0xFF00732D)],
+            // Gradiente do verde-menta para sua variante escura, derivado de AppColors
+            colors: [AppColors.primary, AppColors.primaryDark],
           ),
         ),
         padding: const EdgeInsets.all(16),
@@ -200,7 +204,8 @@ class _DoctorWelcomeCard extends StatelessWidget {
             const CircleAvatar(
               radius: 28,
               backgroundColor: Colors.white,
-              child: Icon(Icons.person, color: Color(0xFF009B3A), size: 32),
+              // Ícone usa a cor primária para reforçar a identidade visual
+              child: Icon(Icons.person, color: AppColors.primary, size: 32),
             ),
             const SizedBox(width: 14),
             Expanded(

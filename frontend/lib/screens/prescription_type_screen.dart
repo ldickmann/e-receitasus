@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/prescription_type.dart';
+import '../theme/app_colors.dart';
 import 'prescription_form_screen.dart';
 
 /// Tela de seleção do tipo de receita para o médico prescritor.
@@ -15,7 +16,8 @@ class PrescriptionTypeScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Nova Receita — Selecione o Tipo'),
-        backgroundColor: const Color(0xFF009B3A),
+        // Usa o token primário para padronizar a cor da AppBar com o tema institucional
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
       body: SingleChildScrollView(

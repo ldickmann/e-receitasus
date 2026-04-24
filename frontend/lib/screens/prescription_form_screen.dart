@@ -5,6 +5,7 @@ import '../models/prescription_model.dart';
 import '../models/prescription_type.dart';
 import '../providers/auth_provider.dart';
 import '../services/prescription_service.dart';
+import '../theme/app_colors.dart';
 import 'prescription_view_screen.dart';
 
 // ---------------------------------------------------------------------------
@@ -319,7 +320,8 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
     switch (widget.type) {
       case PrescriptionType.branca:
       case PrescriptionType.controlada:
-        return const Color(0xFF009B3A);
+        // Receitas comuns/controle especial usam o verde-menta institucional
+        return AppColors.primary;
       case PrescriptionType.amarela:
         return const Color(0xFFF9A825);
       case PrescriptionType.azul:
@@ -371,7 +373,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
               const _SectionHeader(
                 title: 'Dados do Prescritor',
                 icon: Icons.person,
-                color: Color(0xFF009B3A),
+                color: AppColors.primary,
               ),
               const SizedBox(height: 8),
               _DoctorSection(
@@ -391,7 +393,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
               const _SectionHeader(
                 title: 'Dados do Paciente',
                 icon: Icons.people,
-                color: Color(0xFF009B3A),
+                color: AppColors.primary,
               ),
               const SizedBox(height: 8),
               _PatientSection(
@@ -411,7 +413,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
               const _SectionHeader(
                 title: 'Prescrição',
                 icon: Icons.medication,
-                color: Color(0xFF009B3A),
+                color: AppColors.primary,
               ),
               const SizedBox(height: 8),
               _MedicineSection(
@@ -431,7 +433,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
                 const _SectionHeader(
                   title: 'Uso Contínuo (RDC 471/2021)',
                   icon: Icons.repeat,
-                  color: Color(0xFF009B3A),
+                  color: AppColors.primary,
                 ),
                 const SizedBox(height: 8),
                 _ContinuousUseSection(
@@ -459,7 +461,8 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
                         style: TextStyle(fontSize: 16),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF009B3A),
+                        // Botão de emissão usa a cor primária do tema
+                        backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 52),
                         shape: RoundedRectangleBorder(
@@ -1148,7 +1151,7 @@ class _ContinuousUseSection extends StatelessWidget {
           value: isContinuousUse,
           onChanged: onChanged,
           // activeThumbColor: substitui activeColor (depreciado no Flutter 3.0+)
-          activeThumbColor: const Color(0xFF009B3A),
+          activeThumbColor: AppColors.primary,
         ),
         if (isContinuousUse) ...[
           const SizedBox(height: 8),
@@ -1163,7 +1166,7 @@ class _ContinuousUseSection extends StatelessWidget {
                   divisions: 5,
                   label: '$continuousMonths meses',
                   onChanged: (v) => onMonthsChanged(v.round()),
-                  activeColor: const Color(0xFF009B3A),
+                  activeColor: AppColors.primary,
                 ),
               ),
               Text(
@@ -1171,7 +1174,7 @@ class _ContinuousUseSection extends StatelessWidget {
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  color: Color(0xFF009B3A),
+                  color: AppColors.primary,
                 ),
               ),
             ],
