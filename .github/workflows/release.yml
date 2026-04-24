@@ -28,6 +28,12 @@ jobs:
     name: Build APK e Publicar Release
     runs-on: ubuntu-latest
 
+    # Permite que o GITHUB_TOKEN crie/atualize releases e faça upload de assets.
+    # Sem 'contents: write' a action softprops/action-gh-release falha com 403
+    # ("Resource not accessible by integration") ao tentar criar a release.
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout Repository
         uses:
