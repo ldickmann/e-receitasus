@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../models/patient_search_result.dart';
 import '../models/prescription_model.dart';
@@ -968,10 +969,19 @@ class _PatientSectionState extends State<_PatientSection> {
         TextFormField(
           controller: widget.cpfCtrl,
           keyboardType: TextInputType.number,
+          // CPF tem exatamente 11 dígitos numéricos. Restringimos a entrada
+          // para apenas dígitos e bloqueamos qualquer caractere além do 11º
+          // — proteção contra colagem de strings inválidas e contra digitação
+          // acidental (ex.: usuário segurando tecla). Mantém integridade do
+          // dado antes mesmo da validação posterior.
+          inputFormatters: [
+            FilteringTextInputFormatter.digitsOnly,
+            LengthLimitingTextInputFormatter(11),
+          ],
           decoration: InputDecoration(
             labelText:
                 widget.requireCpf ? 'CPF do Paciente *' : 'CPF do Paciente',
-            hintText: '000.000.000-00',
+            hintText: '00000000000',
             border: const OutlineInputBorder(),
             prefixIcon: const Icon(Icons.credit_card),
           ),

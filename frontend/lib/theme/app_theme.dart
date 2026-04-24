@@ -64,7 +64,11 @@ class AppTheme {
         scrim: AppColors.scrim,
       ),
 
-      // Tipografia global, usando os estilos definidos em AppTextStyles
+      // Tipografia global, usando os estilos definidos em AppTextStyles.
+      // `.apply(...)` sobrescreve a cor hardcoded em AppTextStyles para
+      // garantir contraste adequado no tema CLARO (texto escuro sobre fundo
+      // claro). Sem isso, herdamos a cor padrão de AppTextStyles e podemos
+      // ter divergir entre temas.
       textTheme: const TextTheme(
         displayLarge: AppTextStyles.displayLarge,
         displayMedium: AppTextStyles.displayMedium,
@@ -81,6 +85,9 @@ class AppTheme {
         labelLarge: AppTextStyles.labelLarge,
         labelMedium: AppTextStyles.labelMedium,
         labelSmall: AppTextStyles.labelSmall,
+      ).apply(
+        bodyColor: AppColors.onSurface,
+        displayColor: AppColors.onSurface,
       ),
 
       // Estilos específicos para componentes da UI
@@ -231,7 +238,11 @@ class AppTheme {
         inversePrimary: AppColors.primary,
       ),
 
-      // Tipografia compartilhada — cores são resolvidas pelo ColorScheme
+      // Tipografia compartilhada — `.apply(...)` sobrescreve a cor hardcoded
+      // de AppTextStyles (que aponta para o onSurface do tema CLARO) pelo
+      // tom claro adequado ao dark mode. Sem isso, todos os textos do app
+      // (inclusive valores selecionados em dropdowns e textos digitados em
+      // inputs) ficavam quase invisíveis no tema escuro.
       textTheme: const TextTheme(
         displayLarge: AppTextStyles.displayLarge,
         displayMedium: AppTextStyles.displayMedium,
@@ -248,6 +259,9 @@ class AppTheme {
         labelLarge: AppTextStyles.labelLarge,
         labelMedium: AppTextStyles.labelMedium,
         labelSmall: AppTextStyles.labelSmall,
+      ).apply(
+        bodyColor: darkOnSurface,
+        displayColor: darkOnSurface,
       ),
 
       // AppBar com fundo escuro elevado — evita brilho excessivo do verde-menta
