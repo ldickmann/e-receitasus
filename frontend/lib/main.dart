@@ -67,8 +67,13 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'E-ReceitaSUS',
 
-        // Aplicação do tema oficial centralizado em AppTheme
+        // Aplicação do tema oficial centralizado em AppTheme.
+        // O `themeMode` segue a preferência do sistema operacional do usuário,
+        // alternando automaticamente entre claro e escuro — habilita conforto
+        // visual em ambientes hospitalares com baixa luminosidade.
         theme: AppTheme.lightTheme,
+        darkTheme: AppTheme.darkTheme,
+        themeMode: ThemeMode.system,
 
         // Gerenciamento de navegação
         initialRoute: '/',

@@ -50,19 +50,22 @@ class _InfoBanner extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFE3F2FD),
+        // Banner informativo usando os tokens 'info' da paleta oficial
+        color: AppColors.infoContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFF1565C0), width: 1),
+        border: Border.all(color: AppColors.info, width: 1),
       ),
       child: const Row(
         children: [
-          Icon(Icons.info_outline, color: Color(0xFF1565C0), size: 20),
+          Icon(Icons.info_outline, color: AppColors.info, size: 20),
           SizedBox(width: 10),
           Expanded(
             child: Text(
               'Selecione o tipo de receita conforme a substância prescrita '
               'e a legislação ANVISA vigente (Portaria SVS/MS 344/98).',
-              style: TextStyle(fontSize: 13, color: Color(0xFF0D47A1)),
+              // onInfoContainer assegura contraste WCAG AA sobre infoContainer
+              style:
+                  TextStyle(fontSize: 13, color: AppColors.onInfoContainer),
             ),
           ),
         ],
@@ -229,22 +232,23 @@ class _AnvisaLegalNote extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF8E1),
+        // Bloco 'Base Legal' com tokens 'warning' — destaca conteúdo regulatório
+        color: AppColors.warningContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFFFCA28)),
+        border: Border.all(color: AppColors.warning),
       ),
       child: const Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              Icon(Icons.gavel, size: 16, color: Color(0xFFF57F17)),
+              Icon(Icons.gavel, size: 16, color: AppColors.warning),
               SizedBox(width: 6),
               Text(
                 'Base Legal',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFFF57F17),
+                  color: AppColors.warning,
                   fontSize: 13,
                 ),
               ),
@@ -256,8 +260,10 @@ class _AnvisaLegalNote extends StatelessWidget {
             '• RDC ANVISA 471/2021 — Receitas de medicamentos de uso contínuo\n'
             '• RDC ANVISA 204/2017 — Notificação de Receita\n'
             '• Lei 13.021/2014 — Exercício da Farmácia',
-            style:
-                TextStyle(fontSize: 11, color: Color(0xFF5D4037), height: 1.5),
+            style: TextStyle(
+                fontSize: 11,
+                color: AppColors.onWarningContainer,
+                height: 1.5),
           ),
         ],
       ),

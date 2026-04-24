@@ -287,11 +287,12 @@ class _PrescriptionListTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final type = prescription.type;
     final isExpired = prescription.isExpired;
+    // Cores de status alinhadas à paleta oficial (AppColors.error/success)
     final statusColor = isExpired
-        ? const Color(0xFFD32F2F)
+        ? AppColors.error
         : prescription.status == 'utilizada'
             ? Colors.grey
-            : const Color(0xFF2E7D32);
+            : AppColors.success;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -441,14 +442,15 @@ class _PendingRenewalsSection extends StatelessWidget {
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    // Cor de alerta suave para destacar a fila sem alarmar
-                    color: const Color(0xFFE65100),
+                    // Cor de alerta (warning) da paleta oficial — destaca a fila
+                    // sem competir com erros (vermelho) ou sucessos (verde).
+                    color: AppColors.warning,
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
                     '${requests.length}',
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: AppColors.onWarning,
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
                     ),
@@ -509,7 +511,8 @@ class _RenewalRequestCard extends StatelessWidget {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(10),
         side: BorderSide(
-          color: const Color(0xFFE65100).withValues(alpha: 0.3),
+          // Tokens de warning da paleta oficial substituem o laranja hardcoded
+          color: AppColors.warning.withValues(alpha: 0.3),
           width: 1,
         ),
       ),
@@ -519,16 +522,16 @@ class _RenewalRequestCard extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-            // Cor laranja suave para diferenciar visualmente das receitas emitidas
-            color: const Color(0xFFFFF3E0),
+            // warningContainer (#FFE0B2) garante contraste do ícone laranja
+            color: AppColors.warningContainer,
             shape: BoxShape.circle,
             border: Border.all(
-              color: const Color(0xFFE65100).withValues(alpha: 0.4),
+              color: AppColors.warning.withValues(alpha: 0.4),
             ),
           ),
           child: const Icon(
             Icons.assignment_outlined,
-            color: Color(0xFFE65100),
+            color: AppColors.warning,
             size: 20,
           ),
         ),
@@ -556,7 +559,7 @@ class _RenewalRequestCard extends StatelessWidget {
         ),
         trailing: const Icon(
           Icons.chevron_right,
-          color: Color(0xFFE65100),
+          color: AppColors.warning,
         ),
         onTap: onTap,
       ),

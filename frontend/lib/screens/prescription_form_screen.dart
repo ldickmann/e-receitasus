@@ -1198,22 +1198,23 @@ class _LegalWarning extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF3E0),
+        // Banner de aviso legal usando os tokens 'warning' da paleta oficial
+        color: AppColors.warningContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE65100), width: 1),
+        border: Border.all(color: AppColors.warning, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.warning_amber, color: Color(0xFFE65100), size: 16),
+              Icon(Icons.warning_amber, color: AppColors.warning, size: 16),
               SizedBox(width: 6),
               Text(
                 'Aviso Legal',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFFE65100),
+                  color: AppColors.warning,
                   fontSize: 13,
                 ),
               ),
@@ -1222,8 +1223,11 @@ class _LegalWarning extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             type.legalFooter,
+            // onWarningContainer garante contraste sobre o fundo âmbar
             style: const TextStyle(
-                fontSize: 11, color: Color(0xFF5D4037), height: 1.5),
+                fontSize: 11,
+                color: AppColors.onWarningContainer,
+                height: 1.5),
           ),
         ],
       ),

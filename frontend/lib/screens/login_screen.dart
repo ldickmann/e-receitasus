@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../theme/app_colors.dart';
 import 'register_screen.dart';
 
 class LoginScreen extends StatefulWidget {
@@ -112,8 +113,10 @@ class _LoginScreenState extends State<LoginScreen> {
                   semanticLabel: 'Logo E-ReceitaSUS',
                 ),
                 const SizedBox(height: 24),
+                // Título simplificado para 'Login' conforme a nova diretriz de UX
+                // — reduz ruído cognitivo e mantém foco no formulário.
                 Text(
-                  'Acesso do Paciente / Administrador',
+                  'Login',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 22,
@@ -196,9 +199,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ElevatedButton(
                   onPressed: _handlePatientRegister,
                   style: ElevatedButton.styleFrom(
-                    // Azul secundário — identidade visual do E-ReceitaSUS
-                    backgroundColor: const Color(0xFF1565C0),
-                    foregroundColor: Colors.white,
+                    // Azul-aço secundário (#5AB4D4) da nova identidade visual
+                    // — diferencia visualmente o fluxo de cadastro do paciente
+                    // sem reintroduzir cores fora da paleta oficial.
+                    backgroundColor: AppColors.secondary,
+                    foregroundColor: AppColors.onSecondary,
                     minimumSize: const Size.fromHeight(44),
                   ),
                   child: const Text('Cadastro Usuário SUS'),
