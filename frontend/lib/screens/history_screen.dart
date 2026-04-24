@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import '../models/prescription_model.dart';
-import '../services/prescription_service.dart';
+import '../providers/prescription_provider.dart';
 import '../theme/app_colors.dart';
 import 'prescription_view_screen.dart';
 
@@ -17,7 +18,10 @@ class HistoryScreen extends StatelessWidget {
         foregroundColor: Colors.white,
       ),
       body: FutureBuilder<List<PrescriptionModel>>(
-        future: PrescriptionService().fetchPatientHistory(),
+        // Delega ao PrescriptionProvider em vez de instanciar o service diretamente —
+        // segue a arquitetura screen → provider → service do projeto e permite
+        // substituição por mock em testes unitários (TDD com Mockito).
+        future: context.read<PrescriptionProvider>().fetchPatientHistory(),
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -131,7 +135,8 @@ class _HistoryTile extends StatelessWidget {
             color: type.backgroundColor,
             shape: BoxShape.circle,
             // withValues evita perda de precisão na conversão de canal alpha
-            border: Border.all(color: type.foregroundColor.withValues(alpha: 0.3)),
+            border:
+                Border.all(color: type.foregroundColor.withValues(alpha: 0.3)),
           ),
           child: Icon(type.icon, color: type.foregroundColor, size: 20),
         ),

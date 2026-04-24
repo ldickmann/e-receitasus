@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart'; // Importação para a nova infraestrutura
 import 'providers/auth_provider.dart';
 import 'services/auth_service.dart';
+import 'services/prescription_service.dart';
+import 'providers/prescription_provider.dart';
 import 'screens/splash_screen.dart';
 import 'screens/login_screen.dart';
 import 'screens/register_screen.dart';
@@ -57,6 +59,11 @@ class MyApp extends StatelessWidget {
       providers: [
         ChangeNotifierProvider(
           create: (_) => AuthProvider(AuthService()),
+        ),
+        // Provider de histórico de receitas do paciente: desacopla HistoryScreen
+        // da instanciação direta do PrescriptionService, permitindo mocks em testes.
+        ChangeNotifierProvider(
+          create: (_) => PrescriptionProvider(PrescriptionService()),
         ),
         // Provider de renovação: utilizado pelo paciente para solicitar renovação de receitas
         ChangeNotifierProvider(
