@@ -268,7 +268,8 @@ class AppColors {
   }
 
   /// Retorna a cor com opacidade especificada
+  /// Utiliza withValues() para evitar perda de precisão
   static Color withOpacity(Color color, double opacity) {
-    return color.withOpacity(opacity);
+    return color.withValues(alpha: opacity);
   }
 }
