@@ -254,18 +254,23 @@ class _PrescriptionTypeLegend extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 8,
+      spacing: 6,
       runSpacing: 4,
       children: PrescriptionType.values.map((type) {
         return Chip(
-          avatar: Icon(type.icon, size: 14, color: type.foregroundColor),
+          avatar: Icon(type.icon, size: 12, color: type.foregroundColor),
           label: Text(
             type.displayName.split(' ').first,
-            style: TextStyle(fontSize: 11, color: type.foregroundColor),
+            style: TextStyle(fontSize: 10, color: type.foregroundColor),
           ),
           backgroundColor: type.backgroundColor,
           side: BorderSide(color: type.foregroundColor.withValues(alpha: 0.3)),
-          padding: const EdgeInsets.symmetric(horizontal: 4),
+          // Compactação agressiva para caber 4 chips na largura padrão de
+          // celulares ~360dp (Samsung A55 e similares) sem quebrar linha.
+          padding: EdgeInsets.zero,
+          labelPadding: const EdgeInsets.symmetric(horizontal: 4),
+          materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          visualDensity: const VisualDensity(horizontal: -4, vertical: -4),
         );
       }).toList(),
     );
