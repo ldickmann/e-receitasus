@@ -53,21 +53,33 @@ jobs:
         working-directory: ./frontend
 
       # Recria o key.properties a partir dos secrets — nunca
-      # versionado no repositório por conter credenciais sensíveis
+      # versionado no repositório por conter credenciais sensíveis.
+      # IMPORTANTE: passamos os secrets via env: e usamos printf com %s
+      # para evitar expansão shell de caracteres como $ na senha
+      # (ex: "$19" seria interpretado como variável posicional pelo bash,
+      # corrompendo a senha gravada no arquivo).
       - name: Criar key.properties a partir dos Secrets
+        env:
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
         run: |
-          echo "keyAlias=${{ secrets.KEY_ALIAS }}" > frontend/android/key.properties
-          echo "keyPassword=${{ secrets.KEY_PASSWORD }}" >> frontend/android/key.properties
-          echo "storePassword=${{ secrets.STORE_PASSWORD }}" >> frontend/android/key.properties
-          echo "storeFile=keystore.jks" >> frontend/android/key.properties
+          {
+            printf 'keyAlias=%s\n' "$KEY_ALIAS"
+            printf 'keyPassword=%s\n' "$KEY_PASSWORD"
+            printf 'storePassword=%s\n' "$STORE_PASSWORD"
+            printf 'storeFile=%s\n' "keystore.jks"
+          } > frontend/android/key.properties
 
       # Decodifica o keystore (armazenado em base64 no secret)
       # e o salva em android/app/ — Gradle resolve file() em signingConfigs
       # relativo ao módulo app, não ao rootProject. Salvar um nível acima
       # causa "Keystore file not found" mesmo com storeFile=keystore.jks.
       - name: Decodificar Keystore
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 --decode > frontend/android/app/keystore.jks
+          printf '%s' "$KEYSTORE_BASE64" | base64 --decode > frontend/android/app/keystore.jks
 
       # Gera o APK release assinado com as credenciais do keystore
       - name: Build APK Release
