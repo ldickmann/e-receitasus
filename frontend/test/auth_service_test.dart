@@ -223,8 +223,7 @@ void main() {
       // Verifica presença das chaves snake_case corretas
       expect(map.containsKey('birth_date'), isTrue,
           reason: 'birthDate → birth_date');
-      expect(map.containsKey('zip_code'), isTrue,
-          reason: 'zipCode → zip_code');
+      expect(map.containsKey('zip_code'), isTrue, reason: 'zipCode → zip_code');
       expect(map.containsKey('street_number'), isTrue,
           reason: 'streetNumber → street_number');
       expect(map.containsKey('address_city'), isTrue,
@@ -283,8 +282,7 @@ void main() {
           reason: 'birthState → birth_state');
       expect(map.containsKey('marital_status'), isTrue,
           reason: 'maritalStatus → marital_status');
-      expect(map.containsKey('zip_code'), isTrue,
-          reason: 'zipCode → zip_code');
+      expect(map.containsKey('zip_code'), isTrue, reason: 'zipCode → zip_code');
       expect(map.containsKey('street_number'), isTrue,
           reason: 'streetNumber → street_number');
       expect(map.containsKey('address_city'), isTrue,
@@ -335,7 +333,8 @@ void main() {
       expect(map.containsKey('social_name'), isFalse);
       expect(map.containsKey('zip_code'), isFalse);
       expect(map.containsKey('address_city'), isFalse);
-      expect(map.length, 2, reason: 'Apenas birth_date e phone devem estar presentes');
+      expect(map.length, 2,
+          reason: 'Apenas birth_date e phone devem estar presentes');
     });
   });
 }
