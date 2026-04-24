@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../theme/app_colors.dart';
 
 /// Tela de splash exibida durante inicialização do app
 ///
@@ -85,16 +86,20 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF4CAF50),
+      // Fundo segue a cor prim\u00e1ria do tema (verde-menta) para alinhar
+      // a tela de abertura com a nova identidade visual do E-ReceitaSUS.
+      backgroundColor: AppColors.primary,
       body: FadeTransition(
         opacity: _fadeAnimation,
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Ícone principal
+              // Logo institucional dentro de um cart\u00e3o branco arredondado.
+              // Substitui o antigo \u00edcone gen\u00e9rico Icons.medication para reforçar
+              // a marca E-ReceitaSUS desde o primeiro frame visualizado.
               Container(
-                padding: const EdgeInsets.all(24),
+                padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.circular(20),
@@ -106,10 +111,12 @@ class _SplashScreenState extends State<SplashScreen>
                     ),
                   ],
                 ),
-                child: const Icon(
-                  Icons.medication,
-                  size: 80,
-                  color: Color(0xFF4CAF50),
+                child: Image.asset(
+                  'assets/images/logo-e-receitasus.png',
+                  width: 120,
+                  height: 120,
+                  fit: BoxFit.contain,
+                  semanticLabel: 'Logo E-ReceitaSUS',
                 ),
               ),
               const SizedBox(height: 32),
