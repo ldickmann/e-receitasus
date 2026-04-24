@@ -1,5 +1,6 @@
 import 'dart:developer' as developer;
 
+import 'package:flutter/foundation.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/patient_search_result.dart';
 import '../models/prescription_model.dart';
@@ -20,7 +21,13 @@ class PatientSearchException implements Exception {
 }
 
 class PrescriptionService {
-  final _supabase = Supabase.instance.client;
+  // Cliente injetável para testes; em produção usa o singleton do Supabase.
+  // Mesmo padrão adotado em AuthService para permitir mocks sem inicializar
+  // o SDK em ambiente de teste.
+  final SupabaseClient _supabase;
+
+  PrescriptionService({SupabaseClient? supabaseClient})
+      : _supabase = supabaseClient ?? Supabase.instance.client;
 
   static const String _table = 'prescriptions';
 
@@ -138,10 +145,9 @@ class PrescriptionService {
     final List<dynamic> response;
     try {
       // Chamada à RPC: protegida por SECURITY DEFINER + checagem de profissional.
-      final raw = await _supabase.rpc(
-        'search_patients_for_prescription',
-        params: {'name_query': trimmed},
-      );
+      // Encapsulada em método sobrescrevível para permitir testes unitários
+      // sem precisar mockar toda a cadeia PostgrestFilterBuilder do SDK.
+      final raw = await invokeSearchPatientsRpc(trimmed);
       // RPC sempre retorna List (mesmo vazia); defensivo contra tipo inesperado.
       if (raw is! List) {
         throw const PatientSearchException(
@@ -159,6 +165,10 @@ class PrescriptionService {
       throw const PatientSearchException(
         'Não foi possível buscar pacientes no momento. Tente novamente.',
       );
+    } on PatientSearchException {
+      // Já é uma falha tipada (ex.: tipo inesperado da RPC); propaga sem
+      // re-empacotar para não mascarar a mensagem específica.
+      rethrow;
     } catch (e) {
       // Erros de rede / parsing / desconhecidos: loga sem expor a query.
       developer.log(
@@ -188,5 +198,19 @@ class PrescriptionService {
         'Resultado da busca em formato inválido.',
       );
     }
+  }
+
+  /// Seam de testabilidade: encapsula a chamada à RPC do Supabase.
+  ///
+  /// Em produção delega ao `SupabaseClient.rpc`. Testes unitários sobrescrevem
+  /// este método para devolver payloads controlados ou simular falhas, evitando
+  /// a necessidade de mockar `PostgrestFilterBuilder` (cadeia fluente complexa).
+  @protected
+  @visibleForTesting
+  Future<dynamic> invokeSearchPatientsRpc(String nameQuery) {
+    return _supabase.rpc(
+      'search_patients_for_prescription',
+      params: {'name_query': nameQuery},
+    );
   }
 }
