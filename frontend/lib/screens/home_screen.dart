@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/renewal_request_model.dart';
 import '../providers/auth_provider.dart';
+import '../providers/theme_provider.dart';
 import '../models/prescription_model.dart';
 import '../providers/renewal_provider.dart';
 import '../services/prescription_service.dart'; // Importação do novo serviço
@@ -66,6 +67,17 @@ class HomeScreen extends StatelessWidget {
         title: const Text('E-ReceitaSUS - Área do Paciente'),
         // Mantendo consistência visual com o tema definido no main.dart
         actions: [
+          // Botão de alternância de tema — sol para claro, lua para escuro
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, _) => IconButton(
+              icon: Icon(
+                themeProvider.isDark ? Icons.light_mode : Icons.dark_mode,
+                color: Colors.white,
+              ),
+              onPressed: themeProvider.toggleTheme,
+              tooltip: themeProvider.isDark ? 'Tema claro' : 'Tema escuro',
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () => _handleLogout(context),
