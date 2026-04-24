@@ -5,6 +5,7 @@ import '../models/prescription_model.dart';
 import '../models/prescription_type.dart';
 import '../providers/auth_provider.dart';
 import '../services/prescription_service.dart';
+import '../theme/app_colors.dart';
 import 'prescription_view_screen.dart';
 
 // ---------------------------------------------------------------------------
@@ -319,7 +320,8 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
     switch (widget.type) {
       case PrescriptionType.branca:
       case PrescriptionType.controlada:
-        return const Color(0xFF009B3A);
+        // Receitas comuns/controle especial usam o verde-menta institucional
+        return AppColors.primary;
       case PrescriptionType.amarela:
         return const Color(0xFFF9A825);
       case PrescriptionType.azul:
@@ -371,7 +373,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
               const _SectionHeader(
                 title: 'Dados do Prescritor',
                 icon: Icons.person,
-                color: Color(0xFF009B3A),
+                color: AppColors.primary,
               ),
               const SizedBox(height: 8),
               _DoctorSection(
@@ -391,7 +393,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
               const _SectionHeader(
                 title: 'Dados do Paciente',
                 icon: Icons.people,
-                color: Color(0xFF009B3A),
+                color: AppColors.primary,
               ),
               const SizedBox(height: 8),
               _PatientSection(
@@ -411,7 +413,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
               const _SectionHeader(
                 title: 'Prescrição',
                 icon: Icons.medication,
-                color: Color(0xFF009B3A),
+                color: AppColors.primary,
               ),
               const SizedBox(height: 8),
               _MedicineSection(
@@ -431,7 +433,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
                 const _SectionHeader(
                   title: 'Uso Contínuo (RDC 471/2021)',
                   icon: Icons.repeat,
-                  color: Color(0xFF009B3A),
+                  color: AppColors.primary,
                 ),
                 const SizedBox(height: 8),
                 _ContinuousUseSection(
@@ -459,7 +461,8 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
                         style: TextStyle(fontSize: 16),
                       ),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF009B3A),
+                        // Botão de emissão usa a cor primária do tema
+                        backgroundColor: AppColors.primary,
                         foregroundColor: Colors.white,
                         minimumSize: const Size(double.infinity, 52),
                         shape: RoundedRectangleBorder(
@@ -850,10 +853,32 @@ class _PatientSectionState extends State<_PatientSection> {
   /// FocusNode obrigatório para uso com [RawAutocomplete] e controller externo.
   final _nameFocusNode = FocusNode();
 
+  /// Evita exibir múltiplos SnackBars consecutivos quando o autocomplete
+  /// dispara várias buscas seguidas e todas falham (ex.: rede instável).
+  /// É reabilitado assim que ocorrer uma busca bem-sucedida.
+  bool _errorShown = false;
+
   @override
   void dispose() {
     _nameFocusNode.dispose();
     super.dispose();
+  }
+
+  /// Exibe SnackBar de erro de busca, agendado para o próximo frame para evitar
+  /// disparar UI durante o `optionsBuilder` do [RawAutocomplete].
+  void _showSearchError(String message) {
+    if (_errorShown) return;
+    _errorShown = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(message),
+          backgroundColor: Colors.orange.shade700,
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    });
   }
 
   @override
@@ -870,9 +895,21 @@ class _PatientSectionState extends State<_PatientSection> {
             final query = textEditingValue.text;
             if (query.trim().length < 2) return const [];
             try {
-              return await PrescriptionService().searchPatients(query.trim());
+              final results =
+                  await PrescriptionService().searchPatients(query.trim());
+              // Sucesso → reabilita SnackBar para futuras falhas.
+              _errorShown = false;
+              return results;
+            } on PatientSearchException catch (e) {
+              // Falha controlada da RPC: feedback visual ao médico, mas o campo
+              // continua editável para preenchimento manual.
+              _showSearchError(e.message);
+              return const [];
             } catch (_) {
-              // Falha silenciosa no autocomplete: o médico ainda pode digitar manualmente.
+              // Qualquer outra falha: mensagem genérica (sem detalhes técnicos).
+              _showSearchError(
+                'Erro ao buscar pacientes. Você pode digitar manualmente.',
+              );
               return const [];
             }
           },
@@ -1148,7 +1185,7 @@ class _ContinuousUseSection extends StatelessWidget {
           value: isContinuousUse,
           onChanged: onChanged,
           // activeThumbColor: substitui activeColor (depreciado no Flutter 3.0+)
-          activeThumbColor: const Color(0xFF009B3A),
+          activeThumbColor: AppColors.primary,
         ),
         if (isContinuousUse) ...[
           const SizedBox(height: 8),
@@ -1163,7 +1200,7 @@ class _ContinuousUseSection extends StatelessWidget {
                   divisions: 5,
                   label: '$continuousMonths meses',
                   onChanged: (v) => onMonthsChanged(v.round()),
-                  activeColor: const Color(0xFF009B3A),
+                  activeColor: AppColors.primary,
                 ),
               ),
               Text(
@@ -1171,7 +1208,7 @@ class _ContinuousUseSection extends StatelessWidget {
                 style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   fontSize: 16,
-                  color: Color(0xFF009B3A),
+                  color: AppColors.primary,
                 ),
               ),
             ],
@@ -1195,22 +1232,23 @@ class _LegalWarning extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFFFFF3E0),
+        // Banner de aviso legal usando os tokens 'warning' da paleta oficial
+        color: AppColors.warningContainer,
         borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: const Color(0xFFE65100), width: 1),
+        border: Border.all(color: AppColors.warning, width: 1),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Row(
             children: [
-              Icon(Icons.warning_amber, color: Color(0xFFE65100), size: 16),
+              Icon(Icons.warning_amber, color: AppColors.warning, size: 16),
               SizedBox(width: 6),
               Text(
                 'Aviso Legal',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
-                  color: Color(0xFFE65100),
+                  color: AppColors.warning,
                   fontSize: 13,
                 ),
               ),
@@ -1219,8 +1257,11 @@ class _LegalWarning extends StatelessWidget {
           const SizedBox(height: 6),
           Text(
             type.legalFooter,
+            // onWarningContainer garante contraste sobre o fundo âmbar
             style: const TextStyle(
-                fontSize: 11, color: Color(0xFF5D4037), height: 1.5),
+                fontSize: 11,
+                color: AppColors.onWarningContainer,
+                height: 1.5),
           ),
         ],
       ),

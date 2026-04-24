@@ -110,8 +110,10 @@ model Professional {
   professionalType   ProfessionalType @default(ADMINISTRATIVO)
   /// Número de registro no conselho (CRM, COREN, CRF, etc.)
   professionalId     String?
-  /// UF do conselho de classe (ex: SC)
-  professionalState  String?
+  /// UF do conselho de classe (ex: SC) — restrito a 2 caracteres no Postgres
+  /// (PBI 157 / TASK 165) para garantir consistência com o Dropdown do
+  /// frontend e impedir gravação de UFs inválidas (ex: "Santa Catarina").
+  professionalState  String?          @db.Char(2)
   /// Especialidade clínica (ex: Clínica Geral, Pediatria)
   specialty          String?
   /// CEP do endereço — 8 dígitos sem hífen

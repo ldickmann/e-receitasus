@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/prescription_model.dart';
 import '../models/prescription_type.dart';
+import '../theme/app_colors.dart';
 
 /// Renderiza visualmente uma prescrição médica digital conforme
 /// layout baseado nos modelos oficiais da ANVISA.
@@ -104,7 +105,8 @@ class PrescriptionViewScreen extends StatelessWidget {
       case PrescriptionType.azul:
         return const Color(0xFF1565C0);
       default:
-        return const Color(0xFF009B3A);
+        // Default é a cor primária do tema (verde-menta) para receitas branca/controlada
+        return AppColors.primary;
     }
   }
 
@@ -269,8 +271,9 @@ class _DocumentHeader extends StatelessWidget {
               margin: const EdgeInsets.symmetric(horizontal: 40),
               padding: const EdgeInsets.symmetric(vertical: 3),
               decoration: BoxDecoration(
-                color: const Color(0xFFD32F2F).withValues(alpha: 0.08),
-                border: Border.all(color: const Color(0xFFD32F2F)),
+                // Tokens de erro da paleta oficial — destaca o badge regulatório
+                color: AppColors.error.withValues(alpha: 0.08),
+                border: Border.all(color: AppColors.error),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: const Text(
@@ -278,7 +281,7 @@ class _DocumentHeader extends StatelessWidget {
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 10,
-                  color: Color(0xFFD32F2F),
+                  color: AppColors.error,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 0.4,
                 ),
@@ -443,16 +446,18 @@ class _BodySection extends StatelessWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: const Color(0xFF009B3A).withValues(alpha: 0.1),
+                      // Badge de uso contínuo: tom claro do verde primário (transparência 10%)
+                      color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                       border: Border.all(
-                          color: const Color(0xFF009B3A).withValues(alpha: 0.4)),
+                          color: AppColors.primary.withValues(alpha: 0.4)),
                     ),
                     child: const Text(
                       'USO CONTÍNUO — RDC ANVISA 471/2021',
                       style: TextStyle(
                         fontSize: 10,
-                        color: Color(0xFF2E7D32),
+                        // Token de sucesso — sinaliza validade contínua positiva
+                        color: AppColors.success,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
@@ -559,9 +564,11 @@ class _SignatureSection extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 12,
                   fontWeight: FontWeight.bold,
+                  // Tokens semânticos: vermelho (error) para vencida,
+                  // verde (success) para válida — sem hardcode de hex
                   color: prescription.isExpired
-                      ? const Color(0xFFD32F2F)
-                      : const Color(0xFF2E7D32),
+                      ? AppColors.error
+                      : AppColors.success,
                 ),
               ),
             ],

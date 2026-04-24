@@ -5,6 +5,7 @@ import '../models/prescription_type.dart';
 import '../models/renewal_request_model.dart';
 import '../services/prescription_service.dart';
 import '../services/renewal_service.dart';
+import '../theme/app_colors.dart';
 import 'prescription_form_screen.dart';
 
 /// Tela de emissão de renovação de prescrição pelo médico.
@@ -119,7 +120,8 @@ class _RenewalPrescriptionScreenState extends State<RenewalPrescriptionScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Renovação emitida com sucesso'),
-          backgroundColor: Color(0xFF009B3A),
+          // Cor de sucesso usando o token primário do tema
+          backgroundColor: AppColors.primary,
         ),
       );
       // Retorna para DoctorHomeScreen — o pedido some automaticamente da fila
@@ -144,7 +146,8 @@ class _RenewalPrescriptionScreenState extends State<RenewalPrescriptionScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Renovar Prescrição'),
-        backgroundColor: const Color(0xFF009B3A),
+        // AppBar usa a cor primária do tema institucional
+        backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
       body: FutureBuilder<PrescriptionModel?>(
@@ -194,7 +197,8 @@ class _RenewalPrescriptionScreenState extends State<RenewalPrescriptionScreen> {
                           style: TextStyle(fontSize: 16),
                         ),
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF009B3A),
+                          // Botão de ação crítica (emitir renovação) usa a cor primária
+                          backgroundColor: AppColors.primary,
                           foregroundColor: Colors.white,
                           minimumSize: const Size(double.infinity, 52),
                           shape: RoundedRectangleBorder(
