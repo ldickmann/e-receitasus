@@ -95,9 +95,7 @@ class _SplashScreenState extends State<SplashScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Logo institucional dentro de um cart\u00e3o branco arredondado.
-              // Substitui o antigo \u00edcone gen\u00e9rico Icons.medication para reforçar
-              // a marca E-ReceitaSUS desde o primeiro frame visualizado.
+              // Ícone principal
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(

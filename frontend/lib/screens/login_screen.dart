@@ -86,6 +86,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
+      // Fundo branco puro: maximiza contraste dos campos do formulário
+      // e reforça a hierarquia visual (logo + AppBar verde-menta + card branco).
+      backgroundColor: Colors.white,
       appBar: AppBar(
         title: const Text('App E-ReceitaSUS'),
       ),

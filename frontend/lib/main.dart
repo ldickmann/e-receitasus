@@ -18,6 +18,7 @@ import 'models/prescription_type.dart';
 import 'services/renewal_service.dart';
 import 'providers/renewal_provider.dart';
 import 'providers/triage_provider.dart';
+import 'theme/app_theme.dart';
 
 /// Ponto de entrada da aplicação E-ReceitaSUS
 ///
@@ -46,10 +47,10 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Definição da identidade visual do projeto conforme o PRD
-    const corVerdePrincipal = Color(0xFF4CAF50);
-    const corAzulSecundaria = Color(0xFF1565C0);
-
+    // O tema oficial vive em `AppTheme.lightTheme`, que utiliza a paleta
+    // centralizada em `AppColors` (verde-menta #43C59E + azul-aço #5AB4D4).
+    // Mantemos a definição em um único lugar para evitar divergência visual
+    // entre AppBars, botões e cards — conforme a nova identidade do logo.
     return MultiProvider(
       // Configuração centralizada de estado (Provider Pattern)
       providers: [
@@ -66,51 +67,8 @@ class MyApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         title: 'E-ReceitaSUS',
 
-        // Configuração do tema Material Design 3 otimizado para acessibilidade no SUS
-        theme: ThemeData(
-          useMaterial3: true,
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: corVerdePrincipal,
-            primary: corVerdePrincipal,
-            secondary: corAzulSecundaria,
-            brightness: Brightness.light,
-          ),
-
-          // Customização de componentes UI
-          appBarTheme: const AppBarTheme(
-            backgroundColor: corVerdePrincipal,
-            foregroundColor: Colors.white,
-            centerTitle: true,
-            elevation: 2,
-          ),
-
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: corVerdePrincipal,
-              foregroundColor: Colors.white,
-              minimumSize: const Size(double.infinity, 50),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
-              ),
-            ),
-          ),
-
-          inputDecorationTheme: InputDecorationTheme(
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            filled: true,
-            fillColor: Colors.grey[100],
-          ),
-
-          // Flutter 3.41+ exige CardThemeData (antes era CardTheme) na propriedade cardTheme do ThemeData
-          cardTheme: CardThemeData(
-            elevation: 2,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-          ),
-        ),
+        // Aplicação do tema oficial centralizado em AppTheme
+        theme: AppTheme.lightTheme,
 
         // Gerenciamento de navegação
         initialRoute: '/',
