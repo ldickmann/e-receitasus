@@ -8,6 +8,7 @@ import '../services/prescription_service.dart'; // Importação do novo serviço
 import '../widgets/prescription_card.dart';
 import 'history_screen.dart';
 import 'prescription_view_screen.dart';
+import 'renewal_tracking_screen.dart';
 import 'request_renewal_screen.dart';
 
 /// Tela Inicial do Paciente
@@ -35,8 +36,17 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  void _handleTrack() {
-    debugPrint('Ação de Rastrear Receita acionada');
+  /// Navega para a tela de rastreamento de pedidos de renovação.
+  ///
+  /// Usa [MaterialPageRoute] em vez de rota nomeada para evitar dependência
+  /// de contexto de argumento — a tela lê o [RenewalProvider] diretamente.
+  void _handleTrack(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const RenewalTrackingScreen(),
+      ),
+    );
   }
 
   void _handleHistory(BuildContext context) {
@@ -106,7 +116,8 @@ class HomeScreen extends StatelessWidget {
               const SizedBox(height: 10),
 
               OutlinedButton.icon(
-                onPressed: _handleTrack,
+                // Passa o contexto para permitir a navegação via Navigator
+                onPressed: () => _handleTrack(context),
                 icon: const Icon(Icons.track_changes),
                 label: const Text('Rastrear Status do Pedido'),
               ),
