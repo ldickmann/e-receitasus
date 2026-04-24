@@ -20,7 +20,28 @@ class PatientSearchException implements Exception {
   String toString() => 'PatientSearchException: $message';
 }
 
-class PrescriptionService {
+// ---------------------------------------------------------------------------
+// Interface abstrata — obrigatória para injeção de dependência e TDD (Mockito)
+// ---------------------------------------------------------------------------
+
+/// Contrato da camada de acesso a dados de prescrições para o paciente.
+///
+/// Toda comunicação ocorre via Supabase SDK diretamente — sem passar pelo
+/// backend Express. O controle de acesso é garantido pelas políticas RLS.
+///
+/// Implementação concreta: [PrescriptionService].
+/// Mock de teste: gerado pelo `@GenerateMocks([IPrescriptionService])` via Mockito.
+abstract class IPrescriptionService {
+  /// Lista o histórico completo de receitas do paciente autenticado.
+  ///
+  /// Usa `currentUser?.id` internamente — nenhum `patientId` é aceito como
+  /// parâmetro externo para evitar falsificação de identidade (LGPD).
+  /// O RLS do Supabase valida que apenas registros do próprio paciente
+  /// são retornados antes de chegar ao app.
+  Future<List<PrescriptionModel>> fetchPatientHistory();
+}
+
+class PrescriptionService implements IPrescriptionService {
   // Cliente injetável para testes; em produção usa o singleton do Supabase.
   // Mesmo padrão adotado em AuthService para permitir mocks sem inicializar
   // o SDK em ambiente de teste.
@@ -90,6 +111,7 @@ class PrescriptionService {
   }
 
   /// Lista histórico completo de receitas do paciente (sem stream).
+  @override
   Future<List<PrescriptionModel>> fetchPatientHistory() async {
     final myId = _supabase.auth.currentUser?.id;
     if (myId == null) return [];

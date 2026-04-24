@@ -17,12 +17,10 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:mockito/mockito.dart';
 import 'package:provider/provider.dart';
 
 import 'package:e_receitasus/models/renewal_request_model.dart';
 import 'package:e_receitasus/models/user_model.dart';
-import 'package:e_receitasus/models/professional_type.dart';
 import 'package:e_receitasus/providers/renewal_provider.dart';
 import 'package:e_receitasus/screens/renewal_tracking_screen.dart';
 import 'package:e_receitasus/services/renewal_service.dart';
