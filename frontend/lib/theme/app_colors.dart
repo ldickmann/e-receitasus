@@ -2,14 +2,17 @@ import 'package:flutter/material.dart';
 
 /// Paleta de cores da aplicação E-ReceitaSUS
 ///
+/// Atualizada com a nova identidade visual baseada no gradiente da logo:
+/// verde-menta (#43C59E) → azul-aço (#5AB4D4)
+///
 /// Define todas as cores utilizadas seguindo:
 /// - Material Design 3 (ColorScheme)
-/// - Identidade Visual do SUS (verde #009B3A)
-/// - Acessibilidade WCAG 2.1 AAA (contraste mínimo 7:1)
+/// - Nova identidade visual E-ReceitaSUS (gradiente menta→azul)
+/// - Acessibilidade WCAG 2.1 AA (contraste mínimo 4.5:1)
 ///
 /// **Cores Principais:**
-/// - Primary: Verde SUS (#009B3A)
-/// - Secondary: Azul Saúde (#0075C9)
+/// - Primary: Verde-menta (#43C59E) — topo esquerdo do gradiente da logo
+/// - Secondary: Azul-aço (#5AB4D4) — base direita do gradiente da logo
 /// - Tertiary: Amarelo Atenção (#FFC107)
 /// - Error: Vermelho Erro (#D32F2F)
 ///
@@ -28,41 +31,51 @@ class AppColors {
   AppColors._();
 
   // ==========================================================================
-  // CORES PRIMÁRIAS (Primary) - Verde SUS
+  // CORES PRIMÁRIAS (Primary) - Verde-menta (identidade visual da logo)
   // ==========================================================================
 
-  /// Cor primária da aplicação - Verde SUS
-  /// Contraste com branco: 4.89:1 (AA Large)
-  static const Color primary = Color(0xFF009B3A);
+  /// Cor primária — Verde-menta derivado do gradiente da nova logo
+  /// Contraste com [onPrimary] (#003D26): 5.77:1 (WCAG AA ✓)
+  static const Color primary = Color(0xFF43C59E);
+
+  /// Variante escura da cor primária para estados hover/pressed e
+  /// superfícies que exigem maior contraste visual
+  static const Color primaryDark = Color(0xFF2BA882);
 
   /// Cor do texto/ícones sobre a cor primária
-  /// Branco com alto contraste
-  static const Color onPrimary = Color(0xFFFFFFFF);
+  /// Verde escuro para atingir contraste WCAG AA (5.77:1) sobre o verde-menta
+  static const Color onPrimary = Color(0xFF003D26);
 
   /// Container/Surface com tom primário
-  /// Tom mais claro do verde para cards e containers
-  static const Color primaryContainer = Color(0xFFA8E6C1);
+  /// Tom pastel do verde-menta para cards e containers
+  static const Color primaryContainer = Color(0xFFB8F0DF);
 
   /// Texto sobre primaryContainer
-  /// Verde escuro para máximo contraste
-  static const Color onPrimaryContainer = Color(0xFF00411A);
+  /// Verde muito escuro para contraste mínimo de 7:1 (WCAG AAA)
+  static const Color onPrimaryContainer = Color(0xFF002117);
 
   // ==========================================================================
-  // CORES SECUNDÁRIAS (Secondary) - Azul Saúde
+  // CORES SECUNDÁRIAS (Secondary) - Azul-aço (identidade visual da logo)
   // ==========================================================================
 
-  /// Cor secundária - Azul institucional da saúde
-  /// Usada em elementos de apoio e informação
-  static const Color secondary = Color(0xFF0075C9);
+  /// Cor secundária — Azul-aço derivado do gradiente da nova logo
+  /// Usada em elementos de apoio, informação e detalhes visuais
+  /// Contraste com [onSecondary] (#003547): 5.63:1 (WCAG AA ✓)
+  static const Color secondary = Color(0xFF5AB4D4);
+
+  /// Variante escura da cor secundária para estados hover/pressed e
+  /// superfícies que exigem maior contraste visual
+  static const Color secondaryDark = Color(0xFF3A95B5);
 
   /// Cor do texto/ícones sobre a cor secundária
-  static const Color onSecondary = Color(0xFFFFFFFF);
+  /// Azul escuro para atingir contraste WCAG AA (5.63:1) sobre o azul-aço
+  static const Color onSecondary = Color(0xFF003547);
 
   /// Container/Surface com tom secundário
-  static const Color secondaryContainer = Color(0xFFB3E5FC);
+  static const Color secondaryContainer = Color(0xFFC9E8F5);
 
   /// Texto sobre secondaryContainer
-  static const Color onSecondaryContainer = Color(0xFF003D5C);
+  static const Color onSecondaryContainer = Color(0xFF001F2A);
 
   // ==========================================================================
   // CORES TERCIÁRIAS (Tertiary) - Amarelo Atenção
@@ -195,8 +208,8 @@ class AppColors {
   /// Texto sobre inverseSurface
   static const Color onInverseSurface = Color(0xFFF4EFF4);
 
-  /// Cor primária inversa
-  static const Color inversePrimary = Color(0xFF7CDB9A);
+  /// Cor primária inversa — tom claro do verde-menta para uso em superfícies escuras
+  static const Color inversePrimary = Color(0xFF6FDBBF);
 
   // ==========================================================================
   // CORES ESPECÍFICAS DO DOMÍNIO (SUS/Receitas)
@@ -221,18 +234,19 @@ class AppColors {
   // GRADIENTES
   // ==========================================================================
 
-  /// Gradiente principal (Verde SUS)
+  /// Gradiente da identidade visual — Verde-menta → Azul-aço
+  /// Replica o gradiente presente na nova logo do E-ReceitaSUS
   static const LinearGradient primaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF009B3A), Color(0xFF00732D)],
+    colors: [Color(0xFF43C59E), Color(0xFF5AB4D4)],
   );
 
-  /// Gradiente secundário (Azul Saúde)
+  /// Gradiente com variantes escuras — para superfícies que exigem maior contraste
   static const LinearGradient secondaryGradient = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
-    colors: [Color(0xFF0075C9), Color(0xFF005691)],
+    colors: [Color(0xFF2BA882), Color(0xFF3A95B5)],
   );
 
   // ==========================================================================
