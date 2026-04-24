@@ -369,9 +369,13 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
-    final professionalIdRaw = _professionalIdController.text.trim();
-    final professionalId = professionalType.extractNumber(professionalIdRaw);
-    final professionalState = professionalType.extractState(professionalIdRaw);
+    // PBI 157 / TASK 164 — Número do registro vai puro (sem sufixo "-UF"),
+    // pois a UF agora vem do Dropdown dedicado `_selectedCouncilState`.
+    // Para profissionais sem conselho (ADMINISTRATIVO/OUTROS) o dropdown não
+    // é renderizado e o valor permanece nulo, comportamento esperado pelo
+    // backend (coluna `professionalState` é opcional).
+    final professionalId = _professionalIdController.text.trim();
+    final professionalState = _selectedCouncilState;
 
     final success = await authProvider.registerWithProfessionalInfo(
       firstName: _firstNameController.text.trim(),

@@ -96,10 +96,25 @@ enum ProfessionalType {
     return null;
   }
 
+  /// Extrai apenas o número do registro descartando o sufixo de UF.
+  ///
+  /// @deprecated PBI 157 / TASK 164 — a UF passou a ser coletada em um
+  /// `DropdownButtonFormField` separado em `register_screen.dart`, então o
+  /// usuário já digita apenas o número. Mantido temporáriamente para não
+  /// quebrar importérios externos; remover quando nenhum chamador restar.
+  @Deprecated(
+      'Use o valor direto do controller; UF vem do dropdown _selectedCouncilState (PBI 157).')
   String extractNumber(String registration) {
     return registration.replaceAll(RegExp(r'[-/\s][A-Za-z]{2}$'), '').trim();
   }
 
+  /// Extrai a sigla da UF do final da string de registro.
+  ///
+  /// @deprecated PBI 157 / TASK 164 — substituído por seleção explícita em
+  /// dropdown na tela de cadastro. Parsing por regex era frágil (aceitava
+  /// UFs inválidas se a regex casasse) e impedia validador robusto.
+  @Deprecated(
+      'Use _selectedCouncilState do formulário em vez de parsing de string (PBI 157).')
   String? extractState(String registration) {
     final match = RegExp(r'[-/\s]([A-Za-z]{2})$').firstMatch(registration);
     return match?.group(1)?.toUpperCase();
