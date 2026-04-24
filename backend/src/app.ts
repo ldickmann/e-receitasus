@@ -17,9 +17,32 @@ export const app = express();
 // inclusive preflight CORS (OPTIONS) e respostas 4xx/5xx.
 app.use(requestLogger);
 
-// CORS aberto: o frontend Flutter roda em portas dinamicas durante o desenvolvimento.
-// Em producao, restringir origins via variavel de ambiente.
-app.use(cors());
+// Lê as origens permitidas da variável de ambiente ALLOWED_ORIGINS (separadas por vírgula).
+// Em produção, ALLOWED_ORIGINS deve conter apenas os domínios do frontend autorizado.
+// Em desenvolvimento, se a variável não for definida, nenhuma origem é permitida por padrão —
+// força o desenvolvedor a configurar explicitamente, evitando CORS aberto em staging/produção
+// (OWASP A05:2021 — Security Misconfiguration).
+const allowedOrigins = (process.env.ALLOWED_ORIGINS ?? '')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    /** Valida cada requisição cross-origin contra a lista de origens configurada. */
+    origin: (origin, callback) => {
+      // Requisições sem `Origin` (ex: Postman, curl, server-to-server) são permitidas
+      // para não bloquear testes locais e chamadas de ferramentas internas.
+      if (!origin || allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      // Origem não autorizada — rejeita sem expor detalhes internos
+      callback(new Error('CORS: origem não autorizada'));
+    },
+    // Necessário para cookies/tokens em requisições cross-origin autenticadas
+    credentials: true,
+  })
+);
 
 // Parse de JSON nas requisicoes
 app.use(express.json());
