@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/renewal_request_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/triage_provider.dart';
+import '../providers/theme_provider.dart';
 import '../theme/app_colors.dart';
 
 /// Tela inicial do Enfermeiro — ponto de entrada para o fluxo de triagem
@@ -35,6 +36,16 @@ class NurseHomeScreen extends StatelessWidget {
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.onPrimary,
         actions: [
+          // Botão de alternância de tema — sol para claro, lua para escuro
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, _) => IconButton(
+              icon: Icon(
+                themeProvider.isDark ? Icons.light_mode : Icons.dark_mode,
+              ),
+              onPressed: themeProvider.toggleTheme,
+              tooltip: themeProvider.isDark ? 'Tema claro' : 'Tema escuro',
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout),
             onPressed: () => _handleLogout(context),

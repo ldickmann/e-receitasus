@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart'; // Importação para a nova infraestrutura
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'providers/auth_provider.dart';
 import 'services/auth_service.dart';
 import 'services/prescription_service.dart';
@@ -26,6 +26,7 @@ import 'models/renewal_request_model.dart';
 import 'services/renewal_service.dart';
 import 'providers/renewal_provider.dart';
 import 'providers/triage_provider.dart';
+import 'providers/theme_provider.dart';
 import 'theme/app_theme.dart';
 
 /// Ponto de entrada da aplicação E-ReceitaSUS
@@ -62,6 +63,8 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       // Configuração centralizada de estado (Provider Pattern)
       providers: [
+        // Provider de tema: controla alternância light/dark pelo usuário
+        ChangeNotifierProvider(create: (_) => ThemeProvider()),
         ChangeNotifierProvider(
           create: (_) => AuthProvider(AuthService()),
         ),
@@ -76,86 +79,88 @@ class MyApp extends StatelessWidget {
         // Provider de triagem: utilizado pelo enfermeiro para aprovar ou rejeitar pedidos
         ChangeNotifierProvider(create: (_) => TriageProvider(RenewalService())),
       ],
-      child: MaterialApp(
-        debugShowCheckedModeBanner: false,
-        title: 'E-ReceitaSUS',
+      // Consumer cirúrgico: só reconstrói o MaterialApp quando o tema muda,
+      // sem afetar a árvore de providers acima nem os filhos da navegação.
+      child: Consumer<ThemeProvider>(
+        builder: (context, themeProvider, _) => MaterialApp(
+          debugShowCheckedModeBanner: false,
+          title: 'E-ReceitaSUS',
 
-        // Aplicação do tema oficial centralizado em AppTheme.
-        // O `themeMode` segue a preferência do sistema operacional do usuário,
-        // alternando automaticamente entre claro e escuro — habilita conforto
-        // visual em ambientes hospitalares com baixa luminosidade.
-        theme: AppTheme.lightTheme,
-        darkTheme: AppTheme.darkTheme,
-        themeMode: ThemeMode.system,
+          // ThemeMode controlado pelo ThemeProvider — o usuário pode alternar via
+          // botão de sol/lua na AppBar. Inicia em ThemeMode.system (preferência do SO).
+          theme: AppTheme.lightTheme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: themeProvider.themeMode,
 
-        // Gerenciamento de navegação
-        initialRoute: '/',
-        routes: {
-          '/': (context) => const SplashScreen(),
-          '/login': (context) => const LoginScreen(),
-          '/register': (context) => const RegisterScreen(),
-          // Rota dedicada ao cadastro de pacientes — fluxo separado do cadastro profissional
-          '/register_patient': (context) => const PatientRegisterScreen(),
-          '/home': (context) => const HomeScreen(),
-          '/doctor_home': (context) => const DoctorHomeScreen(),
-          '/nurse_home': (context) => const NurseHomeScreen(),
-          '/history': (context) => const HistoryScreen(),
-          '/new_prescription': (context) => const PrescriptionTypeScreen(),
-          '/prescription_form_branca': (context) =>
-              const PrescriptionFormScreen(type: PrescriptionType.branca),
-          '/prescription_form_controlada': (context) =>
-              const PrescriptionFormScreen(type: PrescriptionType.controlada),
-          '/prescription_form_amarela': (context) =>
-              const PrescriptionFormScreen(type: PrescriptionType.amarela),
-          '/prescription_form_azul': (context) =>
-              const PrescriptionFormScreen(type: PrescriptionType.azul),
-          // Rota de solicitação de renovação de receita — perfil paciente
-          '/request_renewal': (context) => const RequestRenewalScreen(),
-          // Rota de rastreamento de pedidos de renovação — perfil paciente
-          '/renewal_tracking': (context) => const RenewalTrackingScreen(),
-        },
+          // Gerenciamento de navegação
+          initialRoute: '/',
+          routes: {
+            '/': (context) => const SplashScreen(),
+            '/login': (context) => const LoginScreen(),
+            '/register': (context) => const RegisterScreen(),
+            // Rota dedicada ao cadastro de pacientes — fluxo separado do cadastro profissional
+            '/register_patient': (context) => const PatientRegisterScreen(),
+            '/home': (context) => const HomeScreen(),
+            '/doctor_home': (context) => const DoctorHomeScreen(),
+            '/nurse_home': (context) => const NurseHomeScreen(),
+            '/history': (context) => const HistoryScreen(),
+            '/new_prescription': (context) => const PrescriptionTypeScreen(),
+            '/prescription_form_branca': (context) =>
+                const PrescriptionFormScreen(type: PrescriptionType.branca),
+            '/prescription_form_controlada': (context) =>
+                const PrescriptionFormScreen(type: PrescriptionType.controlada),
+            '/prescription_form_amarela': (context) =>
+                const PrescriptionFormScreen(type: PrescriptionType.amarela),
+            '/prescription_form_azul': (context) =>
+                const PrescriptionFormScreen(type: PrescriptionType.azul),
+            // Rota de solicitação de renovação de receita — perfil paciente
+            '/request_renewal': (context) => const RequestRenewalScreen(),
+            // Rota de rastreamento de pedidos de renovação — perfil paciente
+            '/renewal_tracking': (context) => const RenewalTrackingScreen(),
+          },
 
-        // Rotas com argumentos obrigatórios não podem usar construtor vazio no mapa
-        // estático — usamos onGenerateRoute para extrair os argumentos em runtime
-        // e passá-los ao construtor correto de cada tela.
-        onGenerateRoute: (settings) {
-          switch (settings.name) {
-            case '/prescription_view':
-              // Recebe PrescriptionModel para renderizar a receita conforme modelo ANVISA
-              final prescription = settings.arguments as PrescriptionModel;
-              return MaterialPageRoute(
-                builder: (_) =>
-                    PrescriptionViewScreen(prescription: prescription),
-              );
-            case '/renewal_prescription':
-              // Recebe RenewalRequestModel para pré-preencher o formulário de renovação
-              final request = settings.arguments as RenewalRequestModel;
-              return MaterialPageRoute(
-                builder: (_) => RenewalPrescriptionScreen(request: request),
-              );
-            case '/triage_detail':
-              // Recebe RenewalRequestModel para exibir os detalhes do pedido ao enfermeiro
-              final request = settings.arguments as RenewalRequestModel;
-              return MaterialPageRoute(
-                builder: (_) => TriageDetailScreen(request: request),
-              );
-            default:
-              // Retorna null para delegar ao onUnknownRoute abaixo
-              return null;
-          }
-        },
+          // Rotas com argumentos obrigatórios não podem usar construtor vazio no mapa
+          // estático — usamos onGenerateRoute para extrair os argumentos em runtime
+          // e passá-los ao construtor correto de cada tela.
+          onGenerateRoute: (settings) {
+            switch (settings.name) {
+              case '/prescription_view':
+                // Recebe PrescriptionModel para renderizar a receita conforme modelo ANVISA
+                final prescription = settings.arguments as PrescriptionModel;
+                return MaterialPageRoute(
+                  builder: (_) =>
+                      PrescriptionViewScreen(prescription: prescription),
+                );
+              case '/renewal_prescription':
+                // Recebe RenewalRequestModel para pré-preencher o formulário de renovação
+                final request = settings.arguments as RenewalRequestModel;
+                return MaterialPageRoute(
+                  builder: (_) => RenewalPrescriptionScreen(request: request),
+                );
+              case '/triage_detail':
+                // Recebe RenewalRequestModel para exibir os detalhes do pedido ao enfermeiro
+                final request = settings.arguments as RenewalRequestModel;
+                return MaterialPageRoute(
+                  builder: (_) => TriageDetailScreen(request: request),
+                );
+              default:
+                // Retorna null para delegar ao onUnknownRoute abaixo
+                return null;
+            }
+          },
 
-        // Fallback de segurança para rotas inexistentes
-        onUnknownRoute: (settings) {
-          return MaterialPageRoute(
-            builder: (context) => Scaffold(
-              appBar: AppBar(title: const Text('Erro')),
-              body: const Center(
-                child: Text('Página não encontrada'),
+          // Fallback de segurança para rotas inexistentes
+          onUnknownRoute: (settings) {
+            return MaterialPageRoute(
+              builder: (context) => Scaffold(
+                appBar: AppBar(title: const Text('Erro')),
+                body: const Center(
+                  child: Text('Página não encontrada'),
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

@@ -6,9 +6,9 @@ import '../models/renewal_request_model.dart';
 import '../providers/auth_provider.dart';
 import '../services/prescription_service.dart';
 import '../services/renewal_service.dart';
+import '../providers/theme_provider.dart';
 import '../theme/app_colors.dart';
 import 'prescription_type_screen.dart';
-
 
 /// Tela principal para profissionais de saúde (médicos, dentistas, etc.).
 ///
@@ -39,6 +39,17 @@ class DoctorHomeScreen extends StatelessWidget {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [
+          // Botão de alternância de tema — sol para claro, lua para escuro
+          Consumer<ThemeProvider>(
+            builder: (context, themeProvider, _) => IconButton(
+              icon: Icon(
+                themeProvider.isDark ? Icons.light_mode : Icons.dark_mode,
+                color: Colors.white,
+              ),
+              onPressed: themeProvider.toggleTheme,
+              tooltip: themeProvider.isDark ? 'Tema claro' : 'Tema escuro',
+            ),
+          ),
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white),
             onPressed: () => _handleLogout(context),
@@ -310,10 +321,11 @@ class _PrescriptionListTile extends StatelessWidget {
           width: 44,
           height: 44,
           decoration: BoxDecoration(
-              color: _typeColor,
-              shape: BoxShape.circle,
-              border: Border.all(color: type.foregroundColor.withValues(alpha: 0.3)),
-            ),
+            color: _typeColor,
+            shape: BoxShape.circle,
+            border:
+                Border.all(color: type.foregroundColor.withValues(alpha: 0.3)),
+          ),
           child: Icon(type.icon, color: type.foregroundColor, size: 20),
         ),
         title: Text(
