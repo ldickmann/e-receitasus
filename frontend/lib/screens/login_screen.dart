@@ -98,6 +98,17 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
+                // Logo institucional do E-ReceitaSUS — reforça identidade visual
+                // antes do título de acesso. `Image.asset` é carregada de forma
+                // síncrona pois o asset está embarcado no bundle (pubspec.yaml).
+                Image.asset(
+                  'assets/images/logo-e-receitasus.png',
+                  height: 140,
+                  fit: BoxFit.contain,
+                  // semanticLabel garante acessibilidade para leitores de tela
+                  semanticLabel: 'Logo E-ReceitaSUS',
+                ),
+                const SizedBox(height: 24),
                 Text(
                   'Acesso do Paciente / Administrador',
                   textAlign: TextAlign.center,
