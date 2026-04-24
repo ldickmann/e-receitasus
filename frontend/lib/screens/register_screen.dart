@@ -541,18 +541,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             TextFormField(
                               controller: _professionalIdController,
                               keyboardType: TextInputType.text,
-                              textCapitalization:
-                                  TextCapitalization.characters,
+                              textCapitalization: TextCapitalization.characters,
                               decoration: InputDecoration(
                                 // Label/hint deixam claro que o campo recebe
                                 // APENAS o número do registro. A UF é coletada
                                 // no Dropdown imediatamente abaixo (TASK 163).
                                 labelText:
                                     'Número do ${_selectedProfessionalType!.councilName}',
-                                hintText: _selectedProfessionalType!
-                                        .requiresCouncil
-                                    ? 'Ex: 123456'
-                                    : 'Ex: MAT-2024-001',
+                                hintText:
+                                    _selectedProfessionalType!.requiresCouncil
+                                        ? 'Ex: 123456'
+                                        : 'Ex: MAT-2024-001',
                                 border: const OutlineInputBorder(),
                                 prefixIcon: const Icon(Icons.badge),
                                 helperText: 'Campo obrigatorio',
@@ -605,7 +604,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                                 // mas a guarda extra protege contra mudanças
                                 // futuras de fluxo.
                                 validator: (value) {
-                                  if (_selectedProfessionalType?.requiresCouncil !=
+                                  if (_selectedProfessionalType
+                                          ?.requiresCouncil !=
                                       true) {
                                     return null;
                                   }
