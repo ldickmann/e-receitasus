@@ -110,7 +110,11 @@ class _SplashScreenState extends State<SplashScreen>
                   ],
                 ),
                 child: Image.asset(
-                  'assets/images/logo-e-receitasus.png',
+                  // Ícone oficial do app, alinhado ao launcher icon configurado
+                  // em `flutter_launcher_icons` (pubspec.yaml). Manter o mesmo
+                  // arquivo na splash garante coerência visual entre o atalho
+                  // do dispositivo e a tela de abertura.
+                  'assets/icons/app_icon.jpg',
                   width: 120,
                   height: 120,
                   fit: BoxFit.contain,
