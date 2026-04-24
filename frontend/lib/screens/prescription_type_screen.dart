@@ -114,7 +114,7 @@ class _PrescriptionTypeCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: type.foregroundColor.withOpacity(0.1),
+                  color: type.foregroundColor.withValues(alpha: 0.1),
                   shape: BoxShape.circle,
                   border: Border.all(color: _borderColor),
                 ),
@@ -138,7 +138,7 @@ class _PrescriptionTypeCard extends StatelessWidget {
                       type.description,
                       style: TextStyle(
                         fontSize: 12,
-                        color: type.foregroundColor.withOpacity(0.75),
+                        color: type.foregroundColor.withValues(alpha: 0.75),
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -172,7 +172,7 @@ class _PrescriptionTypeCard extends StatelessWidget {
               Icon(
                 Icons.arrow_forward_ios,
                 size: 16,
-                color: type.foregroundColor.withOpacity(0.5),
+                color: type.foregroundColor.withValues(alpha: 0.5),
               ),
             ],
           ),
@@ -201,16 +201,17 @@ class _Badge extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: borderColor.withOpacity(0.6)),
+        border: Border.all(color: borderColor.withValues(alpha: 0.6)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 11, color: textColor.withOpacity(0.7)),
+          Icon(icon, size: 11, color: textColor.withValues(alpha: 0.7)),
           const SizedBox(width: 3),
           Text(
             label,
-            style: TextStyle(fontSize: 11, color: textColor.withOpacity(0.8)),
+            style: TextStyle(
+                fontSize: 11, color: textColor.withValues(alpha: 0.8)),
           ),
         ],
       ),
@@ -253,7 +254,8 @@ class _AnvisaLegalNote extends StatelessWidget {
             '• RDC ANVISA 471/2021 — Receitas de medicamentos de uso contínuo\n'
             '• RDC ANVISA 204/2017 — Notificação de Receita\n'
             '• Lei 13.021/2014 — Exercício da Farmácia',
-            style: TextStyle(fontSize: 11, color: Color(0xFF5D4037), height: 1.5),
+            style:
+                TextStyle(fontSize: 11, color: Color(0xFF5D4037), height: 1.5),
           ),
         ],
       ),

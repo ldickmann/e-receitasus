@@ -485,7 +485,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<ProfessionalType>(
-                  value: _selectedProfessionalType,
+                  initialValue: _selectedProfessionalType,
                   decoration: const InputDecoration(
                     labelText: 'Tipo de Profissional',
                     border: OutlineInputBorder(),
@@ -730,7 +730,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                     Flexible(
                       flex: 2,
                       child: DropdownButtonFormField<String>(
-                        value: _addressState,
+                        initialValue: _addressState,
                         decoration: const InputDecoration(
                           labelText: 'UF',
                           border: OutlineInputBorder(),

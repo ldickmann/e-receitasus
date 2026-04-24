@@ -97,7 +97,8 @@ class AppTheme {
             AppTextStyles.titleLarge.copyWith(color: AppColors.onPrimary),
       ),
 
-      cardTheme: CardTheme(
+      // Flutter 3.41+ exige CardThemeData (antes era CardTheme) na propriedade cardTheme do ThemeData
+      cardTheme: CardThemeData(
         elevation: 1,
         color: AppColors.surface,
         surfaceTintColor: Colors

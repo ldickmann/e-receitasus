@@ -33,12 +33,24 @@ if (keyPropertiesFile.exists()) {
 
 android {
     namespace = "br.com.e_receitasus"
-    compileSdk = flutter.compileSdkVersion
+    // Fixado explicitamente em 36: androidx.browser:1.9.0 e androidx.core:1.17.0 exigem
+    // compileSdk >= 36. AGP 8.10.1 é o primeiro a suportar SDK 36 (max API 36).
+    // AGP 8.9.x suportava apenas até SDK 35, por isso o upgrade foi necessário.
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_1_8
-        targetCompatibility = JavaVersion.VERSION_1_8
+        // Java 17 alinhado com kotlinOptions abaixo. AGP 8.10.x + Gradle 8.11.1
+        // usam JDK 17 no CI (setup-java temurin 17), e misturar 1.8 com Kotlin 17
+        // causa "Inconsistent JVM-target compatibility" e falha em compileReleaseKotlin.
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        // Deve ser igual ao targetCompatibility acima para evitar incompatibilidade
+        // entre compileReleaseJavaWithJavac e compileReleaseKotlin.
+        jvmTarget = "17"
     }
 
     // Define a configuração de assinatura para o build de release
@@ -53,8 +65,14 @@ android {
 
     defaultConfig {
         applicationId = "br.com.e_receitasus"
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // flutter_secure_storage 9.x usa EncryptedSharedPreferences (Android Keystore),
+        // que exige minSdk 23. Sobrescrevemos o default do Flutter (21) para evitar
+        // falha em :app:checkReleaseAarMetadata durante o build de release.
+        minSdk = 23
+        // Alinhado com compileSdk = 36 — targetSdk pode ser mantido em 35
+        // por enquanto se quiser evitar mudanças de comportamento em runtime,
+        // mas 36 garante consistência com o compileSdk e evita novos warnings.
+        targetSdk = 36
         versionCode = flutterVersionCode.toInteger()
         versionName = flutterVersionName
     }
