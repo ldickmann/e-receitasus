@@ -121,10 +121,12 @@ void main() {
     test(
         'lança PatientSearchException com mensagem genérica em PostgrestException',
         () async {
-      // Arrange: simula falha de RLS / RPC ausente.
+      // Arrange: simula falha de RLS / GRANT ausente (code 42501) — diferente
+      // do P0001 (acesso negado por falta de UBS), que tem mensagem própria.
       final service = _FakePrescriptionService(
         rpcError: const PostgrestException(
-          message: 'permission denied for function search_patients_for_prescription',
+          message:
+              'permission denied for function search_patients_for_prescription',
           code: '42501',
         ),
       );
@@ -136,7 +138,38 @@ void main() {
           isA<PatientSearchException>().having(
             (e) => e.message,
             'message',
-            'Não foi possível buscar pacientes no momento. Tente novamente.',
+            'Você não tem permissão para buscar pacientes. '
+                'Contate o administrador.',
+          ),
+        ),
+      );
+    });
+
+    test(
+        'mapeia P0001 (RAISE EXCEPTION da RPC) para mensagem orientando vínculo com UBS',
+        () async {
+      // Arrange: a RPC `search_patients_for_prescription` faz
+      // `RAISE EXCEPTION 'Acesso negado: ...'` quando o profissional autenticado
+      // não tem `healthUnitId` — esse RAISE retorna code SQLSTATE = P0001.
+      // Esse é exatamente o cenário do BUG do PBI #197.
+      final service = _FakePrescriptionService(
+        rpcError: const PostgrestException(
+          message:
+              'Acesso negado: apenas profissionais vinculados a uma UBS podem buscar pacientes.',
+          code: 'P0001',
+        ),
+      );
+
+      // Act + Assert: mensagem amigável aponta a causa-raiz acionável pelo médico
+      // (verificar vínculo com UBS), sem repassar a frase técnica do plpgsql.
+      await expectLater(
+        service.searchPatients('Jo'),
+        throwsA(
+          isA<PatientSearchException>().having(
+            (e) => e.message,
+            'message',
+            'Não foi possível buscar pacientes. Verifique se você está '
+                'vinculado a uma UBS no seu cadastro.',
           ),
         ),
       );

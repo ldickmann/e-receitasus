@@ -184,9 +184,10 @@ class PrescriptionService implements IPrescriptionService {
         name: 'PrescriptionService.searchPatients',
         error: '${e.code}: ${e.message}',
       );
-      throw const PatientSearchException(
-        'Não foi possível buscar pacientes no momento. Tente novamente.',
-      );
+      // Traduz o erro técnico para uma mensagem amigável segundo o code/mensagem.
+      // O motivo de centralizar aqui é evitar que o widget tenha que conhecer
+      // códigos do Postgres ou frases retornadas pela RPC (acoplamento ruim).
+      throw PatientSearchException(_mapPostgrestErrorToUserMessage(e));
     } on PatientSearchException {
       // Já é uma falha tipada (ex.: tipo inesperado da RPC); propaga sem
       // re-empacotar para não mascarar a mensagem específica.
@@ -234,5 +235,33 @@ class PrescriptionService implements IPrescriptionService {
       'search_patients_for_prescription',
       params: {'name_query': nameQuery},
     );
+  }
+
+  /// Converte uma [PostgrestException] vinda da RPC em uma mensagem amigável
+  /// pronta para exibição ao usuário (sem dados técnicos, sem stack trace).
+  ///
+  /// Casos tratados explicitamente:
+  /// - `P0001` (RAISE EXCEPTION do PL/pgSQL — usado quando o profissional
+  ///   autenticado não está vinculado a uma UBS): orienta o médico a verificar
+  ///   o vínculo com a UBS, que é a causa-raiz do BUG (PBI #197).
+  /// - `42501` (permission denied — RLS ou GRANT ausente): mensagem genérica
+  ///   sem expor detalhes do controle de acesso.
+  /// - Demais códigos: fallback genérico pedindo nova tentativa.
+  ///
+  /// Importante: nunca repassamos `e.message` cru à UI — a mensagem original
+  /// pode conter detalhes do schema/banco que não devem vazar (LGPD/segurança).
+  String _mapPostgrestErrorToUserMessage(PostgrestException e) {
+    // P0001 = exception levantada via RAISE EXCEPTION dentro de função plpgsql.
+    // É o code retornado pela RPC quando o caller não tem `healthUnitId`.
+    if (e.code == 'P0001') {
+      return 'Não foi possível buscar pacientes. Verifique se você está '
+          'vinculado a uma UBS no seu cadastro.';
+    }
+    // Permission denied direto do Postgres (GRANT/RLS) — não detalha o motivo.
+    if (e.code == '42501') {
+      return 'Você não tem permissão para buscar pacientes. '
+          'Contate o administrador.';
+    }
+    return 'Não foi possível buscar pacientes no momento. Tente novamente.';
   }
 }

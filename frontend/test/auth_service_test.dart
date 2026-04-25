@@ -4,12 +4,14 @@ import 'package:mockito/mockito.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:e_receitasus/models/professional_type.dart';
+import 'package:e_receitasus/services/auth_exceptions.dart';
 import 'package:e_receitasus/services/auth_service.dart';
 
 import 'auth_service_test.mocks.dart';
 
 @GenerateMocks([
   SupabaseClient,
+  SupabaseQueryBuilder,
   GoTrueClient,
   AuthResponse,
   User,
@@ -335,6 +337,168 @@ void main() {
       expect(map.containsKey('address_city'), isFalse);
       expect(map.length, 2,
           reason: 'Apenas birth_date e phone devem estar presentes');
+    });
+
+    // ─── PBI #201 / TASK 208 — cobertura dos ramos do refactor try/catch ──────
+    // Os testes a seguir validam as 3 categorias de erro do registro:
+    //   1. RegisterException por AuthException no signUp (ex.: e-mail duplicado)
+    //   2. RegisterException por erro genérico no signUp (ex.: rede)
+    //   3. RegisterException por response.user == null (BLOCO 1 sem usuário)
+    //   4. ProfileIncompleteException por falha no update pós-signUp
+    //
+    // O AuthService trata BLOCO 1 (signUp) e BLOCO 2 (update profissional/paciente)
+    // separadamente. Esta separação é crítica para LGPD e UX: um sucesso parcial
+    // (conta criada + perfil incompleto) NÃO deve ser apresentado como erro real
+    // ao usuário, evitando duplicidade de cadastro.
+    //
+    // Parâmetros mínimos válidos para registerWithProfessionalInfo são reusados
+    // entre os testes. Centralizamos para reduzir ruído e facilitar manutenção.
+    Future<void> callRegisterProfessional() =>
+        authService.registerWithProfessionalInfo(
+          firstName: 'Carlos',
+          lastName: 'Lima',
+          email: 'carlos.lima@sus.gov.br',
+          birthDate: DateTime(1980, 5, 10),
+          password: 'Senha@123',
+          professionalType: ProfessionalType.medico,
+          professionalId: '12345',
+          professionalState: 'SC',
+        );
+
+    /// Caso 1 — e-mail já cadastrado. O Supabase devolve AuthException com
+    /// statusCode HTTP. Esperamos RegisterException com `step=before_signup`
+    /// e o `userMessage` propagado para a UI.
+    test(
+        'lanca RegisterException quando signUp dispara AuthException de e-mail duplicado',
+        () async {
+      // ARRANGE — signUp lança AuthException simulando 422 user_already_exists
+      when(
+        mockGoTrueClient.signUp(
+          email: anyNamed('email'),
+          password: anyNamed('password'),
+          data: anyNamed('data'),
+        ),
+      ).thenThrow(
+        // Mensagem amigável; statusCode mapeia para `code` na exceção.
+        const AuthException('User already registered', statusCode: '422'),
+      );
+
+      // ACT + ASSERT — espera-se RegisterException, não AuthException crua
+      try {
+        await callRegisterProfessional();
+        fail('Deveria ter lancado RegisterException');
+      } on RegisterException catch (e) {
+        expect(e.step, 'before_signup');
+        expect(e.code, '422');
+        expect(e.userMessage, contains('already'));
+      }
+    });
+
+    /// Caso 2 — falha genérica antes do signUp (ex.: SocketException por
+    /// queda de rede). O service captura no `catch (e)` genérico e lança
+    /// RegisterException com mensagem padrão (sem vazar detalhes técnicos).
+    test(
+        'lanca RegisterException com mensagem padrao quando signUp dispara erro generico (sem rede)',
+        () async {
+      // ARRANGE — simula StateError genérico (StateError não é AuthException)
+      when(
+        mockGoTrueClient.signUp(
+          email: anyNamed('email'),
+          password: anyNamed('password'),
+          data: anyNamed('data'),
+        ),
+      ).thenThrow(StateError('SocketException: failed host lookup'));
+
+      // ACT + ASSERT
+      try {
+        await callRegisterProfessional();
+        fail('Deveria ter lancado RegisterException');
+      } on RegisterException catch (e) {
+        expect(e.step, 'before_signup');
+        // userMessage é genérico — NÃO vaza detalhes da exceção (LGPD/segurança)
+        expect(e.userMessage, 'Ocorreu um erro inesperado no cadastro.');
+        expect(e.userMessage, isNot(contains('SocketException')));
+      }
+    });
+
+    /// Caso 3 — signUp retorna response.user == null. O Supabase considera
+    /// que nada foi criado em auth.users. Trata-se de falha real → RegisterException
+    /// com `code=no_user`. UI deve exibir alerta vermelho.
+    test('lanca RegisterException quando signUp retorna AuthResponse sem user',
+        () async {
+      // ARRANGE
+      final mockAuthResponse = MockAuthResponse();
+      when(
+        mockGoTrueClient.signUp(
+          email: anyNamed('email'),
+          password: anyNamed('password'),
+          data: anyNamed('data'),
+        ),
+      ).thenAnswer((_) async => mockAuthResponse);
+      when(mockAuthResponse.user).thenReturn(null);
+      when(mockAuthResponse.session).thenReturn(null);
+
+      // ACT + ASSERT
+      try {
+        await callRegisterProfessional();
+        fail('Deveria ter lancado RegisterException');
+      } on RegisterException catch (e) {
+        expect(e.step, 'after_signup_no_user');
+        expect(e.code, 'no_user');
+      }
+    });
+
+    /// Caso 4 — sucesso parcial: signUp OK + sessão presente, mas o update
+    /// em `public.professionals` lança PostgrestException (RLS, FK, etc.).
+    /// Esperamos ProfileIncompleteException carregando o `userId` para que
+    /// a UI exiba mensagem laranja "complete seus dados depois".
+    ///
+    /// Truque do mock: como `from(...).update(...)` é avaliado de forma
+    /// síncrona antes do `await`, fazemos o builder lançar PostgrestException
+    /// já no `update()` — o try/catch do service captura via
+    /// `on PostgrestException` exatamente como aconteceria em produção.
+    test(
+        'lanca ProfileIncompleteException quando update pos-signUp falha (PostgrestException)',
+        () async {
+      // ARRANGE — signUp OK com sessão (entra no BLOCO 2)
+      final mockAuthResponse = MockAuthResponse();
+      final mockUser = MockUser();
+      final mockSession = MockSession();
+      final mockQueryBuilder = MockSupabaseQueryBuilder();
+
+      when(
+        mockGoTrueClient.signUp(
+          email: anyNamed('email'),
+          password: anyNamed('password'),
+          data: anyNamed('data'),
+        ),
+      ).thenAnswer((_) async => mockAuthResponse);
+      when(mockAuthResponse.user).thenReturn(mockUser);
+      when(mockAuthResponse.session).thenReturn(mockSession);
+      when(mockUser.id).thenReturn('99999999-9999-9999-9999-999999999999');
+
+      // BLOCO 2 — update em professionals lança PostgrestException ao ser invocado.
+      // Uso `thenAnswer` porque SupabaseQueryBuilder estende um tipo Future-like
+      // (PostgrestQueryBuilder), e Mockito recusa `thenReturn` nesse cenário.
+      when(mockSupabaseClient.from('professionals'))
+          .thenAnswer((_) => mockQueryBuilder);
+      when(mockQueryBuilder.update(any)).thenThrow(
+        const PostgrestException(
+          message: 'permission denied for table professionals',
+          code: '42501',
+        ),
+      );
+
+      // ACT + ASSERT
+      try {
+        await callRegisterProfessional();
+        fail('Deveria ter lancado ProfileIncompleteException');
+      } on ProfileIncompleteException catch (e) {
+        expect(e.step, 'before_update_professionals');
+        expect(e.userId, '99999999-9999-9999-9999-999999999999');
+        expect(e.sessionPresent, isTrue);
+        expect(e.code, '42501');
+      }
     });
   });
 }

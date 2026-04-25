@@ -377,7 +377,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final professionalId = _professionalIdController.text.trim();
     final professionalState = _selectedCouncilState;
 
-    final success = await authProvider.registerWithProfessionalInfo(
+    final outcome = await authProvider.registerWithProfessionalInfo(
       firstName: _firstNameController.text.trim(),
       lastName: _lastNameController.text.trim(),
       email: _emailController.text.trim().toLowerCase(),
@@ -413,23 +413,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (!mounted) return;
 
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Cadastro realizado com sucesso! Faca login para continuar.'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
-        ),
-      );
-      Navigator.pop(context);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.errorMessage ?? 'Erro ao cadastrar'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    // Tratamento tripartido (TASK 207 / PBI 201) — distingue sucesso completo,
+    // sucesso parcial (auth.users criado mas perfil falhou) e falha pré-signUp.
+    switch (outcome) {
+      case RegistrationOutcome.success:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Cadastro realizado com sucesso! Faca login para continuar.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        Navigator.pop(context);
+        break;
+      case RegistrationOutcome.profileIncomplete:
+        // Sucesso parcial — NÃO orientar a repetir o cadastro (e-mail já em uso).
+        // Cor laranja para diferenciar de sucesso pleno e de falha real.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.errorMessage ??
+                'Conta criada. Faça login e complete seus dados.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        Navigator.pop(context);
+        break;
+      case RegistrationOutcome.failure:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.errorMessage ?? 'Erro ao cadastrar'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        break;
     }
   }
 
@@ -705,11 +723,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 20),
                 // --- Seção Endereço ---
-                // Campos opcionais. CEP dispara ViaCEP automaticamente ao
-                // completar 8 dígitos; logradouro, bairro e cidade são
-                // preenchidos automaticamente e ficam somente-leitura.
+                // Endereço é obrigatório (TASK 225 / PBI 197): a trigger
+                // auto_assign_professional_health_unit usa (district, city) para
+                // resolver a UBS do profissional. Sem isso, o profissional não
+                // consegue buscar pacientes da própria UBS na tela de prescrição.
                 Text(
-                  'Endereço (opcional)',
+                  'Endereço',
                   style: TextStyle(
                     fontSize: 15,
                     fontWeight: FontWeight.w600,
@@ -724,7 +743,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   // Contador de caracteres desnecessário para CEP — remove-se
                   // o sufixo de "X/8" que polui o campo visualmente
                   decoration: InputDecoration(
-                    labelText: 'CEP',
+                    labelText: 'CEP *',
                     hintText: '00000000',
                     border: const OutlineInputBorder(),
                     counterText: '',
@@ -739,16 +758,25 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           )
                         : const Icon(Icons.location_on_outlined),
                   ),
+                  validator: (v) {
+                    // Obrigatório porque dispara o autopreenchimento de bairro/cidade
+                    // que alimentam a trigger de vínculo à UBS.
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Informe o CEP.';
+                    }
+                    if (v.trim().length != 8) {
+                      return 'CEP deve ter 8 dígitos.';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _streetController,
-                  // readOnly: preenchido automaticamente via ViaCEP —
-                  // bloqueia edição acidental; o usuário pode ainda limpar
-                  // e redigitar se o logradouro vier incompleto da API
-                  readOnly: true,
                   decoration: const InputDecoration(
                     labelText: 'Logradouro',
+                    hintText:
+                        'Preenchido automaticamente ou digitado manualmente',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.signpost_outlined),
                   ),
@@ -784,12 +812,22 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _districtController,
-                  readOnly: true,
                   decoration: const InputDecoration(
-                    labelText: 'Bairro',
+                    labelText: 'Bairro *',
+                    hintText:
+                        'Preenchido automaticamente ou digitado manualmente',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.map_outlined),
                   ),
+                  validator: (v) {
+                    // Obrigatório (TASK 225 / PBI 197): chave da trigger de UBS.
+                    // Mantém fallback manual porque ViaCEP pode estar indisponível
+                    // ou não retornar bairro para alguns CEPs.
+                    if (v == null || v.trim().isEmpty) {
+                      return 'Informe o bairro.';
+                    }
+                    return null;
+                  },
                 ),
                 const SizedBox(height: 12),
                 Row(
@@ -798,18 +836,27 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       flex: 3,
                       child: TextFormField(
                         controller: _addressCityController,
-                        readOnly: true,
                         decoration: const InputDecoration(
-                          labelText: 'Cidade',
+                          labelText: 'Cidade *',
+                          hintText:
+                              'Preenchida automaticamente ou digitada manualmente',
                           border: OutlineInputBorder(),
                           prefixIcon: Icon(Icons.location_city_outlined),
                         ),
+                        validator: (v) {
+                          // Obrigatória (TASK 225 / PBI 197): chave da trigger de UBS.
+                          if (v == null || v.trim().isEmpty) {
+                            return 'Informe a cidade.';
+                          }
+                          return null;
+                        },
                       ),
                     ),
                     const SizedBox(width: 12),
                     Flexible(
                       flex: 2,
                       child: DropdownButtonFormField<String>(
+                        key: const Key('address-state-dropdown'),
                         initialValue: _addressState,
                         decoration: const InputDecoration(
                           labelText: 'UF',

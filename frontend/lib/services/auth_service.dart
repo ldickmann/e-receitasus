@@ -1,7 +1,10 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../models/professional_type.dart';
+import 'auth_exceptions.dart';
 
 abstract class IAuthService {
   Future<UserModel> login(String email, String password);
@@ -126,16 +129,28 @@ class AuthService implements IAuthService {
     String? addressCity,
     String? addressState,
   }) async {
-    try {
-      final cleanFirstName = firstName.trim();
-      final cleanLastName = lastName.trim();
-      final cleanEmail = email.trim().toLowerCase();
-      final cleanProfessionalId = professionalId?.trim();
+    // Higienização dos inputs uma única vez — usada por ambos os blocos.
+    final cleanFirstName = firstName.trim();
+    final cleanLastName = lastName.trim();
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanProfessionalId = professionalId?.trim();
 
-      // Enviamos TODOS os campos no metadata para o trigger `handle_new_user`
-      // criar o registro completo em public.professionals em uma unica operacao,
-      // mesmo com confirmacao de e-mail habilitada (sem sessao imediata).
-      final response = await _supabase.auth.signUp(
+    // ---------------------------------------------------------------------
+    // BLOCO 1 — signUp
+    // Falhas aqui significam que o usuário NÃO foi criado em auth.users.
+    // Lançam RegisterException → UI mostra alerta vermelho.
+    // ---------------------------------------------------------------------
+    final AuthResponse response;
+    try {
+      developer.log(
+        'step=before_signup type=professional',
+        name: 'auth.register',
+      );
+
+      // Metadata completo no signUp para que o trigger `handle_new_user` crie o
+      // registro em public.professionals em uma única operação, mesmo quando o
+      // Supabase exige confirmação de e-mail (response.session == null).
+      response = await _supabase.auth.signUp(
         email: cleanEmail,
         password: password,
         data: <String, dynamic>{
@@ -159,58 +174,118 @@ class AuthService implements IAuthService {
             'address_state': addressState!.trim().toUpperCase(),
         },
       );
-
-      final user = response.user;
-      if (user == null) {
-        throw Exception('Erro ao criar conta no Supabase Auth.');
-      }
-
-      // Atualiza campos de endereço via PostgREST quando há sessão imediata.
-      // Sem sessão (e-mail pendente de confirmação), o profissional poderá
-      // preencher o endereço via tela de perfil após confirmar o e-mail.
-      if (response.session != null) {
-        // Chaves em snake_case para corresponder às colunas do Supabase PostgREST —
-        // camelCase causa falha silenciosa (PostgREST ignora chaves desconhecidas).
-        final updates = <String, dynamic>{
-          'birth_date': _formatBirthDate(birthDate),
-          if (_notEmpty(zipCode)) 'zip_code': zipCode!.trim(),
-          if (_notEmpty(street)) 'street': street!.trim(),
-          if (_notEmpty(streetNumber)) 'street_number': streetNumber!.trim(),
-          if (_notEmpty(complement)) 'complement': complement!.trim(),
-          if (_notEmpty(district)) 'district': district!.trim(),
-          if (_notEmpty(addressCity)) 'address_city': addressCity!.trim(),
-          if (_notEmpty(addressState))
-            'address_state': addressState!.trim().toUpperCase(),
-        };
-        // Tabela separada por domínio: profissionais → public.professionals
-        // (migration 20260421000000_split_user_patients_professionals)
-        await _supabase.from('professionals').update(updates).eq('id', user.id);
-      }
-
-      return UserModel(
-        id: user.id,
-        firstName: cleanFirstName,
-        lastName: cleanLastName,
-        email: cleanEmail,
-        birthDate: birthDate,
-        professionalType: professionalType,
-        professionalId: cleanProfessionalId,
-        professionalState: professionalState?.trim().toUpperCase(),
-        specialty: specialty?.trim(),
-        zipCode: _notEmpty(zipCode) ? zipCode!.trim() : null,
-        street: _notEmpty(street) ? street!.trim() : null,
-        streetNumber: _notEmpty(streetNumber) ? streetNumber!.trim() : null,
-        complement: _notEmpty(complement) ? complement!.trim() : null,
-        district: _notEmpty(district) ? district!.trim() : null,
-        addressCity: _notEmpty(addressCity) ? addressCity!.trim() : null,
-        addressState:
-            _notEmpty(addressState) ? addressState!.trim().toUpperCase() : null,
-      );
     } on AuthException catch (e) {
-      throw Exception(e.message);
-    } catch (_) {
-      throw Exception('Ocorreu um erro inesperado no cadastro.');
+      // Sem PII (não logamos `e.message`, que costuma trazer o e-mail tentado).
+      developer.log(
+        'step=before_signup_failed errorType=AuthException code=${e.statusCode ?? 'unknown'}',
+        name: 'auth.register',
+      );
+      throw RegisterException(
+        userMessage: e.message,
+        code: e.statusCode ?? 'unknown',
+        step: 'before_signup',
+      );
+    } catch (e) {
+      developer.log(
+        'step=before_signup_failed errorType=${e.runtimeType}',
+        name: 'auth.register',
+      );
+      throw const RegisterException(
+        userMessage: 'Ocorreu um erro inesperado no cadastro.',
+        step: 'before_signup',
+      );
     }
+
+    final user = response.user;
+    if (user == null) {
+      // Resposta do Supabase chegou sem usuário — tratamos como falha real,
+      // pois não há nada criado em auth.users para resgatar.
+      developer.log(
+        'step=after_signup_no_user errorType=NoUser',
+        name: 'auth.register',
+      );
+      throw const RegisterException(
+        userMessage: 'Erro ao criar conta no Supabase Auth.',
+        code: 'no_user',
+        step: 'after_signup_no_user',
+      );
+    }
+
+    final sessionPresent = response.session != null;
+    developer.log(
+      'step=after_signup type=professional sessionPresent=$sessionPresent',
+      name: 'auth.register',
+    );
+
+    // ---------------------------------------------------------------------
+    // BLOCO 2 — update em public.professionals (sucesso parcial em caso de falha)
+    // O usuário JÁ EXISTE. Falhas aqui lançam ProfileIncompleteException →
+    // UI mostra mensagem amigável e orienta o usuário a completar o perfil.
+    // ---------------------------------------------------------------------
+    if (sessionPresent) {
+      try {
+        developer.log(
+          'step=before_update_professionals',
+          name: 'auth.register',
+        );
+        final updates = buildProfessionalsUpdateMap(
+          birthDate: birthDate,
+          zipCode: zipCode,
+          street: street,
+          streetNumber: streetNumber,
+          complement: complement,
+          district: district,
+          addressCity: addressCity,
+          addressState: addressState,
+        );
+        await _supabase.from('professionals').update(updates).eq('id', user.id);
+        developer.log(
+          'step=after_update_professionals',
+          name: 'auth.register',
+        );
+      } on PostgrestException catch (e) {
+        developer.log(
+          'step=before_update_professionals_failed errorType=PostgrestException code=${e.code ?? 'unknown'}',
+          name: 'auth.register',
+        );
+        throw ProfileIncompleteException(
+          userId: user.id,
+          sessionPresent: sessionPresent,
+          step: 'before_update_professionals',
+          code: e.code ?? 'unknown',
+        );
+      } catch (e) {
+        developer.log(
+          'step=before_update_professionals_failed errorType=${e.runtimeType}',
+          name: 'auth.register',
+        );
+        throw ProfileIncompleteException(
+          userId: user.id,
+          sessionPresent: sessionPresent,
+          step: 'before_update_professionals',
+        );
+      }
+    }
+
+    return UserModel(
+      id: user.id,
+      firstName: cleanFirstName,
+      lastName: cleanLastName,
+      email: cleanEmail,
+      birthDate: birthDate,
+      professionalType: professionalType,
+      professionalId: cleanProfessionalId,
+      professionalState: professionalState?.trim().toUpperCase(),
+      specialty: specialty?.trim(),
+      zipCode: _notEmpty(zipCode) ? zipCode!.trim() : null,
+      street: _notEmpty(street) ? street!.trim() : null,
+      streetNumber: _notEmpty(streetNumber) ? streetNumber!.trim() : null,
+      complement: _notEmpty(complement) ? complement!.trim() : null,
+      district: _notEmpty(district) ? district!.trim() : null,
+      addressCity: _notEmpty(addressCity) ? addressCity!.trim() : null,
+      addressState:
+          _notEmpty(addressState) ? addressState!.trim().toUpperCase() : null,
+    );
   }
 
   /// Cadastra paciente via Supabase Auth (BaaS).
@@ -248,20 +323,36 @@ class AuthService implements IAuthService {
     String? addressCity,
     String? addressState,
   }) async {
+    // Higienização dos inputs uma única vez — usada por ambos os blocos.
+    final cleanFirstName = firstName.trim();
+    final cleanLastName = lastName.trim();
+    final cleanEmail = email.trim().toLowerCase();
+    final cleanPhone = phone.trim();
+
+    // ---------------------------------------------------------------------
+    // BLOCO 1 — signUp
+    // Falhas aqui significam que o usuário NÃO foi criado em auth.users.
+    // Lançam RegisterException → UI mostra alerta vermelho.
+    // ---------------------------------------------------------------------
+    final AuthResponse response;
     try {
-      // Enviamos TODOS os campos no metadata do signUp (snake_case) porque o
-      // trigger `handle_new_user` ja sabe ler todas estas chaves no INSERT.
-      // Vantagem: funciona mesmo quando o Supabase exige confirmacao de e-mail
-      // (response.session == null) — sem isso, campos opcionais ficavam NULL.
-      final response = await _supabase.auth.signUp(
-        email: email.trim().toLowerCase(),
+      developer.log(
+        'step=before_signup type=patient',
+        name: 'auth.register',
+      );
+
+      // Metadata completo no signUp para que o trigger `handle_new_user` crie o
+      // registro em public.patients em uma única operação, mesmo quando o
+      // Supabase exige confirmação de e-mail (response.session == null).
+      response = await _supabase.auth.signUp(
+        email: cleanEmail,
         password: password,
         data: <String, dynamic>{
-          'first_name': firstName.trim(),
-          'last_name': lastName.trim(),
+          'first_name': cleanFirstName,
+          'last_name': cleanLastName,
           'birth_date': _formatBirthDate(birthDate),
           'professional_type': 'PACIENTE',
-          'phone': phone.trim(),
+          'phone': cleanPhone,
           if (_notEmpty(cns)) 'cns': cns!.trim(),
           if (_notEmpty(cpf)) 'cpf': cpf!.trim(),
           if (_notEmpty(socialName)) 'social_name': socialName!.trim(),
@@ -284,83 +375,136 @@ class AuthService implements IAuthService {
             'address_state': addressState!.trim().toUpperCase(),
         },
       );
-
-      final user = response.user;
-      if (user == null) {
-        throw Exception('Cadastro não retornou usuário. Verifique o e-mail.');
-      }
-
-      // Atualiza campos complementares apenas quando há sessão ativa.
-      // Sem sessão (e-mail pendente), o trigger já criou o User; campos opcionais
-      // serão atualizados via tela de perfil quando o usuário confirmar o e-mail.
-      if (response.session != null) {
-        // Chaves em snake_case para corresponder às colunas do Supabase PostgREST —
-        // camelCase causa falha silenciosa (PostgREST ignora chaves desconhecidas).
-        final updates = <String, dynamic>{
-          'birth_date': _formatBirthDate(birthDate),
-          'phone': phone.trim(),
-          if (_notEmpty(cns)) 'cns': cns!.trim(),
-          if (_notEmpty(cpf)) 'cpf': cpf!.trim(),
-          if (_notEmpty(socialName)) 'social_name': socialName!.trim(),
-          if (_notEmpty(motherParentName))
-            'mother_parent_name': motherParentName!.trim(),
-          if (_notEmpty(birthCity)) 'birth_city': birthCity!.trim(),
-          if (_notEmpty(birthState))
-            'birth_state': birthState!.trim().toUpperCase(),
-          if (_notEmpty(gender)) 'gender': gender!.trim(),
-          if (_notEmpty(ethnicity)) 'ethnicity': ethnicity!.trim(),
-          if (_notEmpty(maritalStatus)) 'marital_status': maritalStatus!.trim(),
-          if (_notEmpty(education)) 'education': education!.trim(),
-          if (_notEmpty(zipCode)) 'zip_code': zipCode!.trim(),
-          if (_notEmpty(street)) 'street': street!.trim(),
-          if (_notEmpty(streetNumber)) 'street_number': streetNumber!.trim(),
-          if (_notEmpty(complement)) 'complement': complement!.trim(),
-          if (_notEmpty(district)) 'district': district!.trim(),
-          if (_notEmpty(addressCity)) 'address_city': addressCity!.trim(),
-          if (_notEmpty(addressState))
-            'address_state': addressState!.trim().toUpperCase(),
-        };
-        // Tabela separada por domínio: pacientes → public.patients
-        // (migration 20260421000000_split_user_patients_professionals)
-        await _supabase.from('patients').update(updates).eq('id', user.id);
-      }
-
-      return UserModel(
-        id: user.id,
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
-        email: email.trim().toLowerCase(),
-        birthDate: birthDate,
-        professionalType: ProfessionalType.paciente,
-        phone: phone.trim(),
-        cns: _notEmpty(cns) ? cns!.trim() : null,
-        cpf: _notEmpty(cpf) ? cpf!.trim() : null,
-        socialName: _notEmpty(socialName) ? socialName!.trim() : null,
-        motherParentName:
-            _notEmpty(motherParentName) ? motherParentName!.trim() : null,
-        birthCity: _notEmpty(birthCity) ? birthCity!.trim() : null,
-        birthState:
-            _notEmpty(birthState) ? birthState!.trim().toUpperCase() : null,
-        gender: _notEmpty(gender) ? gender!.trim() : null,
-        ethnicity: _notEmpty(ethnicity) ? ethnicity!.trim() : null,
-        maritalStatus: _notEmpty(maritalStatus) ? maritalStatus!.trim() : null,
-        education: _notEmpty(education) ? education!.trim() : null,
-        zipCode: _notEmpty(zipCode) ? zipCode!.trim() : null,
-        street: _notEmpty(street) ? street!.trim() : null,
-        streetNumber: _notEmpty(streetNumber) ? streetNumber!.trim() : null,
-        complement: _notEmpty(complement) ? complement!.trim() : null,
-        district: _notEmpty(district) ? district!.trim() : null,
-        addressCity: _notEmpty(addressCity) ? addressCity!.trim() : null,
-        addressState:
-            _notEmpty(addressState) ? addressState!.trim().toUpperCase() : null,
-      );
     } on AuthException catch (e) {
-      throw Exception(e.message);
+      developer.log(
+        'step=before_signup_failed errorType=AuthException code=${e.statusCode ?? 'unknown'}',
+        name: 'auth.register',
+      );
+      throw RegisterException(
+        userMessage: e.message,
+        code: e.statusCode ?? 'unknown',
+        step: 'before_signup',
+      );
     } catch (e) {
-      // Relança sem expor detalhes internos — mensagem genérica protege stack trace
-      if (e is Exception) rethrow;
-      throw Exception('Ocorreu um erro inesperado no cadastro de paciente.');
+      developer.log(
+        'step=before_signup_failed errorType=${e.runtimeType}',
+        name: 'auth.register',
+      );
+      throw const RegisterException(
+        userMessage: 'Ocorreu um erro inesperado no cadastro de paciente.',
+        step: 'before_signup',
+      );
     }
+
+    final user = response.user;
+    if (user == null) {
+      developer.log(
+        'step=after_signup_no_user errorType=NoUser',
+        name: 'auth.register',
+      );
+      throw const RegisterException(
+        userMessage: 'Cadastro não retornou usuário. Verifique o e-mail.',
+        code: 'no_user',
+        step: 'after_signup_no_user',
+      );
+    }
+
+    final sessionPresent = response.session != null;
+    developer.log(
+      'step=after_signup type=patient sessionPresent=$sessionPresent',
+      name: 'auth.register',
+    );
+
+    // ---------------------------------------------------------------------
+    // BLOCO 2 — update em public.patients (sucesso parcial em caso de falha)
+    // O usuário JÁ EXISTE. Falhas aqui lançam ProfileIncompleteException →
+    // UI mostra mensagem amigável e orienta o usuário a completar o perfil.
+    // ---------------------------------------------------------------------
+    if (sessionPresent) {
+      try {
+        developer.log(
+          'step=before_update_patients',
+          name: 'auth.register',
+        );
+        final updates = buildPatientsUpdateMap(
+          birthDate: birthDate,
+          phone: cleanPhone,
+          cns: cns,
+          cpf: cpf,
+          socialName: socialName,
+          motherParentName: motherParentName,
+          birthCity: birthCity,
+          birthState: birthState,
+          gender: gender,
+          ethnicity: ethnicity,
+          maritalStatus: maritalStatus,
+          education: education,
+          zipCode: zipCode,
+          street: street,
+          streetNumber: streetNumber,
+          complement: complement,
+          district: district,
+          addressCity: addressCity,
+          addressState: addressState,
+        );
+        await _supabase.from('patients').update(updates).eq('id', user.id);
+        developer.log(
+          'step=after_update_patients',
+          name: 'auth.register',
+        );
+      } on PostgrestException catch (e) {
+        developer.log(
+          'step=before_update_patients_failed errorType=PostgrestException code=${e.code ?? 'unknown'}',
+          name: 'auth.register',
+        );
+        throw ProfileIncompleteException(
+          userId: user.id,
+          sessionPresent: sessionPresent,
+          step: 'before_update_patients',
+          code: e.code ?? 'unknown',
+        );
+      } catch (e) {
+        developer.log(
+          'step=before_update_patients_failed errorType=${e.runtimeType}',
+          name: 'auth.register',
+        );
+        throw ProfileIncompleteException(
+          userId: user.id,
+          sessionPresent: sessionPresent,
+          step: 'before_update_patients',
+        );
+      }
+    }
+
+    return UserModel(
+      id: user.id,
+      firstName: cleanFirstName,
+      lastName: cleanLastName,
+      email: cleanEmail,
+      birthDate: birthDate,
+      professionalType: ProfessionalType.paciente,
+      phone: cleanPhone,
+      cns: _notEmpty(cns) ? cns!.trim() : null,
+      cpf: _notEmpty(cpf) ? cpf!.trim() : null,
+      socialName: _notEmpty(socialName) ? socialName!.trim() : null,
+      motherParentName:
+          _notEmpty(motherParentName) ? motherParentName!.trim() : null,
+      birthCity: _notEmpty(birthCity) ? birthCity!.trim() : null,
+      birthState:
+          _notEmpty(birthState) ? birthState!.trim().toUpperCase() : null,
+      gender: _notEmpty(gender) ? gender!.trim() : null,
+      ethnicity: _notEmpty(ethnicity) ? ethnicity!.trim() : null,
+      maritalStatus: _notEmpty(maritalStatus) ? maritalStatus!.trim() : null,
+      education: _notEmpty(education) ? education!.trim() : null,
+      zipCode: _notEmpty(zipCode) ? zipCode!.trim() : null,
+      street: _notEmpty(street) ? street!.trim() : null,
+      streetNumber: _notEmpty(streetNumber) ? streetNumber!.trim() : null,
+      complement: _notEmpty(complement) ? complement!.trim() : null,
+      district: _notEmpty(district) ? district!.trim() : null,
+      addressCity: _notEmpty(addressCity) ? addressCity!.trim() : null,
+      addressState:
+          _notEmpty(addressState) ? addressState!.trim().toUpperCase() : null,
+    );
   }
 
   @override

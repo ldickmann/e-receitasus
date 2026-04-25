@@ -370,7 +370,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
 
     final authProvider = context.read<AuthProvider>();
 
-    final success = await authProvider.registerPatient(
+    final outcome = await authProvider.registerPatient(
       firstName: _firstNameController.text.trim(),
       lastName: _lastNameController.text.trim(),
       email: _emailController.text.trim(),
@@ -399,28 +399,46 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
 
     if (!mounted) return;
 
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          // Mensagem genérica — pode haver confirmação de e-mail pendente
-          content: Text(
-            'Cadastro realizado! Verifique seu e-mail para confirmar o acesso.',
+    // Tratamento tripartido (TASK 207 / PBI 201) — distingue sucesso completo,
+    // sucesso parcial (auth.users criado mas perfil falhou) e falha pré-signUp.
+    switch (outcome) {
+      case RegistrationOutcome.success:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            // Mensagem genérica — pode haver confirmação de e-mail pendente
+            content: Text(
+              'Cadastro realizado! Verifique seu e-mail para confirmar o acesso.',
+            ),
+            duration: Duration(seconds: 5),
           ),
-          duration: Duration(seconds: 5),
-        ),
-      );
-      // Retorna para LoginScreen — usuário fará login após confirmar o e-mail
-      Navigator.pop(context);
-    } else {
-      if (authProvider.errorMessage != null) {
+        );
+        // Retorna para LoginScreen — usuário fará login após confirmar o e-mail
+        Navigator.pop(context);
+        break;
+      case RegistrationOutcome.profileIncomplete:
+        // Sucesso parcial: usuário JÁ EXISTE em auth.users — NÃO reenviar signUp.
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(authProvider.errorMessage!),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            content: Text(authProvider.errorMessage ??
+                'Conta criada. Faça login e complete seus dados.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
           ),
         );
         authProvider.clearError();
-      }
+        Navigator.pop(context);
+        break;
+      case RegistrationOutcome.failure:
+        if (authProvider.errorMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(authProvider.errorMessage!),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+          authProvider.clearError();
+        }
+        break;
     }
   }
 
@@ -796,7 +814,12 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                         FilteringTextInputFormatter.digitsOnly,
                       ],
                       decoration: InputDecoration(
-                        labelText: 'CEP',
+                        // Asterisco indica campo obrigatório (TASK 225 / PBI 197):
+                        // CEP é a chave que dispara o autopreenchimento do bairro/cidade,
+                        // que por sua vez são usados pela trigger auto_assign_patient_health_unit
+                        // para vincular o paciente à UBS — sem isso a RPC de busca de pacientes
+                        // na tela de prescrição filtra o paciente para fora do resultado.
+                        labelText: 'CEP *',
                         hintText: '8 dígitos',
                         border: const OutlineInputBorder(),
                         prefixIcon: const Icon(Icons.location_on_outlined),
@@ -817,7 +840,12 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                       ),
                       textInputAction: TextInputAction.next,
                       validator: (v) {
-                        if (v == null || v.trim().isEmpty) return null;
+                        // Obrigatoriedade: previne pacientes sem endereço no banco
+                        // (causa-raiz do PBI 197 — 4 de 5 pacientes legados estavam
+                        // com district/addressCity NULL e ficavam invisíveis na busca).
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Informe o CEP.';
+                        }
                         if (v.trim().length != 8) {
                           return 'CEP deve ter 8 dígitos.';
                         }
@@ -864,23 +892,42 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Bairro
+                    // Bairro — obrigatório (TASK 225 / PBI 197).
+                    // Usado pela trigger auto_assign_patient_health_unit junto com a cidade
+                    // para resolver a UBS do paciente. Tipicamente é preenchido pelo ViaCEP,
+                    // mas o usuário pode editar manualmente — ainda assim não pode ficar vazio.
                     _buildTextField(
+                      key: const Key('district_field'),
                       controller: _districtController,
-                      label: 'Bairro',
+                      label: 'Bairro *',
                       icon: Icons.holiday_village_outlined,
                       capitalization: TextCapitalization.words,
-                      hint: 'Opcional',
+                      hint: 'Preenchido automaticamente pelo CEP',
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Informe o bairro.';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 12),
 
-                    // Cidade do endereço
+                    // Cidade do endereço — obrigatória (TASK 225 / PBI 197).
+                    // Veja comentário do Bairro acima: a dupla (district, addressCity)
+                    // é a chave de match contra public.health_units no Supabase.
                     _buildTextField(
+                      key: const Key('address_city_field'),
                       controller: _addressCityController,
-                      label: 'Cidade',
+                      label: 'Cidade *',
                       icon: Icons.location_city,
                       capitalization: TextCapitalization.words,
-                      hint: 'Opcional',
+                      hint: 'Preenchida automaticamente pelo CEP',
+                      validator: (v) {
+                        if (v == null || v.trim().isEmpty) {
+                          return 'Informe a cidade.';
+                        }
+                        return null;
+                      },
                     ),
                     const SizedBox(height: 12),
 

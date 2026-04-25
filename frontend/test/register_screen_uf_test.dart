@@ -35,6 +35,15 @@ class _CapturingAuthService implements IAuthService {
   /// Último valor de `professionalState` recebido pelo cadastro.
   String? capturedProfessionalState;
 
+  /// Último bairro recebido pelo cadastro de profissional.
+  String? capturedDistrict;
+
+  /// Última cidade de endereço recebida pelo cadastro de profissional.
+  String? capturedAddressCity;
+
+  /// Última UF de endereço recebida pelo cadastro de profissional.
+  String? capturedAddressState;
+
   /// Conta quantas vezes `registerWithProfessionalInfo` foi invocado.
   /// Útil para garantir que o submit foi (ou não) acionado.
   int registerCallCount = 0;
@@ -94,6 +103,9 @@ class _CapturingAuthService implements IAuthService {
     registerCallCount += 1;
     capturedProfessionalId = professionalId;
     capturedProfessionalState = professionalState;
+    capturedDistrict = district;
+    capturedAddressCity = addressCity;
+    capturedAddressState = addressState;
 
     // Retorna UserModel mínimo válido — suficiente para popular o provider.
     return UserModel(
@@ -111,9 +123,16 @@ class _CapturingAuthService implements IAuthService {
   Future<void> logout() async {}
 }
 
-/// Monta a `RegisterScreen` com o fake de auth e um MockClient HTTP que
-/// nunca é chamado — os testes não dependem de rede.
-Widget _buildTestApp(_CapturingAuthService fakeAuth) {
+/// Monta a `RegisterScreen` com o fake de auth e um MockClient HTTP.
+///
+/// Por padrão, o `MockClient` devolve 404 para qualquer requisição (ViaCEP
+/// inerte). Testes que precisam validar autopreenchimento de endereço injetam
+/// um `httpClient` com payload ViaCEP válido; testes de fallback manual deixam
+/// bairro/cidade serem digitados diretamente.
+Widget _buildTestApp(
+  _CapturingAuthService fakeAuth, {
+  http.Client? httpClient,
+}) {
   return MultiProvider(
     providers: [
       ChangeNotifierProvider<AuthProvider>(
@@ -122,9 +141,10 @@ Widget _buildTestApp(_CapturingAuthService fakeAuth) {
     ],
     child: MaterialApp(
       home: RegisterScreen(
-        // MockClient inerte: caso o ViaCEP seja acionado por engano, devolve
-        // 404 para não abrir socket real e quebrar o teste.
-        httpClient: MockClient((_) async => http.Response('{}', 404)),
+        // MockClient inerte por padrão: caso o ViaCEP seja acionado por
+        // engano, devolve 404 para não abrir socket real e quebrar o teste.
+        httpClient:
+            httpClient ?? MockClient((_) async => http.Response('{}', 404)),
       ),
     ),
   );
@@ -187,6 +207,14 @@ Future<void> _preencherCamposBasicos(WidgetTester tester) async {
   final confirmFinder = find.widgetWithText(TextFormField, 'Confirmar Senha');
   await tester.ensureVisible(confirmFinder);
   await tester.enterText(confirmFinder, 'Senha@123');
+
+  // Endereço obrigatório (TASK 225 / PBI 197): o CEP dispara ViaCEP quando
+  // disponível, mas os testes podem preencher bairro/cidade manualmente para
+  // cobrir o fallback necessário quando o CEP não retorna endereço completo.
+  final cepFinder = find.widgetWithText(TextFormField, 'CEP *');
+  await tester.ensureVisible(cepFinder);
+  await tester.enterText(cepFinder, '88370000');
+  await tester.pumpAndSettle();
 }
 
 void main() {
@@ -296,8 +324,22 @@ void main() {
       (tester) async {
         // ARRANGE — preenche TODOS os campos obrigatórios e seleciona Médico
         // com número do CRM "123456" e UF "SC".
+        // O MockClient devolve payload válido do ViaCEP para 88370000
+        // (Centro / Navegantes / SC), cobrindo o caminho de autopreenchimento.
         final fakeAuth = _CapturingAuthService();
-        await tester.pumpWidget(_buildTestApp(fakeAuth));
+        final viaCepClient = MockClient((req) async {
+          if (req.url.host == 'viacep.com.br') {
+            return http.Response(
+              '{"cep":"88370-000","logradouro":"","bairro":"Centro",'
+              '"localidade":"Navegantes","uf":"SC"}',
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          }
+          return http.Response('{}', 404);
+        });
+        await tester
+            .pumpWidget(_buildTestApp(fakeAuth, httpClient: viaCepClient));
         await tester.pumpAndSettle();
 
         await _preencherCamposBasicos(tester);
@@ -354,6 +396,84 @@ void main() {
           reason: 'professionalState deve vir do dropdown UF, não do parsing '
               'do número do registro',
         );
+      },
+    );
+
+    testWidgets(
+      'submit válido permite preencher bairro e cidade manualmente quando '
+      'ViaCEP não encontra o CEP',
+      (tester) async {
+        // ARRANGE — ViaCEP responde `erro: true`, cenário realista para CEP
+        // inexistente ou não mapeado. A tela deve manter CEP obrigatório,
+        // mas permitir que o usuário complete bairro/cidade manualmente.
+        final fakeAuth = _CapturingAuthService();
+        final viaCepClient = MockClient((req) async {
+          if (req.url.host == 'viacep.com.br') {
+            return http.Response(
+              '{"erro":true}',
+              200,
+              headers: {'content-type': 'application/json; charset=utf-8'},
+            );
+          }
+          return http.Response('{}', 404);
+        });
+        await tester
+            .pumpWidget(_buildTestApp(fakeAuth, httpClient: viaCepClient));
+        await tester.pumpAndSettle();
+
+        await _preencherCamposBasicos(tester);
+
+        // Fallback manual: bairro/cidade precisam ser editáveis porque o
+        // vínculo de UBS depende desses valores, mas ViaCEP nem sempre resolve.
+        final districtFinder = find.widgetWithText(TextFormField, 'Bairro *');
+        await tester.ensureVisible(districtFinder);
+        await tester.enterText(districtFinder, 'Centro');
+
+        final cityFinder = find.widgetWithText(TextFormField, 'Cidade *');
+        await tester.ensureVisible(cityFinder);
+        await tester.enterText(cityFinder, 'Navegantes');
+
+        await _selectDropdownValue<String>(
+          tester: tester,
+          dropdownFinder: find.byKey(const Key('address-state-dropdown')),
+          value: 'SC',
+        );
+
+        await _selectDropdownValue<ProfessionalType>(
+          tester: tester,
+          dropdownFinder: find.byKey(const Key('professional-type-dropdown')),
+          value: ProfessionalType.medico,
+        );
+
+        await tester.enterText(
+          find.widgetWithText(TextFormField, 'Número do CRM'),
+          '123456',
+        );
+
+        await _selectDropdownValue<String>(
+          tester: tester,
+          dropdownFinder: find.byKey(const Key('council-state-dropdown')),
+          value: 'SC',
+        );
+
+        // O SnackBar de CEP não encontrado fica sobre a região inferior da
+        // tela; avançamos o relógio do teste para simular o usuário aguardando
+        // o aviso sumir antes de tocar no botão de cadastro.
+        await tester.pump(const Duration(seconds: 4));
+        await tester.pumpAndSettle();
+
+        // ACT — submete com endereço manual mesmo após falha lógica do ViaCEP.
+        await tester
+            .ensureVisible(find.widgetWithText(ElevatedButton, 'Cadastrar'));
+        await tester.pumpAndSettle();
+        await tester.tap(find.widgetWithText(ElevatedButton, 'Cadastrar'));
+        await tester.pumpAndSettle();
+
+        // ASSERT — o cadastro deve seguir e enviar os dados manuais ao service.
+        expect(fakeAuth.registerCallCount, 1);
+        expect(fakeAuth.capturedDistrict, 'Centro');
+        expect(fakeAuth.capturedAddressCity, 'Navegantes');
+        expect(fakeAuth.capturedAddressState, 'SC');
       },
     );
   });

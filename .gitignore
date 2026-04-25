@@ -149,8 +149,6 @@ backend/**/*.d.ts.map
 # Exceção: arquivos de configuração JavaScript (não são artefatos de build)
 # ------------------------------------------
 !backend/jest.config.cjs
-.github/appmod/assessment/reports/report-1770713257289/report.json
-.github/modernize/
 
 # -----------------------------------------
 # GITHUB COPILOT CUSTOMIZATIONS (locais)
@@ -162,6 +160,7 @@ backend/**/*.d.ts.map
 .github/skills/
 .github/hooks/
 .github/mvp-implementation-plan.md
+AGENTS.md
 
 # -----------------------------------------
 # AGENT SKILLS INSTALADAS VIA `npx skills add` (locais, não versionadas)
@@ -169,3 +168,4 @@ backend/**/*.d.ts.map
 # -----------------------------------------
 .agents/
 skills-lock.json
+AGENTS.md

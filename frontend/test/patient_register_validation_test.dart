@@ -119,6 +119,10 @@ Widget _buildTestApp({http.Client? httpClient}) {
 ///
 /// Útil para testes que querem verificar o comportamento após submit válido,
 /// sem repetir o setup completo em cada teste.
+///
+/// Inclui CEP/bairro/cidade pois são obrigatórios desde a TASK 225 (PBI 197):
+/// trigger `auto_assign_patient_health_unit` precisa de (district, addressCity)
+/// para vincular o paciente à UBS — sem isso a busca na tela de prescrição falha.
 Future<void> _preencherCamposObrigatorios(WidgetTester tester) async {
   // Nome
   await tester.enterText(find.widgetWithText(TextFormField, 'Nome *'), 'Maria');
@@ -139,6 +143,15 @@ Future<void> _preencherCamposObrigatorios(WidgetTester tester) async {
       .ensureVisible(find.widgetWithText(TextFormField, 'Telefone celular *'));
   await tester.enterText(
       find.widgetWithText(TextFormField, 'Telefone celular *'), '11999999999');
+  // Endereço obrigatório (TASK 225) — CEP/bairro/cidade.
+  // Usamos valores sintéticos: nada de PII real em testes.
+  await tester.ensureVisible(find.byKey(const Key('cep_field')));
+  await tester.enterText(find.byKey(const Key('cep_field')), '88370000');
+  await tester.ensureVisible(find.byKey(const Key('district_field')));
+  await tester.enterText(find.byKey(const Key('district_field')), 'Centro');
+  await tester.ensureVisible(find.byKey(const Key('address_city_field')));
+  await tester.enterText(
+      find.byKey(const Key('address_city_field')), 'Navegantes');
 }
 
 // ---------------------------------------------------------------------------
@@ -514,11 +527,13 @@ void main() {
     );
   });
 
-  group('PatientRegisterScreen — Validação de CEP', () {
+  group('PatientRegisterScreen — Validação de CEP/bairro/cidade (TASK 225)',
+      () {
     testWidgets(
-      'deve aceitar CEP vazio — campo é opcional',
+      'deve exigir CEP no submit — campo passou a ser obrigatório',
       (tester) async {
-        // CEP é opcional — pacientes sem endereço fixo não devem ser bloqueados
+        // CEP é obrigatório desde a TASK 225: dispara o autopreenchimento de
+        // bairro/cidade que alimentam a trigger de vínculo à UBS.
         await tester.pumpWidget(_buildTestApp());
         await tester.pumpAndSettle();
 
@@ -528,9 +543,9 @@ void main() {
         await tester.pump();
 
         expect(
-          find.text('CEP deve ter 8 dígitos.'),
-          findsNothing,
-          reason: 'CEP vazio é válido — endereço é opcional no cadastro',
+          find.text('Informe o CEP.'),
+          findsOneWidget,
+          reason: 'CEP é obrigatório para resolver UBS via trigger',
         );
       },
     );
@@ -561,6 +576,57 @@ void main() {
         );
       },
     );
+
+    testWidgets(
+      'deve exigir bairro no submit — chave da trigger auto_assign_patient_health_unit',
+      (tester) async {
+        // Simula cenário onde ViaCEP não retornou bairro (resposta vazia)
+        // ou usuário limpou o campo manualmente.
+        await tester.pumpWidget(_buildTestApp());
+        await tester.pumpAndSettle();
+
+        // Preenche apenas CEP (sem bairro/cidade) para isolar o erro do bairro
+        await tester.ensureVisible(find.byKey(const Key('cep_field')));
+        await tester.enterText(find.byKey(const Key('cep_field')), '88370000');
+
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester.pump();
+
+        expect(
+          find.text('Informe o bairro.'),
+          findsOneWidget,
+          reason: 'Bairro vazio impede a trigger de resolver a UBS',
+        );
+      },
+    );
+
+    testWidgets(
+      'deve exigir cidade no submit — chave da trigger auto_assign_patient_health_unit',
+      (tester) async {
+        await tester.pumpWidget(_buildTestApp());
+        await tester.pumpAndSettle();
+
+        // Preenche CEP e bairro, mas não cidade — isola o erro da cidade
+        await tester.ensureVisible(find.byKey(const Key('cep_field')));
+        await tester.enterText(find.byKey(const Key('cep_field')), '88370000');
+        await tester.ensureVisible(find.byKey(const Key('district_field')));
+        await tester.enterText(
+            find.byKey(const Key('district_field')), 'Centro');
+
+        await tester
+            .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester.pump();
+
+        expect(
+          find.text('Informe a cidade.'),
+          findsOneWidget,
+          reason: 'Cidade vazia impede a trigger de resolver a UBS',
+        );
+      },
+    );
   });
 
   group('PatientRegisterScreen — Fluxo de submit', () {
@@ -575,9 +641,13 @@ void main() {
 
         await _preencherCamposObrigatorios(tester);
 
-        // ACT — tenta submeter sem preencher a data de nascimento
+        // ACT — tenta submeter sem preencher a data de nascimento.
+        // pumpAndSettle resolve overlays/foco residuais dos enterText anteriores
+        // antes de localizar o botão (senão tap pode cair fora do hit-test).
+        await tester.pumpAndSettle();
         await tester
             .ensureVisible(find.widgetWithText(FilledButton, 'Cadastrar'));
+        await tester.pumpAndSettle();
         await tester.tap(find.widgetWithText(FilledButton, 'Cadastrar'));
         await tester.pump();
 

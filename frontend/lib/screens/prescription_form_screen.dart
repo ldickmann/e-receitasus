@@ -76,6 +76,7 @@ class PrescriptionFormScreen extends StatefulWidget {
     required this.type,
     this.prefill,
     this.onSaved,
+    this.prescriptionService,
   });
 
   final PrescriptionType type;
@@ -90,6 +91,13 @@ class PrescriptionFormScreen extends StatefulWidget {
   /// ao chamador. Usado pelo fluxo de renovação para capturar o ID da nova
   /// prescrição e chamar [RenewalService.markAsPrescribed].
   final void Function(PrescriptionModel)? onSaved;
+
+  /// Serviço opcional para testes de widget.
+  ///
+  /// Em produção permanece `null`, preservando o uso do singleton do Supabase.
+  /// Nos testes, uma subclasse controlada evita rede real e permite simular a
+  /// RPC de autocomplete sem expor dados sensíveis de pacientes.
+  final PrescriptionService? prescriptionService;
 
   @override
   State<PrescriptionFormScreen> createState() => _PrescriptionFormScreenState();
@@ -136,9 +144,12 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
   final _notificationNumberCtrl = TextEditingController();
   final _notificationUfCtrl = TextEditingController();
 
+  late final PrescriptionService _prescriptionService;
+
   @override
   void initState() {
     super.initState();
+    _prescriptionService = widget.prescriptionService ?? PrescriptionService();
     final user = Provider.of<AuthProvider>(context, listen: false).user;
 
     // Preenche dados do prescritor a partir do perfil autenticado
@@ -277,7 +288,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
 
       // Salva no Supabase — qualquer erro propaga para o catch externo
       // que exibe o SnackBar com a mensagem real da falha.
-      final saved = await PrescriptionService().savePrescription(prescription);
+      final saved = await _prescriptionService.savePrescription(prescription);
 
       if (!mounted) return;
 
@@ -406,6 +417,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
                     widget.type == PrescriptionType.controlada,
                 requireAddress: widget.type.isNotification,
                 onPatientSelected: _onPatientSelected,
+                prescriptionService: _prescriptionService,
               ),
               const SizedBox(height: 20),
 
@@ -832,6 +844,7 @@ class _PatientSection extends StatefulWidget {
     required this.requireCpf,
     required this.requireAddress,
     required this.onPatientSelected,
+    required this.prescriptionService,
   });
 
   final TextEditingController nameCtrl;
@@ -844,6 +857,9 @@ class _PatientSection extends StatefulWidget {
 
   /// Chamado quando o médico seleciona um paciente da lista de sugestões.
   final void Function(PatientSearchResult) onPatientSelected;
+
+  /// Serviço injetado pela tela pai para permitir testes sem rede real.
+  final PrescriptionService prescriptionService;
 
   @override
   State<_PatientSection> createState() => _PatientSectionState();
@@ -896,7 +912,7 @@ class _PatientSectionState extends State<_PatientSection> {
             if (query.trim().length < 2) return const [];
             try {
               final results =
-                  await PrescriptionService().searchPatients(query.trim());
+                  await widget.prescriptionService.searchPatients(query.trim());
               // Sucesso → reabilita SnackBar para futuras falhas.
               _errorShown = false;
               return results;

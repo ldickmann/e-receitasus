@@ -100,8 +100,8 @@ void main() {
         );
 
         // ASSERT
-        expect(result, isTrue,
-            reason: 'Cadastro bem-sucedido deve retornar true');
+        expect(result, RegistrationOutcome.success,
+            reason: 'Cadastro bem-sucedido deve retornar success');
         expect(provider.isAuthenticated, isTrue);
         expect(provider.isLoading, isFalse);
         expect(provider.errorMessage, isNull);
@@ -150,8 +150,8 @@ void main() {
         );
 
         // ASSERT
-        expect(result, isFalse,
-            reason: 'Falha no cadastro deve retornar false');
+        expect(result, RegistrationOutcome.failure,
+            reason: 'Falha no cadastro deve retornar failure');
         expect(provider.isAuthenticated, isFalse);
         expect(provider.isLoading, isFalse);
         // O provider interpreta a exceção e expõe mensagem amigável
@@ -242,8 +242,9 @@ void main() {
         );
 
         // ASSERT
-        expect(result, isTrue,
-            reason: 'Cadastro de profissional bem-sucedido deve retornar true');
+        expect(result, RegistrationOutcome.success,
+            reason:
+                'Cadastro de profissional bem-sucedido deve retornar success');
         expect(provider.isAuthenticated, isTrue);
         expect(provider.isLoading, isFalse);
         expect(provider.errorMessage, isNull);
@@ -301,7 +302,7 @@ void main() {
         );
 
         // ASSERT
-        expect(result, isFalse);
+        expect(result, RegistrationOutcome.failure);
         expect(provider.isAuthenticated, isFalse);
         expect(provider.user, isNull);
         expect(provider.errorMessage, isNotNull);
