@@ -3,6 +3,26 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../models/professional_type.dart';
 import '../services/auth_service.dart';
+import '../services/auth_exceptions.dart';
+
+/// Resultado de uma operação de cadastro.
+///
+/// Distinguir os 3 estados é essencial porque a UI deve reagir de forma
+/// diferente em cada um — em especial, NÃO orientar o usuário a tentar
+/// novamente quando o usuário já foi criado em auth.users (sucesso parcial).
+enum RegistrationOutcome {
+  /// Cadastro completo: usuário criado em auth.users + perfil persistido.
+  success,
+
+  /// Usuário criado em auth.users, mas update do perfil falhou. NÃO é seguro
+  /// pedir ao usuário para repetir o signUp (geraria erro "e-mail em uso").
+  /// UI deve orientar a fazer login e completar o perfil.
+  profileIncomplete,
+
+  /// Falha real antes do signUp (ou no próprio signUp). Usuário não foi
+  /// criado — UI pode pedir para corrigir os dados e tentar novamente.
+  failure,
+}
 
 class AuthProvider with ChangeNotifier {
   final IAuthService _authService;
@@ -81,9 +101,13 @@ class AuthProvider with ChangeNotifier {
 
   /// Delega cadastro de profissional ao service e atualiza estado.
   ///
-  /// Retorna true em sucesso; false quando service lança exceção (errorMessage
-  /// é preenchido para exibição via SnackBar na tela).
-  Future<bool> registerWithProfessionalInfo({
+  /// Retorna [RegistrationOutcome] tripartido:
+  /// - [RegistrationOutcome.success] quando tudo deu certo;
+  /// - [RegistrationOutcome.profileIncomplete] quando o usuário foi criado em
+  ///   auth.users mas o update em public.professionals falhou (sucesso parcial);
+  /// - [RegistrationOutcome.failure] quando a falha ocorreu antes/durante o
+  ///   signUp e o usuário NÃO foi criado.
+  Future<RegistrationOutcome> registerWithProfessionalInfo({
     required String firstName,
     required String lastName,
     required String email,
@@ -126,12 +150,25 @@ class AuthProvider with ChangeNotifier {
       );
 
       _setLoading(false);
-      return true;
+      return RegistrationOutcome.success;
+    } on RegisterException catch (e) {
+      // Falha real pré-signUp — usuário NÃO foi criado.
+      _errorMessage = e.userMessage;
+      _user = null;
+      _setLoading(false);
+      return RegistrationOutcome.failure;
+    } on ProfileIncompleteException catch (_) {
+      // Sucesso parcial — auth.users já tem o usuário; orientar a fazer login.
+      _errorMessage =
+          'Conta criada com sucesso. Faça login e complete seus dados quando solicitado.';
+      _user = null;
+      _setLoading(false);
+      return RegistrationOutcome.profileIncomplete;
     } catch (e) {
       _errorMessage = _parseErrorMessage(e);
       _user = null;
       _setLoading(false);
-      return false;
+      return RegistrationOutcome.failure;
     }
   }
 
@@ -139,8 +176,8 @@ class AuthProvider with ChangeNotifier {
   ///
   /// Fluxo BaaS: service chama signUp no Supabase → trigger cria User(PACIENTE)
   /// → service atualiza todos os campos via PostgREST se houver sessão imediata.
-  /// Retorna true em sucesso; false com errorMessage preenchido em falha.
-  Future<bool> registerPatient({
+  /// Retorna [RegistrationOutcome] tripartido (ver doc do método de profissional).
+  Future<RegistrationOutcome> registerPatient({
     required String firstName,
     required String lastName,
     required String email,
@@ -196,12 +233,25 @@ class AuthProvider with ChangeNotifier {
       );
 
       _setLoading(false);
-      return true;
+      return RegistrationOutcome.success;
+    } on RegisterException catch (e) {
+      // Falha real pré-signUp — usuário NÃO foi criado.
+      _errorMessage = e.userMessage;
+      _user = null;
+      _setLoading(false);
+      return RegistrationOutcome.failure;
+    } on ProfileIncompleteException catch (_) {
+      // Sucesso parcial — auth.users já tem o usuário; orientar a fazer login.
+      _errorMessage =
+          'Conta criada com sucesso. Faça login e complete seus dados quando solicitado.';
+      _user = null;
+      _setLoading(false);
+      return RegistrationOutcome.profileIncomplete;
     } catch (e) {
       _errorMessage = _parseErrorMessage(e);
       _user = null;
       _setLoading(false);
-      return false;
+      return RegistrationOutcome.failure;
     }
   }
 
@@ -231,8 +281,7 @@ class AuthProvider with ChangeNotifier {
   }
 
   String _parseErrorMessage(Object error) {
-    debugPrint('Supabase/Auth Error log: $error');
-
+    // LGPD: NÃO logar `error` cru — pode conter e-mail/CPF em mensagens do Supabase.
     if (error is AuthException) {
       if (error.message.contains('Database error saving new user')) {
         return 'Erro interno ao sincronizar cadastro no banco. Verifique trigger SQL no Supabase.';
