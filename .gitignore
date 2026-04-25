@@ -169,3 +169,4 @@ backend/**/*.d.ts.map
 # -----------------------------------------
 .agents/
 skills-lock.json
+AGENTS.md
