@@ -370,7 +370,7 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
 
     final authProvider = context.read<AuthProvider>();
 
-    final success = await authProvider.registerPatient(
+    final outcome = await authProvider.registerPatient(
       firstName: _firstNameController.text.trim(),
       lastName: _lastNameController.text.trim(),
       email: _emailController.text.trim(),
@@ -399,28 +399,46 @@ class _PatientRegisterScreenState extends State<PatientRegisterScreen> {
 
     if (!mounted) return;
 
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          // Mensagem genérica — pode haver confirmação de e-mail pendente
-          content: Text(
-            'Cadastro realizado! Verifique seu e-mail para confirmar o acesso.',
+    // Tratamento tripartido (TASK 207 / PBI 201) — distingue sucesso completo,
+    // sucesso parcial (auth.users criado mas perfil falhou) e falha pré-signUp.
+    switch (outcome) {
+      case RegistrationOutcome.success:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            // Mensagem genérica — pode haver confirmação de e-mail pendente
+            content: Text(
+              'Cadastro realizado! Verifique seu e-mail para confirmar o acesso.',
+            ),
+            duration: Duration(seconds: 5),
           ),
-          duration: Duration(seconds: 5),
-        ),
-      );
-      // Retorna para LoginScreen — usuário fará login após confirmar o e-mail
-      Navigator.pop(context);
-    } else {
-      if (authProvider.errorMessage != null) {
+        );
+        // Retorna para LoginScreen — usuário fará login após confirmar o e-mail
+        Navigator.pop(context);
+        break;
+      case RegistrationOutcome.profileIncomplete:
+        // Sucesso parcial: usuário JÁ EXISTE em auth.users — NÃO reenviar signUp.
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(authProvider.errorMessage!),
-            backgroundColor: Theme.of(context).colorScheme.error,
+            content: Text(authProvider.errorMessage ??
+                'Conta criada. Faça login e complete seus dados.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
           ),
         );
         authProvider.clearError();
-      }
+        Navigator.pop(context);
+        break;
+      case RegistrationOutcome.failure:
+        if (authProvider.errorMessage != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(authProvider.errorMessage!),
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+          );
+          authProvider.clearError();
+        }
+        break;
     }
   }
 

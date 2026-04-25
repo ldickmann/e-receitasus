@@ -377,7 +377,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final professionalId = _professionalIdController.text.trim();
     final professionalState = _selectedCouncilState;
 
-    final success = await authProvider.registerWithProfessionalInfo(
+    final outcome = await authProvider.registerWithProfessionalInfo(
       firstName: _firstNameController.text.trim(),
       lastName: _lastNameController.text.trim(),
       email: _emailController.text.trim().toLowerCase(),
@@ -413,23 +413,41 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
     if (!mounted) return;
 
-    if (success) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-              'Cadastro realizado com sucesso! Faca login para continuar.'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 3),
-        ),
-      );
-      Navigator.pop(context);
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.errorMessage ?? 'Erro ao cadastrar'),
-          backgroundColor: Colors.red,
-        ),
-      );
+    // Tratamento tripartido (TASK 207 / PBI 201) — distingue sucesso completo,
+    // sucesso parcial (auth.users criado mas perfil falhou) e falha pré-signUp.
+    switch (outcome) {
+      case RegistrationOutcome.success:
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+                'Cadastro realizado com sucesso! Faca login para continuar.'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 3),
+          ),
+        );
+        Navigator.pop(context);
+        break;
+      case RegistrationOutcome.profileIncomplete:
+        // Sucesso parcial — NÃO orientar a repetir o cadastro (e-mail já em uso).
+        // Cor laranja para diferenciar de sucesso pleno e de falha real.
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.errorMessage ??
+                'Conta criada. Faça login e complete seus dados.'),
+            backgroundColor: Colors.orange,
+            duration: const Duration(seconds: 5),
+          ),
+        );
+        Navigator.pop(context);
+        break;
+      case RegistrationOutcome.failure:
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(authProvider.errorMessage ?? 'Erro ao cadastrar'),
+            backgroundColor: Colors.red,
+          ),
+        );
+        break;
     }
   }
 
