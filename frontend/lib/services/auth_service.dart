@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/foundation.dart' show visibleForTesting;
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
@@ -126,11 +128,22 @@ class AuthService implements IAuthService {
     String? addressCity,
     String? addressState,
   }) async {
+    // Marcador de etapa do fluxo — atualizado a cada passo para que o catch
+    // saiba exatamente ONDE a exceção foi disparada (signUp vs update vs sessão).
+    // Usado apenas em logs estruturados, nunca exposto ao usuário.
+    String step = 'before_signup';
     try {
       final cleanFirstName = firstName.trim();
       final cleanLastName = lastName.trim();
       final cleanEmail = email.trim().toLowerCase();
       final cleanProfessionalId = professionalId?.trim();
+
+      // Log estruturado SEM PII: registra apenas a etapa e o tipo de cadastro.
+      // Nunca logamos email/senha/CPF/birth_date — proteção LGPD.
+      developer.log(
+        'step=before_signup type=professional',
+        name: 'auth.register',
+      );
 
       // Enviamos TODOS os campos no metadata para o trigger `handle_new_user`
       // criar o registro completo em public.professionals em uma unica operacao,
@@ -162,13 +175,27 @@ class AuthService implements IAuthService {
 
       final user = response.user;
       if (user == null) {
+        // Marcamos a etapa para o catch externo distinguir signUp_no_user de erro real.
+        step = 'after_signup_no_user';
         throw Exception('Erro ao criar conta no Supabase Auth.');
       }
+
+      step = 'after_signup';
+      // Sinaliza apenas presença de sessão (booleano) — nunca o token em si.
+      developer.log(
+        'step=after_signup type=professional sessionPresent=${response.session != null}',
+        name: 'auth.register',
+      );
 
       // Atualiza campos de endereço via PostgREST quando há sessão imediata.
       // Sem sessão (e-mail pendente de confirmação), o profissional poderá
       // preencher o endereço via tela de perfil após confirmar o e-mail.
       if (response.session != null) {
+        step = 'before_update_professionals';
+        developer.log(
+          'step=before_update_professionals',
+          name: 'auth.register',
+        );
         // Chaves em snake_case para corresponder às colunas do Supabase PostgREST —
         // camelCase causa falha silenciosa (PostgREST ignora chaves desconhecidas).
         final updates = <String, dynamic>{
@@ -185,6 +212,11 @@ class AuthService implements IAuthService {
         // Tabela separada por domínio: profissionais → public.professionals
         // (migration 20260421000000_split_user_patients_professionals)
         await _supabase.from('professionals').update(updates).eq('id', user.id);
+        step = 'after_update_professionals';
+        developer.log(
+          'step=after_update_professionals',
+          name: 'auth.register',
+        );
       }
 
       return UserModel(
@@ -207,8 +239,28 @@ class AuthService implements IAuthService {
             _notEmpty(addressState) ? addressState!.trim().toUpperCase() : null,
       );
     } on AuthException catch (e) {
+      // Log estruturado: etapa + código do AuthException (nunca a mensagem completa,
+      // que pode conter o e-mail tentado). LGPD: sem PII, sem stack trace.
+      developer.log(
+        'step=${step}_failed errorType=AuthException code=${e.statusCode ?? 'unknown'}',
+        name: 'auth.register',
+      );
       throw Exception(e.message);
-    } catch (_) {
+    } on PostgrestException catch (e) {
+      // PostgrestException tipicamente surge no .update() pós-signUp.
+      // Logamos apenas code/message curta — `details` pode trazer payload da query.
+      developer.log(
+        'step=${step}_failed errorType=PostgrestException code=${e.code ?? 'unknown'}',
+        name: 'auth.register',
+      );
+      throw Exception('Falha ao salvar dados do profissional.');
+    } catch (e) {
+      // Catch genérico — registra apenas runtimeType (sem `e.toString()`, que
+      // pode conter campos sensíveis dependendo da exceção subjacente).
+      developer.log(
+        'step=${step}_failed errorType=${e.runtimeType}',
+        name: 'auth.register',
+      );
       throw Exception('Ocorreu um erro inesperado no cadastro.');
     }
   }
@@ -248,7 +300,15 @@ class AuthService implements IAuthService {
     String? addressCity,
     String? addressState,
   }) async {
+    // Marcador de etapa — espelha o usado em registerWithProfessionalInfo.
+    // Permite ao catch identificar precisamente o ponto de falha sem PII.
+    String step = 'before_signup';
     try {
+      developer.log(
+        'step=before_signup type=patient',
+        name: 'auth.register',
+      );
+
       // Enviamos TODOS os campos no metadata do signUp (snake_case) porque o
       // trigger `handle_new_user` ja sabe ler todas estas chaves no INSERT.
       // Vantagem: funciona mesmo quando o Supabase exige confirmacao de e-mail
@@ -287,13 +347,25 @@ class AuthService implements IAuthService {
 
       final user = response.user;
       if (user == null) {
+        step = 'after_signup_no_user';
         throw Exception('Cadastro não retornou usuário. Verifique o e-mail.');
       }
+
+      step = 'after_signup';
+      developer.log(
+        'step=after_signup type=patient sessionPresent=${response.session != null}',
+        name: 'auth.register',
+      );
 
       // Atualiza campos complementares apenas quando há sessão ativa.
       // Sem sessão (e-mail pendente), o trigger já criou o User; campos opcionais
       // serão atualizados via tela de perfil quando o usuário confirmar o e-mail.
       if (response.session != null) {
+        step = 'before_update_patients';
+        developer.log(
+          'step=before_update_patients',
+          name: 'auth.register',
+        );
         // Chaves em snake_case para corresponder às colunas do Supabase PostgREST —
         // camelCase causa falha silenciosa (PostgREST ignora chaves desconhecidas).
         final updates = <String, dynamic>{
@@ -323,6 +395,11 @@ class AuthService implements IAuthService {
         // Tabela separada por domínio: pacientes → public.patients
         // (migration 20260421000000_split_user_patients_professionals)
         await _supabase.from('patients').update(updates).eq('id', user.id);
+        step = 'after_update_patients';
+        developer.log(
+          'step=after_update_patients',
+          name: 'auth.register',
+        );
       }
 
       return UserModel(
@@ -355,9 +432,27 @@ class AuthService implements IAuthService {
             _notEmpty(addressState) ? addressState!.trim().toUpperCase() : null,
       );
     } on AuthException catch (e) {
+      // Mesmo padrão de log do registerWithProfessionalInfo — etapa + tipo + código.
+      // Sem PII (sem `e.message`, que pode conter o e-mail).
+      developer.log(
+        'step=${step}_failed errorType=AuthException code=${e.statusCode ?? 'unknown'}',
+        name: 'auth.register',
+      );
       throw Exception(e.message);
+    } on PostgrestException catch (e) {
+      // Esta é tipicamente a falha pós-signUp que motivou o BUG do PBI 201:
+      // o usuário foi criado mas o `.update()` em public.patients falhou.
+      developer.log(
+        'step=${step}_failed errorType=PostgrestException code=${e.code ?? 'unknown'}',
+        name: 'auth.register',
+      );
+      throw Exception('Falha ao salvar dados do paciente.');
     } catch (e) {
       // Relança sem expor detalhes internos — mensagem genérica protege stack trace
+      developer.log(
+        'step=${step}_failed errorType=${e.runtimeType}',
+        name: 'auth.register',
+      );
       if (e is Exception) rethrow;
       throw Exception('Ocorreu um erro inesperado no cadastro de paciente.');
     }
