@@ -86,8 +86,9 @@ class MyApp extends StatelessWidget {
           debugShowCheckedModeBanner: false,
           title: 'E-ReceitaSUS',
 
-          // ThemeMode controlado pelo ThemeProvider — o usuário pode alternar via
-          // botão de sol/lua na AppBar. Inicia em ThemeMode.system (preferência do SO).
+          // ThemeMode controlado pelo ThemeProvider — o app SEMPRE inicia em
+          // ThemeMode.light (decisão de produto); o usuário pode alternar para
+          // o escuro via botão de sol/lua na AppBar.
           theme: AppTheme.lightTheme,
           darkTheme: AppTheme.darkTheme,
           themeMode: themeProvider.themeMode,
