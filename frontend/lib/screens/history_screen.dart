@@ -16,7 +16,10 @@ class HistoryScreen extends StatelessWidget {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
-      body: FutureBuilder<List<PrescriptionModel>>(
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: FutureBuilder<List<PrescriptionModel>>(
         // Delega ao PrescriptionProvider em vez de instanciar o service diretamente —
         // segue a arquitetura screen → provider → service do projeto e permite
         // substituição por mock em testes unitários (TDD com Mockito).
@@ -74,6 +77,7 @@ class HistoryScreen extends StatelessWidget {
             },
           );
         },
+      ),
       ),
     );
   }

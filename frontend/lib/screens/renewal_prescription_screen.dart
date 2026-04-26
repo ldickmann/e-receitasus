@@ -150,7 +150,10 @@ class _RenewalPrescriptionScreenState extends State<RenewalPrescriptionScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
-      body: FutureBuilder<PrescriptionModel?>(
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: FutureBuilder<PrescriptionModel?>(
         future: _prescriptionFuture,
         builder: (context, snapshot) {
           // Estado: carregando
@@ -211,6 +214,7 @@ class _RenewalPrescriptionScreenState extends State<RenewalPrescriptionScreen> {
             ),
           );
         },
+      ),
       ),
     );
   }

@@ -53,15 +53,19 @@ class NurseHomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            _NurseWelcomeCard(nurseName: nurseName),
-            const SizedBox(height: 24),
-            _PendingRenewalsSection(),
-          ],
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              _NurseWelcomeCard(nurseName: nurseName),
+              const SizedBox(height: 24),
+              _PendingRenewalsSection(),
+            ],
+          ),
         ),
       ),
     );

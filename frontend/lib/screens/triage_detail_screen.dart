@@ -196,7 +196,10 @@ class _TriageDetailScreenState extends State<TriageDetailScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.onPrimary,
       ),
-      body: SingleChildScrollView(
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -229,6 +232,7 @@ class _TriageDetailScreenState extends State<TriageDetailScreen> {
             const SizedBox(height: 16),
           ],
         ),
+      ),
       ),
     );
   }

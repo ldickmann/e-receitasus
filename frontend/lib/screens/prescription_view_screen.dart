@@ -43,7 +43,10 @@ class PrescriptionViewScreen extends StatelessWidget {
         ],
       ),
       backgroundColor: const Color(0xFFEEEEEE),
-      body: SingleChildScrollView(
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 16),
         child: Center(
           child: ConstrainedBox(
@@ -52,7 +55,13 @@ class PrescriptionViewScreen extends StatelessWidget {
           ),
         ),
       ),
-      bottomNavigationBar: _CopiesBar(type: type),
+      ),
+      // bottomNavigationBar também envolvido em SafeArea para que os botões
+      // de cópias não sejam ocultados pela system navigation bar do Android.
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: _CopiesBar(type: type),
+      ),
     );
   }
 
