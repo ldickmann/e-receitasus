@@ -36,8 +36,12 @@ Diretórios principais:
 
 - `models/`: modelos como paciente, profissional, prescrição e renovação.
 - `providers/`: `AuthProvider`, `PrescriptionProvider`, `RenewalProvider`, `TriageProvider`, `ThemeProvider`.
-- `services/`: autenticação, prescrições e renovações.
+- `services/`: autenticação, prescrições, renovações e integrações externas (ex.: `IViaCepService` para consulta de CEP).
 - `screens/`: telas por perfil.
+
+### Padrão de injeção de services
+
+Toda service expõe interface abstrata (`IXxxService`) e é injetada via parâmetro de construtor com fallback `const` para a implementação real, permitindo substituir por fakes/mocks em testes sem rede. Exemplo: `PrescriptionFormScreen({IViaCepService? viaCepService})` usa `const ViaCepService()` por padrão e recebe um fake nos widget tests.
 
 ## Telas por perfil
 

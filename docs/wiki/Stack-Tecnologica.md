@@ -35,3 +35,9 @@ O frontend está em `frontend/` e usa Flutter/Dart. As dependências principais 
 - Supabase PostgREST + Realtime para prescrições e renovações.
 - Row Level Security em tabelas sensíveis.
 - GitHub Actions para CI, CD e release Android (`README.md`, linhas 423–460).
+
+## Integrações externas
+
+| Integração | Papel |
+|---|---|
+| [ViaCEP](https://viacep.com.br/) | Auto-preenchimento de logradouro, bairro, cidade e UF a partir do CEP. Consumido pelo frontend via `IViaCepService` (`frontend/lib/services/via_cep_service.dart`) — interface abstrata para suportar mocks em testes. Em produção a implementação `ViaCepService` é injetada como `const`. |
