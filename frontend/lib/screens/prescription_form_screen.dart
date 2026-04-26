@@ -10,6 +10,7 @@ import '../models/prescription_type.dart';
 import '../providers/auth_provider.dart';
 import '../services/health_unit_service.dart';
 import '../services/prescription_service.dart';
+import '../services/via_cep_service.dart';
 import '../theme/app_colors.dart';
 
 // ---------------------------------------------------------------------------
@@ -82,6 +83,7 @@ class PrescriptionFormScreen extends StatefulWidget {
     this.onSaved,
     this.prescriptionService,
     this.healthUnitService,
+    this.viaCepService,
   });
 
   final PrescriptionType type;
@@ -111,6 +113,13 @@ class PrescriptionFormScreen extends StatefulWidget {
   /// de [HealthUnitService] no `initState`.
   final IHealthUnitService? healthUnitService;
 
+  /// Serviço opcional de consulta ao ViaCEP usado para auto-preencher os
+  /// campos de endereço do prescritor a partir do CEP digitado (PBI #200 /
+  /// TASKs #220 e #221). Em produção fica `null` e o formulário cria sua
+  /// própria instância de [ViaCepService]; nos testes injetamos um fake/mock
+  /// para não fazer requisições reais.
+  final IViaCepService? viaCepService;
+
   @override
   State<PrescriptionFormScreen> createState() => _PrescriptionFormScreenState();
 }
@@ -130,6 +139,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
   late final TextEditingController _doctorCouncilCtrl;
   late final TextEditingController _doctorCouncilStateCtrl;
   final _doctorSpecialtyCtrl = TextEditingController();
+  final _doctorCepCtrl = TextEditingController();
   final _doctorAddressCtrl = TextEditingController();
   final _doctorCityCtrl = TextEditingController();
   final _doctorStateCtrl = TextEditingController();
@@ -158,6 +168,15 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
 
   late final PrescriptionService _prescriptionService;
   late final IHealthUnitService _healthUnitService;
+  late final IViaCepService _viaCepService;
+
+  // ---------------------------------------------------------------------------
+  // Estado de auto-preenchimento ViaCEP do endereço do prescritor (PBI #200)
+  // ---------------------------------------------------------------------------
+  // Mantemos o último CEP consultado para não disparar chamadas redundantes
+  // e um flag de loading para exibir o spinner no `prefixIcon` do campo.
+  bool _isSearchingCep = false;
+  String? _lastFetchedCep;
 
   // ---------------------------------------------------------------------------
   // Estado do dropdown de UBS (TASK #215 / PBI #198)
@@ -182,6 +201,9 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
     super.initState();
     _prescriptionService = widget.prescriptionService ?? PrescriptionService();
     _healthUnitService = widget.healthUnitService ?? HealthUnitService();
+    // Resolve o serviço ViaCEP: em produção criamos a implementação real;
+    // nos testes/widget tests o caller injeta um fake/mock para evitar rede.
+    _viaCepService = widget.viaCepService ?? const ViaCepService();
     final user = Provider.of<AuthProvider>(context, listen: false).user;
 
     // Reage a edições manuais de cidade/UF do prescritor para refazer a
@@ -189,6 +211,11 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
     // emissão da receita.
     _doctorCityCtrl.addListener(_onCityOrStateChanged);
     _doctorStateCtrl.addListener(_onCityOrStateChanged);
+
+    // Listener do CEP — dispara busca ViaCEP quando 8 dígitos forem digitados
+    // (TASKs #220/#221). A normalização de caracteres não-numéricos fica a
+    // cargo do próprio service.
+    _doctorCepCtrl.addListener(_onCepChanged);
 
     // Preenche dados do prescritor a partir do perfil autenticado
     _doctorNameCtrl = TextEditingController(text: user?.name ?? '');
@@ -232,6 +259,68 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
     _healthUnitsDebounce = Timer(const Duration(milliseconds: 400), () {
       if (mounted) _fetchHealthUnits();
     });
+  }
+
+  /// Listener do campo CEP do prescritor.
+  ///
+  /// Dispara a busca apenas quando exatamente 8 dígitos foram digitados e o
+  /// CEP é diferente do último já consultado — evita chamadas repetidas e
+  /// preserva banda em digitação rápida.
+  void _onCepChanged() {
+    // Normalização leve: removemos qualquer não-dígito antes de medir o
+    // comprimento porque o usuário pode colar `12345-678`.
+    final digits = _doctorCepCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length == 8 && digits != _lastFetchedCep) {
+      _fetchAddressFromCep(digits);
+    }
+  }
+
+  /// Consulta o ViaCEP via [IViaCepService] e preenche os campos de endereço
+  /// do prescritor (logradouro, cidade e UF). Bairro é concatenado ao final
+  /// do logradouro porque o formulário não possui campo dedicado.
+  ///
+  /// LGPD: nunca exibimos stack trace ou status HTTP cru — a mensagem
+  /// amigável vem do próprio [ViaCepServiceException].
+  Future<void> _fetchAddressFromCep(String cep) async {
+    // Impede chamadas paralelas se uma busca já estiver em andamento.
+    if (_isSearchingCep) return;
+
+    // Marca o CEP antes de iniciar para evitar reentrada via listener.
+    _lastFetchedCep = cep;
+    setState(() => _isSearchingCep = true);
+
+    try {
+      final address = await _viaCepService.fetch(cep);
+      if (!mounted) return;
+
+      // Concatena logradouro + bairro num único campo livre — o formulário
+      // de prescrição não separa esses dois conceitos. O usuário ainda pode
+      // editar manualmente após o auto-preenchimento.
+      final composedAddress = address.bairro.isNotEmpty
+          ? '${address.logradouro}, ${address.bairro}'
+          : address.logradouro;
+
+      setState(() {
+        if (composedAddress.isNotEmpty) {
+          _doctorAddressCtrl.text = composedAddress;
+        }
+        if (address.localidade.isNotEmpty) {
+          _doctorCityCtrl.text = address.localidade;
+        }
+        // UF já vem maiúscula do service; sobrescreve apenas se válida.
+        if (address.uf.length == 2) {
+          _doctorStateCtrl.text = address.uf;
+        }
+      });
+    } on ViaCepServiceException catch (e) {
+      if (!mounted) return;
+      // Mensagem do service já é amigável e em PT-BR.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _isSearchingCep = false);
+    }
   }
 
   /// Busca a lista de UBS no backend para a cidade/UF atualmente preenchidas.
@@ -320,6 +409,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
     _healthUnitsDebounce?.cancel();
     _doctorCityCtrl.removeListener(_onCityOrStateChanged);
     _doctorStateCtrl.removeListener(_onCityOrStateChanged);
+    _doctorCepCtrl.removeListener(_onCepChanged);
     _doctorNameCtrl.dispose();
     _doctorCouncilCtrl.dispose();
     _doctorCouncilStateCtrl.dispose();
@@ -328,6 +418,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
     _doctorCityCtrl.dispose();
     _doctorStateCtrl.dispose();
     _doctorPhoneCtrl.dispose();
+    _doctorCepCtrl.dispose();
     _clinicNameCtrl.dispose();
     _patientNameCtrl.dispose();
     _patientCpfCtrl.dispose();
@@ -531,6 +622,8 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
                 councilCtrl: _doctorCouncilCtrl,
                 councilStateCtrl: _doctorCouncilStateCtrl,
                 specialtyCtrl: _doctorSpecialtyCtrl,
+                cepCtrl: _doctorCepCtrl,
+                isSearchingCep: _isSearchingCep,
                 addressCtrl: _doctorAddressCtrl,
                 cityCtrl: _doctorCityCtrl,
                 stateCtrl: _doctorStateCtrl,
@@ -817,6 +910,8 @@ class _DoctorSection extends StatelessWidget {
     required this.councilCtrl,
     required this.councilStateCtrl,
     required this.specialtyCtrl,
+    required this.cepCtrl,
+    required this.isSearchingCep,
     required this.addressCtrl,
     required this.cityCtrl,
     required this.stateCtrl,
@@ -834,6 +929,8 @@ class _DoctorSection extends StatelessWidget {
   final TextEditingController councilCtrl;
   final TextEditingController councilStateCtrl;
   final TextEditingController specialtyCtrl;
+  final TextEditingController cepCtrl;
+  final bool isSearchingCep;
   final TextEditingController addressCtrl;
   final TextEditingController cityCtrl;
   final TextEditingController stateCtrl;
@@ -924,6 +1021,33 @@ class _DoctorSection extends StatelessWidget {
           onRetry: onRetryHealthUnits,
           city: cityCtrl.text.trim(),
           state: stateCtrl.text.trim(),
+        ),
+        const SizedBox(height: 10),
+        // Campo CEP — dispara o auto-preenchimento de logradouro/cidade/UF
+        // do prescritor via ViaCEP quando 8 dígitos forem digitados (PBI #200).
+        // Mantemos os campos abaixo editáveis para correção manual.
+        TextFormField(
+          controller: cepCtrl,
+          keyboardType: TextInputType.number,
+          maxLength: 8,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(
+            labelText: 'CEP',
+            hintText: '00000000',
+            border: const OutlineInputBorder(),
+            // Remove o contador "X/8" — visualmente ruidoso para um CEP.
+            counterText: '',
+            prefixIcon: isSearchingCep
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : const Icon(Icons.location_on_outlined),
+          ),
         ),
         const SizedBox(height: 10),
         TextFormField(
