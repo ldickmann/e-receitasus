@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 // Imports locais (extensao .js obrigatoria com moduleResolution: nodenext)
 import authRoutes from './routes/auth.routes.js';
 import userRoutes from './routes/user.routes.js';
+import healthUnitRoutes from './routes/healthUnit.routes.js';
 import { requestLogger } from './middlewares/request-logger.middleware.js';
 
 // Carrega variaveis do .env antes de qualquer codigo que dependa de process.env
@@ -53,6 +54,10 @@ app.use('/auth', authRoutes);
 
 // Rotas de usuarios (perfil do usuario autenticado via JWKS)
 app.use('/user', userRoutes);
+
+// Rotas de unidades de saude (UBS) — listagem filtrada por municipio.
+// Auth obrigatorio: somente profissional/paciente autenticado pode listar.
+app.use('/health-units', healthUnitRoutes);
 
 // NOTA: Rotas /prescriptions e /history foram removidas. Toda a persistencia
 // e leitura de prescricoes e feita pelo Flutter via Supabase SDK na tabela
