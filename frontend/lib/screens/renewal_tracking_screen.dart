@@ -37,7 +37,10 @@ class _RenewalTrackingScreenState extends State<RenewalTrackingScreen> {
       appBar: AppBar(
         title: const Text('Rastrear Pedidos de Renovação'),
       ),
-      body: StreamBuilder<List<RenewalRequestModel>>(
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: StreamBuilder<List<RenewalRequestModel>>(
         stream: _stream,
         builder: (context, snapshot) {
           // Aguardando a primeira emissão do stream Supabase
@@ -99,6 +102,7 @@ class _RenewalTrackingScreenState extends State<RenewalTrackingScreen> {
                 _RenewalTrackingCard(renewal: renewals[index]),
           );
         },
+      ),
       ),
     );
   }

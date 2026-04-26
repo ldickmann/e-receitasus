@@ -57,115 +57,119 @@ class DoctorHomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        onRefresh: () async {},
-        child: SingleChildScrollView(
-          physics: const AlwaysScrollableScrollPhysics(),
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              // Card de boas-vindas do médico
-              _DoctorWelcomeCard(
-                doctorName: doctorName,
-                specialty: specialty,
-                councilInfo: councilInfo,
-                professionalType:
-                    user?.professionalType.displayName ?? 'Profissional',
-              ),
-              const SizedBox(height: 20),
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: RefreshIndicator(
+          onRefresh: () async {},
+          child: SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                // Card de boas-vindas do médico
+                _DoctorWelcomeCard(
+                  doctorName: doctorName,
+                  specialty: specialty,
+                  councilInfo: councilInfo,
+                  professionalType:
+                      user?.professionalType.displayName ?? 'Profissional',
+                ),
+                const SizedBox(height: 20),
 
-              // Botão principal: nova receita
-              ElevatedButton.icon(
-                onPressed: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => const PrescriptionTypeScreen(),
+                // Botão principal: nova receita
+                ElevatedButton.icon(
+                  onPressed: () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const PrescriptionTypeScreen(),
+                    ),
+                  ),
+                  icon: const Icon(Icons.add_circle_outline, size: 22),
+                  label: const Text(
+                    'Nova Receita',
+                    style: TextStyle(fontSize: 16),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    // Botão de ação principal usa a cor primária do tema
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 52),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
                   ),
                 ),
-                icon: const Icon(Icons.add_circle_outline, size: 22),
-                label: const Text(
-                  'Nova Receita',
-                  style: TextStyle(fontSize: 16),
+                const SizedBox(height: 12),
+
+                // Legenda de tipos de receita
+                const _PrescriptionTypeLegend(),
+                const SizedBox(height: 24),
+
+                // Seção de renovações pendentes — aparece apenas quando há pedidos
+                // com status TRIAGED designados para este médico.
+                // Usa StreamBuilder direto (sem Provider) pois o dado é exclusivo
+                // desta tela e não precisa ser compartilhado globalmente.
+                const _PendingRenewalsSection(),
+
+                // Lista de receitas emitidas (stream em tempo real)
+                const Text(
+                  'Receitas Emitidas',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
                 ),
-                style: ElevatedButton.styleFrom(
-                  // Botão de ação principal usa a cor primária do tema
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  minimumSize: const Size(double.infinity, 52),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
+                const SizedBox(height: 10),
 
-              // Legenda de tipos de receita
-              const _PrescriptionTypeLegend(),
-              const SizedBox(height: 24),
-
-              // Seção de renovações pendentes — aparece apenas quando há pedidos
-              // com status TRIAGED designados para este médico.
-              // Usa StreamBuilder direto (sem Provider) pois o dado é exclusivo
-              // desta tela e não precisa ser compartilhado globalmente.
-              const _PendingRenewalsSection(),
-
-              // Lista de receitas emitidas (stream em tempo real)
-              const Text(
-                'Receitas Emitidas',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
-
-              StreamBuilder<List<Map<String, dynamic>>>(
-                stream: PrescriptionService().streamDoctorPrescriptions(),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 32),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-
-                  if (snapshot.hasError) {
-                    return const _EmptyState(
-                      icon: Icons.cloud_off,
-                      message:
-                          'Não foi possível carregar as receitas.\nVerifique sua conexão.',
-                      color: Colors.red,
-                    );
-                  }
-
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const _EmptyState(
-                      icon: Icons.receipt_long_outlined,
-                      message:
-                          'Nenhuma receita emitida ainda.\nToque em "Nova Receita" para começar.',
-                      color: Colors.grey,
-                    );
-                  }
-
-                  final list = snapshot.data!;
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: list.length,
-                    itemBuilder: (context, index) {
-                      final item = list[index];
-                      final prescription = PrescriptionModel.fromJson(item);
-                      return _PrescriptionListTile(
-                        prescription: prescription,
-                        onTap: () => Navigator.pushNamed(
-                          context,
-                          '/prescription_view',
-                          arguments: prescription,
-                        ),
+                StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: PrescriptionService().streamDoctorPrescriptions(),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 32),
+                        child: Center(child: CircularProgressIndicator()),
                       );
-                    },
-                  );
-                },
-              ),
-            ],
+                    }
+
+                    if (snapshot.hasError) {
+                      return const _EmptyState(
+                        icon: Icons.cloud_off,
+                        message:
+                            'Não foi possível carregar as receitas.\nVerifique sua conexão.',
+                        color: Colors.red,
+                      );
+                    }
+
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const _EmptyState(
+                        icon: Icons.receipt_long_outlined,
+                        message:
+                            'Nenhuma receita emitida ainda.\nToque em "Nova Receita" para começar.',
+                        color: Colors.grey,
+                      );
+                    }
+
+                    final list = snapshot.data!;
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: list.length,
+                      itemBuilder: (context, index) {
+                        final item = list[index];
+                        final prescription = PrescriptionModel.fromJson(item);
+                        return _PrescriptionListTile(
+                          prescription: prescription,
+                          onTap: () => Navigator.pushNamed(
+                            context,
+                            '/prescription_view',
+                            arguments: prescription,
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ],
+            ),
           ),
         ),
       ),

@@ -1,11 +1,16 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../models/health_unit_model.dart';
 import '../models/patient_search_result.dart';
 import '../models/prescription_model.dart';
 import '../models/prescription_type.dart';
 import '../providers/auth_provider.dart';
+import '../services/health_unit_service.dart';
 import '../services/prescription_service.dart';
+import '../services/via_cep_service.dart';
 import '../theme/app_colors.dart';
 
 // ---------------------------------------------------------------------------
@@ -77,6 +82,8 @@ class PrescriptionFormScreen extends StatefulWidget {
     this.prefill,
     this.onSaved,
     this.prescriptionService,
+    this.healthUnitService,
+    this.viaCepService,
   });
 
   final PrescriptionType type;
@@ -99,6 +106,20 @@ class PrescriptionFormScreen extends StatefulWidget {
   /// RPC de autocomplete sem expor dados sensíveis de pacientes.
   final PrescriptionService? prescriptionService;
 
+  /// Serviço opcional de listagem de UBS — injetado em testes para evitar
+  /// chamada HTTP real ao backend (`GET /health-units`).
+  ///
+  /// Em produção permanece `null` e o formulário cria sua própria instância
+  /// de [HealthUnitService] no `initState`.
+  final IHealthUnitService? healthUnitService;
+
+  /// Serviço opcional de consulta ao ViaCEP usado para auto-preencher os
+  /// campos de endereço do prescritor a partir do CEP digitado (PBI #200 /
+  /// TASKs #220 e #221). Em produção fica `null` e o formulário cria sua
+  /// própria instância de [ViaCepService]; nos testes injetamos um fake/mock
+  /// para não fazer requisições reais.
+  final IViaCepService? viaCepService;
+
   @override
   State<PrescriptionFormScreen> createState() => _PrescriptionFormScreenState();
 }
@@ -118,6 +139,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
   late final TextEditingController _doctorCouncilCtrl;
   late final TextEditingController _doctorCouncilStateCtrl;
   final _doctorSpecialtyCtrl = TextEditingController();
+  final _doctorCepCtrl = TextEditingController();
   final _doctorAddressCtrl = TextEditingController();
   final _doctorCityCtrl = TextEditingController();
   final _doctorStateCtrl = TextEditingController();
@@ -145,12 +167,55 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
   final _notificationUfCtrl = TextEditingController();
 
   late final PrescriptionService _prescriptionService;
+  late final IHealthUnitService _healthUnitService;
+  late final IViaCepService _viaCepService;
+
+  // ---------------------------------------------------------------------------
+  // Estado de auto-preenchimento ViaCEP do endereço do prescritor (PBI #200)
+  // ---------------------------------------------------------------------------
+  // Mantemos o último CEP consultado para não disparar chamadas redundantes
+  // e um flag de loading para exibir o spinner no `prefixIcon` do campo.
+  bool _isSearchingCep = false;
+  String? _lastFetchedCep;
+
+  // ---------------------------------------------------------------------------
+  // Estado do dropdown de UBS (TASK #215 / PBI #198)
+  // ---------------------------------------------------------------------------
+  // A lista é buscada no backend filtrada por `cidade + UF` informados pelo
+  // próprio prescritor. Mantemos o controller `_clinicNameCtrl` em sincronia
+  // com o item selecionado para que o submit (`_handleSubmit`) continue
+  // gerando `clinicName` sem depender de uma nova prop no model.
+  List<HealthUnitModel> _healthUnits = const [];
+  HealthUnitModel? _selectedHealthUnit;
+  bool _loadingHealthUnits = false;
+  String? _healthUnitsError;
+  // Chave usada para deduplicar chamadas e detectar quando a UBS selecionada
+  // ainda é válida após o usuário editar cidade/UF.
+  String? _lastFetchKey;
+  // Debounce evita disparar request a cada caractere digitado nos campos
+  // cidade/UF do prescritor.
+  Timer? _healthUnitsDebounce;
 
   @override
   void initState() {
     super.initState();
     _prescriptionService = widget.prescriptionService ?? PrescriptionService();
+    _healthUnitService = widget.healthUnitService ?? HealthUnitService();
+    // Resolve o serviço ViaCEP: em produção criamos a implementação real;
+    // nos testes/widget tests o caller injeta um fake/mock para evitar rede.
+    _viaCepService = widget.viaCepService ?? const ViaCepService();
     final user = Provider.of<AuthProvider>(context, listen: false).user;
+
+    // Reage a edições manuais de cidade/UF do prescritor para refazer a
+    // listagem de UBS — mantém o dropdown sempre coerente com o local de
+    // emissão da receita.
+    _doctorCityCtrl.addListener(_onCityOrStateChanged);
+    _doctorStateCtrl.addListener(_onCityOrStateChanged);
+
+    // Listener do CEP — dispara busca ViaCEP quando 8 dígitos forem digitados
+    // (TASKs #220/#221). A normalização de caracteres não-numéricos fica a
+    // cargo do próprio service.
+    _doctorCepCtrl.addListener(_onCepChanged);
 
     // Preenche dados do prescritor a partir do perfil autenticado
     _doctorNameCtrl = TextEditingController(text: user?.name ?? '');
@@ -177,10 +242,174 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
       _quantityCtrl.text = prefill.quantity ?? '';
       _quantityWordsCtrl.text = prefill.quantityWords ?? '';
     }
+
+    // Dispara primeira tentativa de carregar UBS após o frame inicial — caso
+    // o perfil do prescritor já tenha cidade/UF preenchidas no AuthProvider
+    // (atualmente esses campos são editados manualmente, mas a chamada é
+    // idempotente e segura mesmo com strings vazias).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _fetchHealthUnits();
+    });
+  }
+
+  /// Callback dos listeners de cidade/UF — agenda um fetch com debounce de
+  /// 400ms para evitar uma requisição a cada caractere digitado.
+  void _onCityOrStateChanged() {
+    _healthUnitsDebounce?.cancel();
+    _healthUnitsDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (mounted) _fetchHealthUnits();
+    });
+  }
+
+  /// Listener do campo CEP do prescritor.
+  ///
+  /// Dispara a busca apenas quando exatamente 8 dígitos foram digitados e o
+  /// CEP é diferente do último já consultado — evita chamadas repetidas e
+  /// preserva banda em digitação rápida.
+  void _onCepChanged() {
+    // Normalização leve: removemos qualquer não-dígito antes de medir o
+    // comprimento porque o usuário pode colar `12345-678`.
+    final digits = _doctorCepCtrl.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.length == 8 && digits != _lastFetchedCep) {
+      _fetchAddressFromCep(digits);
+    }
+  }
+
+  /// Consulta o ViaCEP via [IViaCepService] e preenche os campos de endereço
+  /// do prescritor (logradouro, cidade e UF). Bairro é concatenado ao final
+  /// do logradouro porque o formulário não possui campo dedicado.
+  ///
+  /// LGPD: nunca exibimos stack trace ou status HTTP cru — a mensagem
+  /// amigável vem do próprio [ViaCepServiceException].
+  Future<void> _fetchAddressFromCep(String cep) async {
+    // Impede chamadas paralelas se uma busca já estiver em andamento.
+    if (_isSearchingCep) return;
+
+    // Marca o CEP antes de iniciar para evitar reentrada via listener.
+    _lastFetchedCep = cep;
+    setState(() => _isSearchingCep = true);
+
+    try {
+      final address = await _viaCepService.fetch(cep);
+      if (!mounted) return;
+
+      // Concatena logradouro + bairro num único campo livre — o formulário
+      // de prescrição não separa esses dois conceitos. O usuário ainda pode
+      // editar manualmente após o auto-preenchimento.
+      final composedAddress = address.bairro.isNotEmpty
+          ? '${address.logradouro}, ${address.bairro}'
+          : address.logradouro;
+
+      setState(() {
+        if (composedAddress.isNotEmpty) {
+          _doctorAddressCtrl.text = composedAddress;
+        }
+        if (address.localidade.isNotEmpty) {
+          _doctorCityCtrl.text = address.localidade;
+        }
+        // UF já vem maiúscula do service; sobrescreve apenas se válida.
+        if (address.uf.length == 2) {
+          _doctorStateCtrl.text = address.uf;
+        }
+      });
+    } on ViaCepServiceException catch (e) {
+      if (!mounted) return;
+      // Mensagem do service já é amigável e em PT-BR.
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(e.message)),
+      );
+    } finally {
+      if (mounted) setState(() => _isSearchingCep = false);
+    }
+  }
+
+  /// Busca a lista de UBS no backend para a cidade/UF atualmente preenchidas.
+  ///
+  /// - Não dispara request se cidade ou UF estiverem inválidas (cidade vazia
+  ///   ou UF com tamanho diferente de 2) — preserva banda e evita 400.
+  /// - Atualiza [_healthUnits], [_selectedHealthUnit] (limpando se a opção
+  ///   anterior não estiver mais na nova lista) e o controller `_clinicNameCtrl`.
+  /// - Mensagens de erro humanizadas vêm do próprio [HealthUnitServiceException]
+  ///   (LGPD: nunca exibir stack trace ou status HTTP cru).
+  Future<void> _fetchHealthUnits() async {
+    final city = _doctorCityCtrl.text.trim();
+    final state = _doctorStateCtrl.text.trim().toUpperCase();
+    if (city.isEmpty || state.length != 2) {
+      // Limpa estado anterior para refletir que ainda não há critério válido.
+      setState(() {
+        _healthUnits = const [];
+        _selectedHealthUnit = null;
+        _healthUnitsError = null;
+        _loadingHealthUnits = false;
+        _lastFetchKey = null;
+      });
+      return;
+    }
+
+    final fetchKey = '$city|$state';
+    if (fetchKey == _lastFetchKey && _healthUnits.isNotEmpty) {
+      return; // Mesmo critério já carregado — evita request redundante.
+    }
+    _lastFetchKey = fetchKey;
+
+    setState(() {
+      _loadingHealthUnits = true;
+      _healthUnitsError = null;
+    });
+
+    try {
+      final units = await _healthUnitService.listByCity(city, state: state);
+      if (!mounted || _lastFetchKey != fetchKey) return; // Resposta obsoleta.
+      // Mantém a UBS selecionada apenas se ela continuar presente na lista.
+      final keepSelection = _selectedHealthUnit != null &&
+          units.any((u) => u.id == _selectedHealthUnit!.id);
+      setState(() {
+        _healthUnits = units;
+        _loadingHealthUnits = false;
+        if (!keepSelection) {
+          _selectedHealthUnit = null;
+          _clinicNameCtrl.clear();
+        }
+      });
+    } on HealthUnitServiceException catch (e) {
+      if (!mounted || _lastFetchKey != fetchKey) return;
+      setState(() {
+        _healthUnits = const [];
+        _selectedHealthUnit = null;
+        _clinicNameCtrl.clear();
+        _healthUnitsError = e.message;
+        _loadingHealthUnits = false;
+      });
+    } catch (_) {
+      // Erro inesperado — mensagem genérica para não vazar detalhes internos.
+      if (!mounted || _lastFetchKey != fetchKey) return;
+      setState(() {
+        _healthUnits = const [];
+        _selectedHealthUnit = null;
+        _clinicNameCtrl.clear();
+        _healthUnitsError = 'Não foi possível carregar as UBS no momento.';
+        _loadingHealthUnits = false;
+      });
+    }
+  }
+
+  /// Atualiza a UBS selecionada a partir do dropdown e propaga para o
+  /// controller textual usado pelo `_handleSubmit`.
+  void _onHealthUnitSelected(HealthUnitModel? unit) {
+    setState(() {
+      _selectedHealthUnit = unit;
+      _clinicNameCtrl.text = unit?.name ?? '';
+    });
   }
 
   @override
   void dispose() {
+    // Cancela debounce pendente e remove listeners para evitar callbacks
+    // tardios após o widget ser desmontado.
+    _healthUnitsDebounce?.cancel();
+    _doctorCityCtrl.removeListener(_onCityOrStateChanged);
+    _doctorStateCtrl.removeListener(_onCityOrStateChanged);
+    _doctorCepCtrl.removeListener(_onCepChanged);
     _doctorNameCtrl.dispose();
     _doctorCouncilCtrl.dispose();
     _doctorCouncilStateCtrl.dispose();
@@ -189,6 +418,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
     _doctorCityCtrl.dispose();
     _doctorStateCtrl.dispose();
     _doctorPhoneCtrl.dispose();
+    _doctorCepCtrl.dispose();
     _clinicNameCtrl.dispose();
     _patientNameCtrl.dispose();
     _patientCpfCtrl.dispose();
@@ -354,136 +584,152 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
         backgroundColor: _appBarBg(),
         foregroundColor: _appBarFg(),
       ),
-      body: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _TypeBadge(type: widget.type),
-              const SizedBox(height: 16),
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: Form(
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _TypeBadge(type: widget.type),
+                const SizedBox(height: 16),
 
-              // Seção Notificação (apenas Amarela/Azul)
-              if (widget.type.requiresNotificationNumber) ...[
-                _SectionHeader(
-                  title: 'Numeração da Notificação',
-                  icon: Icons.numbers,
-                  color: widget.type.foregroundColor,
-                ),
-                const SizedBox(height: 8),
-                _NotificationSection(
-                  numberCtrl: _notificationNumberCtrl,
-                  ufCtrl: _notificationUfCtrl,
-                  type: widget.type,
-                ),
-                const SizedBox(height: 20),
-              ],
+                // Seção Notificação (apenas Amarela/Azul)
+                if (widget.type.requiresNotificationNumber) ...[
+                  _SectionHeader(
+                    title: 'Numeração da Notificação',
+                    icon: Icons.numbers,
+                    color: widget.type.foregroundColor,
+                  ),
+                  const SizedBox(height: 8),
+                  _NotificationSection(
+                    numberCtrl: _notificationNumberCtrl,
+                    ufCtrl: _notificationUfCtrl,
+                    type: widget.type,
+                  ),
+                  const SizedBox(height: 20),
+                ],
 
-              // Seção Estabelecimento / Médico
-              const _SectionHeader(
-                title: 'Dados do Prescritor',
-                icon: Icons.person,
-                color: AppColors.primary,
-              ),
-              const SizedBox(height: 8),
-              _DoctorSection(
-                nameCtrl: _doctorNameCtrl,
-                councilCtrl: _doctorCouncilCtrl,
-                councilStateCtrl: _doctorCouncilStateCtrl,
-                specialtyCtrl: _doctorSpecialtyCtrl,
-                addressCtrl: _doctorAddressCtrl,
-                cityCtrl: _doctorCityCtrl,
-                stateCtrl: _doctorStateCtrl,
-                phoneCtrl: _doctorPhoneCtrl,
-                clinicCtrl: _clinicNameCtrl,
-              ),
-              const SizedBox(height: 20),
-
-              // Seção Paciente
-              const _SectionHeader(
-                title: 'Dados do Paciente',
-                icon: Icons.people,
-                color: AppColors.primary,
-              ),
-              const SizedBox(height: 8),
-              _PatientSection(
-                nameCtrl: _patientNameCtrl,
-                cpfCtrl: _patientCpfCtrl,
-                addressCtrl: _patientAddressCtrl,
-                cityCtrl: _patientCityCtrl,
-                ageCtrl: _patientAgeCtrl,
-                requireCpf: widget.type.isNotification ||
-                    widget.type == PrescriptionType.controlada,
-                requireAddress: widget.type.isNotification,
-                onPatientSelected: _onPatientSelected,
-                prescriptionService: _prescriptionService,
-              ),
-              const SizedBox(height: 20),
-
-              // Seção Medicamento
-              const _SectionHeader(
-                title: 'Prescrição',
-                icon: Icons.medication,
-                color: AppColors.primary,
-              ),
-              const SizedBox(height: 8),
-              _MedicineSection(
-                medicineCtrl: _medicineCtrl,
-                dosageCtrl: _dosageCtrl,
-                pharmaceuticalFormCtrl: _pharmaceuticalFormCtrl,
-                routeCtrl: _routeCtrl,
-                quantityCtrl: _quantityCtrl,
-                quantityWordsCtrl: _quantityWordsCtrl,
-                instructionsCtrl: _instructionsCtrl,
-                requireQuantityWords: widget.type.isNotification,
-              ),
-              const SizedBox(height: 20),
-
-              // Receita Contínua (apenas Branca)
-              if (widget.type == PrescriptionType.branca) ...[
+                // Seção Estabelecimento / Médico
                 const _SectionHeader(
-                  title: 'Uso Contínuo (RDC 471/2021)',
-                  icon: Icons.repeat,
+                  title: 'Dados do Prescritor',
+                  icon: Icons.person,
                   color: AppColors.primary,
                 ),
                 const SizedBox(height: 8),
-                _ContinuousUseSection(
-                  isContinuousUse: _isContinuousUse,
-                  continuousMonths: _continuousMonths,
-                  onChanged: (val) => setState(() => _isContinuousUse = val),
-                  onMonthsChanged: (val) =>
-                      setState(() => _continuousMonths = val),
+                _DoctorSection(
+                  nameCtrl: _doctorNameCtrl,
+                  councilCtrl: _doctorCouncilCtrl,
+                  councilStateCtrl: _doctorCouncilStateCtrl,
+                  specialtyCtrl: _doctorSpecialtyCtrl,
+                  cepCtrl: _doctorCepCtrl,
+                  isSearchingCep: _isSearchingCep,
+                  addressCtrl: _doctorAddressCtrl,
+                  cityCtrl: _doctorCityCtrl,
+                  stateCtrl: _doctorStateCtrl,
+                  phoneCtrl: _doctorPhoneCtrl,
+                  clinicCtrl: _clinicNameCtrl,
+                  healthUnits: _healthUnits,
+                  selectedHealthUnit: _selectedHealthUnit,
+                  loadingHealthUnits: _loadingHealthUnits,
+                  healthUnitsError: _healthUnitsError,
+                  onHealthUnitChanged: _onHealthUnitSelected,
+                  onRetryHealthUnits: () {
+                    // Força refetch ignorando o cache do `_lastFetchKey`.
+                    _lastFetchKey = null;
+                    _fetchHealthUnits();
+                  },
                 ),
                 const SizedBox(height: 20),
-              ],
 
-              // Aviso legal
-              _LegalWarning(type: widget.type),
-              const SizedBox(height: 20),
+                // Seção Paciente
+                const _SectionHeader(
+                  title: 'Dados do Paciente',
+                  icon: Icons.people,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(height: 8),
+                _PatientSection(
+                  nameCtrl: _patientNameCtrl,
+                  cpfCtrl: _patientCpfCtrl,
+                  addressCtrl: _patientAddressCtrl,
+                  cityCtrl: _patientCityCtrl,
+                  ageCtrl: _patientAgeCtrl,
+                  requireCpf: widget.type.isNotification ||
+                      widget.type == PrescriptionType.controlada,
+                  requireAddress: widget.type.isNotification,
+                  onPatientSelected: _onPatientSelected,
+                  prescriptionService: _prescriptionService,
+                ),
+                const SizedBox(height: 20),
 
-              // Botão de emissão
-              _isSaving
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton.icon(
-                      onPressed: _handleSubmit,
-                      icon: const Icon(Icons.receipt_long),
-                      label: const Text(
-                        'Emitir Receita',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        // Botão de emissão usa a cor primária do tema
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 52),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                // Seção Medicamento
+                const _SectionHeader(
+                  title: 'Prescrição',
+                  icon: Icons.medication,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(height: 8),
+                _MedicineSection(
+                  medicineCtrl: _medicineCtrl,
+                  dosageCtrl: _dosageCtrl,
+                  pharmaceuticalFormCtrl: _pharmaceuticalFormCtrl,
+                  routeCtrl: _routeCtrl,
+                  quantityCtrl: _quantityCtrl,
+                  quantityWordsCtrl: _quantityWordsCtrl,
+                  instructionsCtrl: _instructionsCtrl,
+                  requireQuantityWords: widget.type.isNotification,
+                ),
+                const SizedBox(height: 20),
+
+                // Receita Contínua (apenas Branca)
+                if (widget.type == PrescriptionType.branca) ...[
+                  const _SectionHeader(
+                    title: 'Uso Contínuo (RDC 471/2021)',
+                    icon: Icons.repeat,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(height: 8),
+                  _ContinuousUseSection(
+                    isContinuousUse: _isContinuousUse,
+                    continuousMonths: _continuousMonths,
+                    onChanged: (val) => setState(() => _isContinuousUse = val),
+                    onMonthsChanged: (val) =>
+                        setState(() => _continuousMonths = val),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
+                // Aviso legal
+                _LegalWarning(type: widget.type),
+                const SizedBox(height: 20),
+
+                // Botão de emissão
+                _isSaving
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton.icon(
+                        onPressed: _handleSubmit,
+                        icon: const Icon(Icons.receipt_long),
+                        label: const Text(
+                          'Emitir Receita',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          // Botão de emissão usa a cor primária do tema
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
-                    ),
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
       ),
@@ -668,22 +914,38 @@ class _DoctorSection extends StatelessWidget {
     required this.councilCtrl,
     required this.councilStateCtrl,
     required this.specialtyCtrl,
+    required this.cepCtrl,
+    required this.isSearchingCep,
     required this.addressCtrl,
     required this.cityCtrl,
     required this.stateCtrl,
     required this.phoneCtrl,
     required this.clinicCtrl,
+    required this.healthUnits,
+    required this.selectedHealthUnit,
+    required this.loadingHealthUnits,
+    required this.healthUnitsError,
+    required this.onHealthUnitChanged,
+    required this.onRetryHealthUnits,
   });
 
   final TextEditingController nameCtrl;
   final TextEditingController councilCtrl;
   final TextEditingController councilStateCtrl;
   final TextEditingController specialtyCtrl;
+  final TextEditingController cepCtrl;
+  final bool isSearchingCep;
   final TextEditingController addressCtrl;
   final TextEditingController cityCtrl;
   final TextEditingController stateCtrl;
   final TextEditingController phoneCtrl;
   final TextEditingController clinicCtrl;
+  final List<HealthUnitModel> healthUnits;
+  final HealthUnitModel? selectedHealthUnit;
+  final bool loadingHealthUnits;
+  final String? healthUnitsError;
+  final ValueChanged<HealthUnitModel?> onHealthUnitChanged;
+  final VoidCallback onRetryHealthUnits;
 
   @override
   Widget build(BuildContext context) {
@@ -750,13 +1012,45 @@ class _DoctorSection extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 10),
+        // Substitui o antigo `TextFormField` livre por um seletor que carrega
+        // dinamicamente as UBS da cidade/UF informadas (TASK #215). O controller
+        // `clinicCtrl` continua sendo a fonte de verdade do `clinicName` no
+        // submit — preenchemos o texto via callback `onHealthUnitChanged`.
+        _HealthUnitField(
+          units: healthUnits,
+          selected: selectedHealthUnit,
+          loading: loadingHealthUnits,
+          errorMessage: healthUnitsError,
+          onChanged: onHealthUnitChanged,
+          onRetry: onRetryHealthUnits,
+          city: cityCtrl.text.trim(),
+          state: stateCtrl.text.trim(),
+        ),
+        const SizedBox(height: 10),
+        // Campo CEP — dispara o auto-preenchimento de logradouro/cidade/UF
+        // do prescritor via ViaCEP quando 8 dígitos forem digitados (PBI #200).
+        // Mantemos os campos abaixo editáveis para correção manual.
         TextFormField(
-          controller: clinicCtrl,
-          textCapitalization: TextCapitalization.words,
-          decoration: const InputDecoration(
-            labelText: 'Nome do Estabelecimento / UBS / Hospital',
-            border: OutlineInputBorder(),
-            prefixIcon: Icon(Icons.local_hospital),
+          controller: cepCtrl,
+          keyboardType: TextInputType.number,
+          maxLength: 8,
+          inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+          decoration: InputDecoration(
+            labelText: 'CEP',
+            hintText: '00000000',
+            border: const OutlineInputBorder(),
+            // Remove o contador "X/8" — visualmente ruidoso para um CEP.
+            counterText: '',
+            prefixIcon: isSearchingCep
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: Padding(
+                      padding: EdgeInsets.all(12),
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  )
+                : const Icon(Icons.location_on_outlined),
           ),
         ),
         const SizedBox(height: 10),
@@ -1288,6 +1582,143 @@ class _LegalWarning extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Widget: campo de seleção de UBS (TASK #215 / PBI #198)
+// ---------------------------------------------------------------------------
+
+/// Renderiza o campo "Estabelecimento/UBS" como dropdown carregado
+/// dinamicamente conforme cidade e UF do prescritor.
+///
+/// Estados visuais:
+/// - `loading`: indicador de progresso linear + label de "Buscando UBS...".
+/// - `errorMessage != null`: mensagem humanizada + botão de "Tentar novamente".
+/// - cidade/UF inválidas: campo desabilitado com hint pedindo para preencher.
+/// - lista vazia (após fetch): aviso "Nenhuma UBS cadastrada" sem quebrar o
+///   fluxo (o campo não é obrigatório no model atual).
+/// - lista preenchida: `DropdownButtonFormField<HealthUnitModel>`.
+class _HealthUnitField extends StatelessWidget {
+  const _HealthUnitField({
+    required this.units,
+    required this.selected,
+    required this.loading,
+    required this.errorMessage,
+    required this.onChanged,
+    required this.onRetry,
+    required this.city,
+    required this.state,
+  });
+
+  final List<HealthUnitModel> units;
+  final HealthUnitModel? selected;
+  final bool loading;
+  final String? errorMessage;
+  final ValueChanged<HealthUnitModel?> onChanged;
+  final VoidCallback onRetry;
+  final String city;
+  final String state;
+
+  @override
+  Widget build(BuildContext context) {
+    // Sem critério válido — orienta o usuário a preencher cidade/UF antes.
+    final hasCriteria = city.isNotEmpty && state.length == 2;
+
+    if (loading) {
+      // Container com altura fixa próxima a um TextFormField padrão para
+      // evitar "salto" de layout quando o fetch termina.
+      return const InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Estabelecimento / UBS / Hospital',
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.local_hospital),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text('Buscando UBS...'),
+          ],
+        ),
+      );
+    }
+
+    if (errorMessage != null) {
+      // Mensagem humanizada + retry. Não exibimos status HTTP para preservar
+      // a postura defensiva exigida pela LGPD/segurança.
+      return InputDecorator(
+        decoration: const InputDecoration(
+          labelText: 'Estabelecimento / UBS / Hospital',
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.error_outline, color: AppColors.error),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                errorMessage!,
+                style: const TextStyle(color: AppColors.error),
+              ),
+            ),
+            TextButton(
+              onPressed: onRetry,
+              child: const Text('Tentar novamente'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!hasCriteria) {
+      return const InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Estabelecimento / UBS / Hospital',
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.local_hospital),
+          helperText: 'Preencha cidade e UF do prescritor para listar as UBS.',
+        ),
+        child: SizedBox(height: 24),
+      );
+    }
+
+    if (units.isEmpty) {
+      return const InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'Estabelecimento / UBS / Hospital',
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.local_hospital),
+          helperText: 'Nenhuma UBS cadastrada para a cidade/UF informadas.',
+        ),
+        child: SizedBox(height: 24),
+      );
+    }
+
+    return DropdownButtonFormField<HealthUnitModel>(
+      initialValue: selected,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'Estabelecimento / UBS / Hospital',
+        border: OutlineInputBorder(),
+        prefixIcon: Icon(Icons.local_hospital),
+      ),
+      items: units
+          .map(
+            (u) => DropdownMenuItem<HealthUnitModel>(
+              value: u,
+              child: Text(
+                u.label,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
     );
   }
 }

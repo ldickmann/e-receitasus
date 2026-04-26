@@ -45,3 +45,7 @@ Status principais (`README.md`, linhas 130–137):
 - O médico responsável é vinculado à UBS do paciente.
 - A renovação gera uma nova prescrição com nova data de emissão e validade.
 - Apenas médicos e dentistas podem emitir ou renovar prescrições (`README.md`, linhas 139–145).
+
+## Auto-preenchimento de endereço por CEP
+
+Nos formulários de cadastro (paciente e profissional) e nas 4 telas de prescrição ANVISA (branca, controlada, amarela, azul), o campo CEP dispara consulta ao [ViaCEP](https://viacep.com.br/) ao atingir 8 dígitos e auto-preenche logradouro, bairro, cidade e UF. Os campos permanecem editáveis para correção manual quando o ViaCEP retorna dados parciais ou indisponíveis. A integração é encapsulada em `IViaCepService` e nenhum dado pessoal de saúde é enviado ao serviço externo — apenas o CEP digitado.
