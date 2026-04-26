@@ -9,9 +9,10 @@ import 'package:flutter/material.dart';
 /// (AuthProvider, PrescriptionProvider etc.) para manter consistência
 /// arquitetural na camada de estado global.
 class ThemeProvider extends ChangeNotifier {
-  /// Estado interno do tema; inicia seguindo a preferência do sistema.
-  /// Ao primeiro toggle, assume controle explícito (light ↔ dark).
-  ThemeMode _themeMode = ThemeMode.system;
+  /// Estado interno do tema; o app SEMPRE inicia em modo claro
+  /// (decisão de produto) — independente da preferência do SO.
+  /// O usuário pode alternar manualmente para o escuro via botão.
+  ThemeMode _themeMode = ThemeMode.light;
 
   /// Tema atualmente ativo, consumido pelo `MaterialApp` via Consumer.
   ThemeMode get themeMode => _themeMode;
@@ -25,12 +26,12 @@ class ThemeProvider extends ChangeNotifier {
   /// Alterna entre tema claro e escuro.
   ///
   /// - Tema escuro ativo → muda para claro.
-  /// - Tema claro ou sistema → muda para escuro.
+  /// - Tema claro → muda para escuro.
   ///
   /// Notifica todos os ouvintes para que o `MaterialApp` reconstrua
   /// com o novo `themeMode`.
   void toggleTheme() {
-    // Inverte o tema: escuro vira claro, qualquer outro vira escuro
+    // Inverte o tema: escuro vira claro, claro vira escuro
     _themeMode =
         _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark;
     notifyListeners();
