@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -9,6 +8,7 @@ import '../models/health_unit_model.dart';
 import '../providers/auth_provider.dart';
 import '../models/professional_type.dart';
 import '../services/health_unit_service.dart';
+import '../services/via_cep_service.dart';
 import '../theme/app_colors.dart';
 
 /// Formata automaticamente o campo de data de nascimento no padrão DD/MM/AAAA.
@@ -44,9 +44,10 @@ class _DateMaskFormatter extends TextInputFormatter {
 
 /// Tela de cadastro para profissionais de saúde (médico, enfermeiro, dentista, etc.).
 ///
-/// O parâmetro [httpClient] é opcional e destinado exclusivamente a testes —
-/// permite injetar um cliente HTTP fake para simular respostas da ViaCEP
-/// sem abrir sockets reais.
+/// O parâmetro [httpClient] é opcional e mantido por retrocompatibilidade dos
+/// testes existentes — quando informado, é envelopado num [ViaCepService]
+/// interno. Para novos testes, prefira injetar diretamente [viaCepService]
+/// (mockável via Mockito) — TASK #222.
 ///
 /// O parâmetro [healthUnitService] também é opcional e existe para permitir
 /// que os widget tests injetem um fake de [IHealthUnitService] e validem o
@@ -55,12 +56,17 @@ class RegisterScreen extends StatefulWidget {
   /// Cliente HTTP customizado; `null` usa o cliente padrão do pacote `http`.
   final http.Client? httpClient;
 
+  /// Serviço ViaCEP injetável; tem precedência sobre [httpClient] quando ambos
+  /// são fornecidos. `null` faz a tela construir um [ViaCepService] padrão.
+  final IViaCepService? viaCepService;
+
   /// Serviço de UBS injetável para testes; `null` usa [HealthUnitService].
   final IHealthUnitService? healthUnitService;
 
   const RegisterScreen({
     super.key,
     this.httpClient,
+    this.viaCepService,
     this.healthUnitService,
   });
 
@@ -93,6 +99,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
   bool _isSearchingCep = false;
   // Evita chamadas duplicadas para o mesmo CEP já consultado
   String? _lastFetchedCep;
+
+  // Serviço ViaCEP resolvido em initState — mockável via widget.viaCepService
+  // ou via widget.httpClient (este último apenas para retrocompatibilidade).
+  late final IViaCepService _viaCepService;
 
   ProfessionalType? _selectedProfessionalType;
   DateTime? _selectedBirthDate;
@@ -175,6 +185,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
     super.initState();
     // Service injetável para testes; em produção usa a implementação real.
     _healthUnitService = widget.healthUnitService ?? HealthUnitService();
+    // Resolve o serviço ViaCEP: prioriza injeção explícita; cai para wrapper
+    // do httpClient legado quando nenhum service é informado.
+    _viaCepService =
+        widget.viaCepService ?? ViaCepService(client: widget.httpClient);
     // Registra listener para disparar busca ViaCEP assim que 8 dígitos forem digitados
     _zipCodeController.addListener(_onCepChanged);
     // Listener da cidade — mudanças manuais também devem refazer a busca de UBS.
@@ -192,11 +206,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
     }
   }
 
-  /// Consulta a API pública ViaCEP e preenche automaticamente os campos de endereço.
+  /// Consulta o ViaCEP via [IViaCepService] e preenche os campos de endereço.
   ///
-  /// A ViaCEP (viacep.com.br) é um serviço gratuito do governo brasileiro —
-  /// não envia dados do usuário, apenas consulta logradouros pelo CEP informado.
-  /// CEP inválido retorna `{"erro": true}` com status 200 — tratado separadamente.
+  /// Toda a lógica HTTP/parsing fica no service — esta tela só lida com UI:
+  /// SnackBar amigável em PT-BR para qualquer falha (LGPD: nunca expõe stack
+  /// trace) e atualização de estado quando o endereço é resolvido.
   Future<void> _fetchAddressFromCep(String cep) async {
     // Impede chamada paralela se uma busca já está em andamento
     if (_isSearchingCep) return;
@@ -206,66 +220,28 @@ class _RegisterScreenState extends State<RegisterScreen> {
     setState(() => _isSearchingCep = true);
 
     try {
-      final uri = Uri.parse('https://viacep.com.br/ws/$cep/json/');
-      // Usa cliente injetado (testes) ou o cliente global padrão (produção).
-      // O timeout de 10s é aplicado apenas ao cliente padrão — em testes,
-      // o MockClient retorna imediatamente e o Timer causaria comportamento
-      // indefinido no scheduler sintético do flutter_test.
-      final client = widget.httpClient;
-      final responseFuture = client != null
-          ? client.get(uri)
-          : http.get(uri).timeout(const Duration(seconds: 10));
-      final response = await responseFuture;
-
+      final address = await _viaCepService.fetch(cep);
       if (!mounted) return;
 
-      if (response.statusCode == 200) {
-        // Decodifica explicitamente como UTF-8 — evita corrupção de caracteres
-        // especiais (ç, ã, é…) quando o Content-Type não declara charset.
-        final data =
-            jsonDecode(utf8.decode(response.bodyBytes)) as Map<String, dynamic>;
+      // Preenche todos os campos — sobrescreve valores anteriores porque
+      // o usuário acabou de digitar um novo CEP e espera ver o endereço atualizado
+      setState(() {
+        _streetController.text = address.logradouro;
+        _districtController.text = address.bairro;
+        _addressCityController.text = address.localidade;
 
-        // ViaCEP responde com {"erro": true} para CEPs inexistentes (status 200)
-        if (data.containsKey('erro')) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content:
-                  Text('CEP não encontrado. Preencha o endereço manualmente.'),
-            ),
-          );
-          return;
+        // UF já vem em maiúsculas do service — só atribui se estiver na lista.
+        if (_ufOptions.contains(address.uf)) {
+          _addressState = address.uf;
         }
-
-        // Preenche todos os campos — sobrescreve valores anteriores porque
-        // o usuário acabou de digitar um novo CEP e espera ver o endereço atualizado
-        setState(() {
-          _streetController.text = (data['logradouro'] as String?) ?? '';
-          _districtController.text = (data['bairro'] as String?) ?? '';
-          _addressCityController.text = (data['localidade'] as String?) ?? '';
-
-          // UF vem como sigla em maiúsculas — compatível com _ufOptions
-          final uf = (data['uf'] as String?)?.toUpperCase();
-          if (uf != null && _ufOptions.contains(uf)) {
-            _addressState = uf;
-          }
-        });
-        // Após o autopreenchimento, refaz a busca de UBS com cidade/UF novos.
-        _scheduleHealthUnitsFetch();
-      }
-    } on TimeoutException {
+      });
+      // Após o autopreenchimento, refaz a busca de UBS com cidade/UF novos.
+      _scheduleHealthUnitsFetch();
+    } on ViaCepServiceException catch (e) {
       if (!mounted) return;
+      // Mensagem do service já é amigável e em PT-BR.
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tempo esgotado ao consultar o CEP. Tente novamente.'),
-        ),
-      );
-    } catch (_) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content:
-              Text('Não foi possível consultar o CEP. Verifique a conexão.'),
-        ),
+        SnackBar(content: Text(e.message)),
       );
     } finally {
       if (mounted) setState(() => _isSearchingCep = false);

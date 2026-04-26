@@ -150,10 +150,11 @@ const _ubsPadrao = HealthUnitModel(
 
 /// Monta a `RegisterScreen` com o fake de auth e um MockClient HTTP.
 ///
-/// Por padrão, o `MockClient` devolve 404 para qualquer requisição (ViaCEP
-/// inerte). Testes que precisam validar autopreenchimento de endereço injetam
-/// um `httpClient` com payload ViaCEP válido; testes de fallback manual deixam
-/// bairro/cidade serem digitados diretamente.
+/// Por padrão, o `MockClient` devolve 200 com `{}` para qualquer requisição
+/// (ViaCEP inerte: o [ViaCepService] interpreta como endereço vazio sem
+/// disparar SnackBar). Testes que precisam validar autopreenchimento injetam
+/// um `httpClient` com payload ViaCEP válido; testes de fallback manual
+/// deixam bairro/cidade serem digitados diretamente.
 Widget _buildTestApp(
   _CapturingAuthService fakeAuth, {
   http.Client? httpClient,
@@ -167,10 +168,11 @@ Widget _buildTestApp(
     ],
     child: MaterialApp(
       home: RegisterScreen(
-        // MockClient inerte por padrão: caso o ViaCEP seja acionado por
-        // engano, devolve 404 para não abrir socket real e quebrar o teste.
+        // MockClient inerte por padrão: 200 com `{}` faz o ViaCepService
+        // interno tratar como endereço vazio (sem SnackBar de erro), evitando
+        // que mensagens transitórias obstruam a interação nos testes.
         httpClient:
-            httpClient ?? MockClient((_) async => http.Response('{}', 404)),
+            httpClient ?? MockClient((_) async => http.Response('{}', 200)),
         // Fake inerte por padrão (lista vazia) — suficiente para testes que
         // não fazem submit válido. Submits válidos injetam um fake com UBS.
         healthUnitService:
