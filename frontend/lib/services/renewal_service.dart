@@ -1,9 +1,36 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/renewal_request_model.dart';
 import '../models/user_model.dart';
+
+// ---------------------------------------------------------------------------
+// Exceção tipada — evita vazar detalhes internos do Postgres na UI (LGPD).
+// ---------------------------------------------------------------------------
+
+/// Exceção lançada quando uma operação de [IRenewalService] falha de forma
+/// previsível (RLS, constraint, default ausente, etc.).
+///
+/// A camada de provider/UI deve consumir [message] diretamente — já vem
+/// humanizada e em PT-BR. Evita que a tela precise inspecionar `code`/`details`
+/// crus de [PostgrestException], cumprindo o princípio de não expor stack
+/// traces ou nomes de constraints ao usuário final (segurança + LGPD).
+class RenewalRequestException implements Exception {
+  /// Mensagem amigável já pronta para exibição (PT-BR, sem dados sensíveis).
+  final String message;
+
+  /// Código SQLSTATE original (`23505`, `42501`, ...) preservado apenas para
+  /// telemetria/log interno. Nunca deve ser exibido ao usuário.
+  final String? code;
+
+  /// Construtor padrão.
+  RenewalRequestException(this.message, {this.code});
+
+  @override
+  String toString() => 'RenewalRequestException($code): $message';
+}
 
 // ---------------------------------------------------------------------------
 // Interface abstrata — obrigatória para injeção de dependência e TDD (Mockito)
@@ -205,11 +232,69 @@ class RenewalService implements IRenewalService {
     // aceito como parâmetro externo. É lido de auth.currentUser para garantir
     // que o cliente não pode forjar uma identidade diferente. O RLS
     // (paciente_insere_pedido) faz a validação final no servidor com auth.uid().
-    await _supabase.from(_table).insert({
-      'prescriptionId': prescriptionId,
-      'patientUserId': _currentUserId,
-      if (notes != null) 'patientNotes': notes,
-    });
+    //
+    // O try/catch converte PostgrestException em RenewalRequestException
+    // tipada com mensagem humanizada — evita expor SQLSTATE/constraint name
+    // na UI (segurança + LGPD) e dá feedback acionável ao paciente quando o
+    // erro tem causa conhecida (ex.: já existe pedido pendente, RLS negou,
+    // FK quebrada, default ausente após bug de migração — caso histórico AB#228).
+    try {
+      await _supabase.from(_table).insert({
+        'prescriptionId': prescriptionId,
+        'patientUserId': _currentUserId,
+        if (notes != null) 'patientNotes': notes,
+      });
+    } on PostgrestException catch (e) {
+      // Loga apenas código + mensagem técnica (sem prescriptionId nem notes,
+      // que podem revelar dados clínicos). LGPD art. 6° VII (segurança).
+      developer.log(
+        'requestRenewal falhou',
+        name: 'RenewalService',
+        error: 'code=${e.code} message=${e.message}',
+      );
+      throw RenewalRequestException(
+        _mapPostgrestErrorToUserMessage(e),
+        code: e.code,
+      );
+    }
+  }
+
+  /// Converte códigos SQLSTATE conhecidos em mensagens humanizadas em PT-BR.
+  ///
+  /// Mantém um fallback genérico para qualquer código não mapeado — nunca
+  /// retorna a mensagem crua do Postgres, que pode conter nomes de tabelas,
+  /// colunas e constraints (vetor de information disclosure).
+  String _mapPostgrestErrorToUserMessage(PostgrestException e) {
+    switch (e.code) {
+      // Trigger PL/pgSQL com RAISE EXCEPTION — mensagem já é humanizada
+      // pelo backend (ex.: validações customizadas em triggers futuros).
+      case 'P0001':
+        return e.message;
+      // RLS negou a operação (paciente_insere_pedido) — sessão expirada,
+      // tentativa de inserir com patientUserId diferente do auth.uid(), etc.
+      case '42501':
+        return 'Você não tem permissão para solicitar essa renovação. '
+            'Faça login novamente e tente de novo.';
+      // FK violada — prescriptionId aponta para registro inexistente.
+      // Aconteceria também se a prescrição tivesse sido removida entre o
+      // carregamento da tela e o envio do pedido.
+      case '23503':
+        return 'Receita não encontrada. Atualize a tela e tente novamente.';
+      // Unique constraint — paciente já tem pedido ativo para esta prescrição.
+      case '23505':
+        return 'Você já possui um pedido de renovação ativo para esta prescrição.';
+      // NOT NULL violada — caso histórico do AB#228 (id/updatedAt sem default).
+      // Hoje resolvido pela migration renewal_request_defaults, mas mantemos
+      // o mapeamento como guardrail caso surja nova coluna NOT NULL.
+      case '23502':
+        return 'Não foi possível enviar o pedido de renovação. '
+            'Avise o suporte se o problema persistir.';
+      // Tabela inexistente — erro de configuração de ambiente, não do usuário.
+      case '42P01':
+        return 'Erro de configuração do sistema. Avise o suporte.';
+      default:
+        return 'Não foi possível enviar o pedido de renovação. Tente novamente.';
+    }
   }
 
   // ---- Métodos do enfermeiro ----------------------------------------------
