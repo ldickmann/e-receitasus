@@ -5,16 +5,15 @@
 ///
 /// Estrategia:
 /// - Provider e construido com [MockIRenewalService] no setUp.
-/// - Cada teste valida uma branch do fluxo: sucesso, PostgrestException com
-///   codigo de unique violation, PostgrestException generica, StateError
-///   (sessao expirada) e excecao inesperada.
+/// - Cada teste valida uma branch do fluxo: sucesso, RenewalRequestException
+///   (erro tipado mapeado pelo service), StateError (sessao expirada) e
+///   excecao inesperada.
 /// - Testes de stream apenas verificam delegacao ao service (sem subscribe).
 library;
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import 'package:e_receitasus/models/renewal_request_model.dart';
 import 'package:e_receitasus/providers/renewal_provider.dart';
@@ -72,13 +71,12 @@ void main() {
   });
 
   group('RenewalProvider — requestRenewal falhas', () {
-    test(
-        'deve mapear PostgrestException codigo 23505 para mensagem de duplicacao',
+    test('deve repassar mensagem de RenewalRequestException 23505 (duplicado)',
         () async {
-      // ARRANGE — simula violacao de unique constraint (pedido ja existe)
+      // ARRANGE — service ja mapeia o codigo para mensagem humanizada
       when(mockService.requestRenewal(any, notes: anyNamed('notes')))
-          .thenThrow(const PostgrestException(
-        message: 'duplicate key',
+          .thenThrow(RenewalRequestException(
+        'Você já possui um pedido de renovação ativo para esta prescrição.',
         code: '23505',
       ));
 
@@ -91,25 +89,74 @@ void main() {
       expect(provider.errorMessage, contains('já possui um pedido'));
     });
 
-    test('deve mapear PostgrestException generica para mensagem nao especifica',
+    test('deve repassar mensagem de RenewalRequestException 42501 (RLS negou)',
         () async {
-      // ARRANGE — codigo nao mapeado (qualquer outro Postgres error)
       when(mockService.requestRenewal(any, notes: anyNamed('notes')))
-          .thenThrow(const PostgrestException(
-        message: 'connection lost',
-        code: '08000',
+          .thenThrow(RenewalRequestException(
+        'Você não tem permissão para solicitar essa renovação. '
+        'Faça login novamente e tente de novo.',
+        code: '42501',
       ));
 
-      // ACT
-      final result = await provider.requestRenewal(prescriptionId: 'p-2');
+      final result = await provider.requestRenewal(prescriptionId: 'p-rls');
 
-      // ASSERT — mensagem generica protege detalhes do banco (LGPD)
       expect(result, isFalse);
-      expect(provider.errorMessage, contains('Não foi possível enviar'));
+      expect(provider.errorMessage, contains('não tem permissão'));
+    });
+
+    test(
+        'deve repassar mensagem de RenewalRequestException 23503 (FK quebrada)',
+        () async {
+      when(mockService.requestRenewal(any, notes: anyNamed('notes')))
+          .thenThrow(RenewalRequestException(
+        'Receita não encontrada. Atualize a tela e tente novamente.',
+        code: '23503',
+      ));
+
+      final result = await provider.requestRenewal(prescriptionId: 'p-fk');
+
+      expect(result, isFalse);
+      expect(provider.errorMessage, contains('Receita não encontrada'));
+    });
+
+    test(
+        'deve repassar mensagem de RenewalRequestException 23502 (NOT NULL — bug AB#228)',
+        () async {
+      // Caso historico do bug AB#228: ate 26/04/2026 a tabela RenewalRequest
+      // tinha id/updatedAt sem default, todo INSERT do paciente quebrava.
+      // Hoje resolvido pela migration renewal_request_defaults, mas mantemos
+      // o teste como guardrail.
+      when(mockService.requestRenewal(any, notes: anyNamed('notes')))
+          .thenThrow(RenewalRequestException(
+        'Não foi possível enviar o pedido de renovação. '
+        'Avise o suporte se o problema persistir.',
+        code: '23502',
+      ));
+
+      final result = await provider.requestRenewal(prescriptionId: 'p-null');
+
+      expect(result, isFalse);
+      expect(provider.errorMessage, contains('suporte'));
+    });
+
+    test(
+        'deve repassar mensagem de RenewalRequestException 42P01 (tabela inexistente)',
+        () async {
+      when(mockService.requestRenewal(any, notes: anyNamed('notes')))
+          .thenThrow(RenewalRequestException(
+        'Erro de configuração do sistema. Avise o suporte.',
+        code: '42P01',
+      ));
+
+      final result = await provider.requestRenewal(prescriptionId: 'p-cfg');
+
+      expect(result, isFalse);
+      expect(provider.errorMessage, contains('configuração'));
     });
 
     test('deve mapear StateError para mensagem de relogin', () async {
-      // ARRANGE — usuario perdeu sessao no meio da operacao
+      // ARRANGE — usuario perdeu sessao no meio da operacao (lancado pelo
+      // _currentUserId no service antes do INSERT).
       when(mockService.requestRenewal(any, notes: anyNamed('notes')))
           .thenThrow(StateError('usuario_nao_autenticado'));
 

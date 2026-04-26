@@ -1,5 +1,4 @@
 import 'package:flutter/foundation.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 import '../models/renewal_request_model.dart';
 import '../services/renewal_service.dart';
@@ -71,11 +70,12 @@ class RenewalProvider with ChangeNotifier {
   /// Retorna `true` em sucesso e `false` em falha, sempre com [errorMessage]
   /// preenchido na falha para que a tela exiba o feedback adequado.
   ///
-  /// Tratamento de erros do Supabase:
-  /// - Código `23505` (unique_violation): paciente já tem pedido ativo para
-  ///   esta prescrição → mensagem humanizada específica.
-  /// - [StateError] (usuário não autenticado): redirecionar ao login.
-  /// - Outros erros: mensagem genérica sem vazar detalhes internos (LGPD).
+  /// Tratamento de erros:
+  /// - [RenewalRequestException]: erro previsível mapeado pelo service —
+  ///   a mensagem já vem humanizada em PT-BR (RLS, FK, unique, NOT NULL,
+  ///   tabela inexistente). É repassada direto para a UI.
+  /// - [StateError] (`usuario_nao_autenticado`): sessão expirou — pede relogin.
+  /// - Outros: mensagem genérica sem vazar detalhes internos (LGPD).
   Future<bool> requestRenewal({
     required String prescriptionId,
     String? notes,
@@ -87,29 +87,20 @@ class RenewalProvider with ChangeNotifier {
       await _service.requestRenewal(prescriptionId, notes: notes);
       _setSubmitting(false);
       return true;
-    } on PostgrestException catch (e) {
-      // Trata violação de unicidade — pedido duplicado para a mesma prescrição
-      if (e.code == '23505') {
-        _errorMessage =
-            'Você já possui um pedido de renovação ativo para esta prescrição.';
-      } else {
-        // Mensagem genérica para outros erros do banco de dados (não vazar
-        // detalhes internos como estrutura de tabela ou constraint names)
-        _errorMessage =
-            'Não foi possível enviar o pedido de renovação. Tente novamente.';
-      }
-      // Loga apenas o código do erro — sem dados sensíveis do paciente (LGPD)
-      debugPrint(
-          'RenewalProvider.requestRenewal: PostgrestException ${e.code}');
+    } on RenewalRequestException catch (e) {
+      // Mensagem já vem humanizada do service (ver _mapPostgrestErrorToUserMessage).
+      _errorMessage = e.message;
+      // Loga apenas o código SQLSTATE — sem prescriptionId nem dados do paciente.
+      debugPrint('RenewalProvider.requestRenewal: ${e.code ?? 'sem-codigo'}');
       _setSubmitting(false);
       return false;
     } on StateError catch (_) {
-      // Usuário perdeu a sessão durante a operação — solicitar relogin
+      // Usuário perdeu a sessão durante a operação — solicitar relogin.
       _errorMessage = 'Usuário não autenticado. Faça login novamente.';
       _setSubmitting(false);
       return false;
     } catch (_) {
-      // Captura exceções inesperadas sem expor detalhes internos ao usuário
+      // Captura exceções inesperadas sem expor detalhes internos ao usuário.
       _errorMessage =
           'Ocorreu um erro inesperado. Verifique sua conexão e tente novamente.';
       _setSubmitting(false);
