@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
+import '../models/health_unit_model.dart';
 import '../providers/auth_provider.dart';
 import '../models/professional_type.dart';
+import '../services/health_unit_service.dart';
+import '../theme/app_colors.dart';
 
 /// Formata automaticamente o campo de data de nascimento no padrão DD/MM/AAAA.
 ///
@@ -44,11 +47,22 @@ class _DateMaskFormatter extends TextInputFormatter {
 /// O parâmetro [httpClient] é opcional e destinado exclusivamente a testes —
 /// permite injetar um cliente HTTP fake para simular respostas da ViaCEP
 /// sem abrir sockets reais.
+///
+/// O parâmetro [healthUnitService] também é opcional e existe para permitir
+/// que os widget tests injetem um fake de [IHealthUnitService] e validem o
+/// dropdown de UBS sem acessar a rede.
 class RegisterScreen extends StatefulWidget {
   /// Cliente HTTP customizado; `null` usa o cliente padrão do pacote `http`.
   final http.Client? httpClient;
 
-  const RegisterScreen({super.key, this.httpClient});
+  /// Serviço de UBS injetável para testes; `null` usa [HealthUnitService].
+  final IHealthUnitService? healthUnitService;
+
+  const RegisterScreen({
+    super.key,
+    this.httpClient,
+    this.healthUnitService,
+  });
 
   @override
   State<RegisterScreen> createState() => _RegisterScreenState();
@@ -82,6 +96,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   ProfessionalType? _selectedProfessionalType;
   DateTime? _selectedBirthDate;
+
+  // PBI 198 / TASK 216 — Lista de UBS filtrada pelo município/UF do prescritor.
+  // O cadastro só é finalizado após selecionar uma UBS, pois é pré-requisito
+  // para a RPC `search_patients_for_prescription` validar o prescritor.
+  late final IHealthUnitService _healthUnitService;
+  List<HealthUnitModel> _healthUnits = const [];
+  HealthUnitModel? _selectedHealthUnit;
+  bool _loadingHealthUnits = false;
+  String? _healthUnitsError;
+  // Chave `cidade|UF` da última busca — evita refazer a mesma RPC.
+  String? _lastHealthUnitFetchKey;
+  // Debounce para coalescer alterações de cidade/UF em rajada.
+  Timer? _healthUnitsDebounce;
 
   // PBI 157 / TASK 163 — UF do Conselho passou a ser um campo distinto do
   // número de registro. Antes a UF era extraída do final da string digitada
@@ -124,6 +151,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   void dispose() {
     // Remove o listener antes de descartar o controller para evitar memory leak
     _zipCodeController.removeListener(_onCepChanged);
+    _addressCityController.removeListener(_onCityOrStateChanged);
+    _healthUnitsDebounce?.cancel();
     _firstNameController.dispose();
     _lastNameController.dispose();
     _emailController.dispose();
@@ -144,8 +173,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   void initState() {
     super.initState();
+    // Service injetável para testes; em produção usa a implementação real.
+    _healthUnitService = widget.healthUnitService ?? HealthUnitService();
     // Registra listener para disparar busca ViaCEP assim que 8 dígitos forem digitados
     _zipCodeController.addListener(_onCepChanged);
+    // Listener da cidade — mudanças manuais também devem refazer a busca de UBS.
+    _addressCityController.addListener(_onCityOrStateChanged);
   }
 
   /// Callback do listener do campo CEP.
@@ -216,6 +249,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             _addressState = uf;
           }
         });
+        // Após o autopreenchimento, refaz a busca de UBS com cidade/UF novos.
+        _scheduleHealthUnitsFetch();
       }
     } on TimeoutException {
       if (!mounted) return;
@@ -234,6 +269,101 @@ class _RegisterScreenState extends State<RegisterScreen> {
       );
     } finally {
       if (mounted) setState(() => _isSearchingCep = false);
+    }
+  }
+
+  /// Listener de cidade — agenda nova busca de UBS após o usuário parar de
+  /// digitar (debounce de 400ms). UF é dropdown, então seu `onChanged`
+  /// chama [_scheduleHealthUnitsFetch] diretamente.
+  void _onCityOrStateChanged() {
+    _scheduleHealthUnitsFetch();
+  }
+
+  /// Coalesce alterações em rajada (autofill ViaCEP + listeners) em uma única
+  /// chamada à RPC após 400ms de inatividade.
+  void _scheduleHealthUnitsFetch() {
+    _healthUnitsDebounce?.cancel();
+    _healthUnitsDebounce = Timer(const Duration(milliseconds: 400), () {
+      if (!mounted) return;
+      _fetchHealthUnits();
+    });
+  }
+
+  /// Busca a lista de UBS para a cidade/UF informados e atualiza o estado.
+  ///
+  /// Trata todos os ramos previstos pelo PBI 198 / TASK 216:
+  ///   - sem critério (cidade/UF vazios) → limpa lista e não chama backend.
+  ///   - chave já buscada → curto-circuito para evitar chamada duplicada.
+  ///   - sucesso → preserva seleção se o id ainda existir; senão zera.
+  ///   - erro → mantém lista anterior e expõe `_healthUnitsError` para a UI.
+  Future<void> _fetchHealthUnits() async {
+    final city = _addressCityController.text.trim();
+    final state = _addressState?.trim().toUpperCase();
+
+    if (city.isEmpty || state == null || state.isEmpty) {
+      // Sem cidade/UF não há como filtrar — UI exibe helper informativo.
+      if (!mounted) return;
+      setState(() {
+        _healthUnits = const [];
+        _selectedHealthUnit = null;
+        _loadingHealthUnits = false;
+        _healthUnitsError = null;
+        _lastHealthUnitFetchKey = null;
+      });
+      return;
+    }
+
+    final fetchKey = '$city|$state';
+    // Curto-circuito: já buscamos exatamente esse par.
+    if (fetchKey == _lastHealthUnitFetchKey && _healthUnits.isNotEmpty) {
+      return;
+    }
+
+    setState(() {
+      _loadingHealthUnits = true;
+      _healthUnitsError = null;
+    });
+
+    try {
+      final units = await _healthUnitService.listByCity(city, state: state);
+      // Verifica staleness — se o usuário trocou cidade/UF enquanto a chamada
+      // estava em voo, descartamos o resultado para evitar UI inconsistente.
+      if (!mounted) return;
+      final currentCity = _addressCityController.text.trim();
+      final currentState = _addressState?.trim().toUpperCase();
+      if (currentCity != city || currentState != state) return;
+
+      // Preserva seleção se o id ainda figura na nova lista.
+      final stillSelected = _selectedHealthUnit != null
+          ? units.firstWhere(
+              (u) => u.id == _selectedHealthUnit!.id,
+              orElse: () => _selectedHealthUnit!,
+            )
+          : null;
+      final keepSelection =
+          stillSelected != null && units.any((u) => u.id == stillSelected.id);
+
+      setState(() {
+        _healthUnits = units;
+        _selectedHealthUnit = keepSelection ? stillSelected : null;
+        _loadingHealthUnits = false;
+        _healthUnitsError = null;
+        _lastHealthUnitFetchKey = fetchKey;
+      });
+    } on HealthUnitServiceException catch (e) {
+      // Erros previsíveis do service — mostra a mensagem original ao usuário.
+      if (!mounted) return;
+      setState(() {
+        _loadingHealthUnits = false;
+        _healthUnitsError = e.message;
+      });
+    } catch (_) {
+      // Erros inesperados (rede, parsing) — mensagem genérica e amigável.
+      if (!mounted) return;
+      setState(() {
+        _loadingHealthUnits = false;
+        _healthUnitsError = 'Não foi possível carregar as UBS no momento.';
+      });
     }
   }
 
@@ -366,6 +496,20 @@ class _RegisterScreenState extends State<RegisterScreen> {
     final birthDate = _selectedBirthDate;
 
     if (professionalType == null || birthDate == null) return;
+
+    // PBI 198 / TASK 216 — UBS é obrigatória para que a RPC
+    // `search_patients_for_prescription` valide o prescritor. Sem seleção,
+    // bloqueamos o submit com SnackBar explicativo (validator do dropdown
+    // também marca o campo em vermelho via `validate()`).
+    if (_selectedHealthUnit == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selecione a UBS de atuação para concluir o cadastro.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
 
@@ -870,11 +1014,29 @@ class _RegisterScreenState extends State<RegisterScreen> {
                               ),
                             )
                             .toList(),
-                        onChanged: (value) =>
-                            setState(() => _addressState = value),
+                        onChanged: (value) {
+                          setState(() => _addressState = value);
+                          // PBI 198 / TASK 216 — Mudar UF refaz a busca de UBS.
+                          _scheduleHealthUnitsFetch();
+                        },
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                // PBI 198 / TASK 216 — Dropdown de UBS filtrado pela cidade/UF
+                // do endereço do profissional. Obrigatório para finalizar o
+                // cadastro (pré-requisito da RPC search_patients_for_prescription).
+                _HealthUnitField(
+                  units: _healthUnits,
+                  selected: _selectedHealthUnit,
+                  loading: _loadingHealthUnits,
+                  errorMessage: _healthUnitsError,
+                  hasCriteria: _addressCityController.text.trim().isNotEmpty &&
+                      (_addressState ?? '').isNotEmpty,
+                  onChanged: (unit) =>
+                      setState(() => _selectedHealthUnit = unit),
+                  onRetry: _fetchHealthUnits,
                 ),
                 const SizedBox(height: 20),
                 authProvider.isLoading
@@ -891,6 +1053,131 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+/// Widget interno que renderiza o campo de UBS com 4 estados visuais
+/// distintos: carregando, erro (com retry), sem critério (cidade/UF vazios)
+/// e populado/vazio. Mantido fora do State para facilitar testes e leitura.
+class _HealthUnitField extends StatelessWidget {
+  final List<HealthUnitModel> units;
+  final HealthUnitModel? selected;
+  final bool loading;
+  final String? errorMessage;
+  final bool hasCriteria;
+  final ValueChanged<HealthUnitModel?> onChanged;
+  final VoidCallback onRetry;
+
+  const _HealthUnitField({
+    required this.units,
+    required this.selected,
+    required this.loading,
+    required this.errorMessage,
+    required this.hasCriteria,
+    required this.onChanged,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    // Estado de loading: InputDecorator com spinner. Row não-const por causa
+    // do CircularProgressIndicator não ser const.
+    if (loading) {
+      return const InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'UBS de atuação *',
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.local_hospital_outlined),
+        ),
+        child: Row(
+          children: [
+            SizedBox(
+              width: 18,
+              height: 18,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 12),
+            Text('Carregando UBS...'),
+          ],
+        ),
+      );
+    }
+
+    // Estado de erro: mensagem em vermelho + botão "Tentar novamente".
+    if (errorMessage != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            errorMessage!,
+            style: const TextStyle(color: AppColors.error),
+          ),
+          const SizedBox(height: 4),
+          TextButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh),
+            label: const Text('Tentar novamente'),
+          ),
+        ],
+      );
+    }
+
+    // Sem critério: helper informativo, sem dropdown habilitado.
+    if (!hasCriteria) {
+      return const InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'UBS de atuação *',
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.local_hospital_outlined),
+        ),
+        child: Text(
+          'Informe a cidade e a UF do endereço para listar as UBS.',
+          style: TextStyle(color: Colors.black54),
+        ),
+      );
+    }
+
+    // Lista vazia para a cidade/UF: ainda mostra dropdown desabilitado com
+    // helper específico — diferencia de "sem critério" e de erro.
+    if (units.isEmpty) {
+      return const InputDecorator(
+        decoration: InputDecoration(
+          labelText: 'UBS de atuação *',
+          border: OutlineInputBorder(),
+          prefixIcon: Icon(Icons.local_hospital_outlined),
+        ),
+        child: Text(
+          'Nenhuma UBS cadastrada para a cidade/UF informadas.',
+          style: TextStyle(color: Colors.black54),
+        ),
+      );
+    }
+
+    // Lista populada: dropdown obrigatório (validator bloqueia submit).
+    return DropdownButtonFormField<HealthUnitModel>(
+      key: const Key('health-unit-dropdown'),
+      initialValue: selected,
+      isExpanded: true,
+      decoration: const InputDecoration(
+        labelText: 'UBS de atuação *',
+        border: OutlineInputBorder(),
+        prefixIcon: Icon(Icons.local_hospital_outlined),
+      ),
+      items: units
+          .map(
+            (u) => DropdownMenuItem<HealthUnitModel>(
+              value: u,
+              child: Text(u.label, overflow: TextOverflow.ellipsis),
+            ),
+          )
+          .toList(),
+      onChanged: onChanged,
+      validator: (value) {
+        // Obrigatório por regra de negócio (PBI 198 / TASK 216).
+        if (value == null) return 'Selecione a UBS de atuação.';
+        return null;
+      },
     );
   }
 }

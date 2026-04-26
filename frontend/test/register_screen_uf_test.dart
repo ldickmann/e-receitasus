@@ -4,11 +4,13 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:provider/provider.dart';
 
+import 'package:e_receitasus/models/health_unit_model.dart';
 import 'package:e_receitasus/models/professional_type.dart';
 import 'package:e_receitasus/models/user_model.dart';
 import 'package:e_receitasus/providers/auth_provider.dart';
 import 'package:e_receitasus/screens/register_screen.dart';
 import 'package:e_receitasus/services/auth_service.dart';
+import 'package:e_receitasus/services/health_unit_service.dart';
 
 // ---------------------------------------------------------------------------
 // PBI 157 / TASK 166 — Cobertura de testes para o novo dropdown de UF do
@@ -123,6 +125,29 @@ class _CapturingAuthService implements IAuthService {
   Future<void> logout() async {}
 }
 
+/// Fake do `IHealthUnitService` que sempre devolve uma única UBS pré-definida.
+///
+/// Necessário para os testes de submit válido após PBI 198 / TASK 216 ter
+/// tornado a UBS de atuação obrigatória no cadastro de profissionais.
+class _StaticHealthUnitService implements IHealthUnitService {
+  final List<HealthUnitModel> units;
+  _StaticHealthUnitService(this.units);
+
+  @override
+  Future<List<HealthUnitModel>> listByCity(String city, {String? state}) async {
+    return units;
+  }
+}
+
+/// UBS padrão usada nos cenários de submit válido.
+const _ubsPadrao = HealthUnitModel(
+  id: 'ubs-padrao-id',
+  name: 'UBS Centro',
+  district: 'Centro',
+  city: 'Navegantes',
+  state: 'SC',
+);
+
 /// Monta a `RegisterScreen` com o fake de auth e um MockClient HTTP.
 ///
 /// Por padrão, o `MockClient` devolve 404 para qualquer requisição (ViaCEP
@@ -132,6 +157,7 @@ class _CapturingAuthService implements IAuthService {
 Widget _buildTestApp(
   _CapturingAuthService fakeAuth, {
   http.Client? httpClient,
+  IHealthUnitService? healthUnitService,
 }) {
   return MultiProvider(
     providers: [
@@ -145,6 +171,10 @@ Widget _buildTestApp(
         // engano, devolve 404 para não abrir socket real e quebrar o teste.
         httpClient:
             httpClient ?? MockClient((_) async => http.Response('{}', 404)),
+        // Fake inerte por padrão (lista vazia) — suficiente para testes que
+        // não fazem submit válido. Submits válidos injetam um fake com UBS.
+        healthUnitService:
+            healthUnitService ?? _StaticHealthUnitService(const []),
       ),
     ),
   );
@@ -338,13 +368,14 @@ void main() {
           }
           return http.Response('{}', 404);
         });
-        await tester
-            .pumpWidget(_buildTestApp(fakeAuth, httpClient: viaCepClient));
+        await tester.pumpWidget(_buildTestApp(
+          fakeAuth,
+          httpClient: viaCepClient,
+          healthUnitService: _StaticHealthUnitService(const [_ubsPadrao]),
+        ));
         await tester.pumpAndSettle();
 
         await _preencherCamposBasicos(tester);
-
-        // Tipo de profissional → Médico (exige conselho + UF)
         await _selectDropdownValue<ProfessionalType>(
           tester: tester,
           dropdownFinder: find.byKey(const Key('professional-type-dropdown')),
@@ -363,6 +394,16 @@ void main() {
           tester: tester,
           dropdownFinder: find.byKey(const Key('council-state-dropdown')),
           value: 'SC',
+        );
+
+        // Aguarda debounce do dropdown de UBS (400ms) — disparado pelo ViaCEP
+        // ao popular cidade/UF — e seleciona a UBS de atuação (PBI 198 / TASK 216).
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pumpAndSettle();
+        await _selectDropdownValue<HealthUnitModel>(
+          tester: tester,
+          dropdownFinder: find.byKey(const Key('health-unit-dropdown')),
+          value: _ubsPadrao,
         );
 
         // ACT — submete o formulário (todos os campos válidos)
@@ -417,8 +458,11 @@ void main() {
           }
           return http.Response('{}', 404);
         });
-        await tester
-            .pumpWidget(_buildTestApp(fakeAuth, httpClient: viaCepClient));
+        await tester.pumpWidget(_buildTestApp(
+          fakeAuth,
+          httpClient: viaCepClient,
+          healthUnitService: _StaticHealthUnitService(const [_ubsPadrao]),
+        ));
         await tester.pumpAndSettle();
 
         await _preencherCamposBasicos(tester);
@@ -454,6 +498,16 @@ void main() {
           tester: tester,
           dropdownFinder: find.byKey(const Key('council-state-dropdown')),
           value: 'SC',
+        );
+
+        // Aguarda debounce do dropdown de UBS e seleciona — UBS é obrigatória
+        // após PBI 198 / TASK 216.
+        await tester.pump(const Duration(milliseconds: 500));
+        await tester.pumpAndSettle();
+        await _selectDropdownValue<HealthUnitModel>(
+          tester: tester,
+          dropdownFinder: find.byKey(const Key('health-unit-dropdown')),
+          value: _ubsPadrao,
         );
 
         // O SnackBar de CEP não encontrado fica sobre a região inferior da
