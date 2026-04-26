@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'providers/auth_provider.dart';
@@ -37,7 +38,22 @@ void main() async {
   // 1. Garante que os bindings do Flutter estejam prontos para operações assíncronas
   WidgetsFlutterBinding.ensureInitialized();
 
-  // 2. Inicializa o Supabase com as credenciais do seu projeto
+  // 2. Habilita modo edge-to-edge (PBI #199 / TASK #219).
+  // Em Android moderno (gesture navigation e botões virtuais), garantimos que
+  // o app desenhe sob a system navigation bar e usamos SafeArea nas telas
+  // para evitar que botões/conteúdo fiquem ocultos pela barra do sistema.
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  // Mantém a navbar transparente para que o conteúdo "passe por baixo"
+  // sem sombreamento extra; ícones em brightness dark para contraste sobre
+  // o fundo claro padrão (o tema dark é aplicado pelo Material via AppTheme).
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.dark,
+    ),
+  );
+
+  // 3. Inicializa o Supabase com as credenciais do seu projeto
   // Esta configuração conecta o app diretamente ao backend-as-a-service na nuvem
   await Supabase.initialize(
     url: 'https://shnahlongybxxilworck.supabase.co',
