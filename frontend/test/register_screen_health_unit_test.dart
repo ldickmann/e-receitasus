@@ -151,10 +151,11 @@ Widget _buildTestApp({
     ],
     child: MaterialApp(
       home: RegisterScreen(
-        // ViaCEP inerte por padrão — testes que precisam de autopreenchimento
-        // injetam um MockClient com payload válido.
+        // ViaCEP inerte por padrão — retorna 200 com objeto vazio. O
+        // [ViaCepService] interno trata como endereço vazio (sem SnackBar)
+        // e os testes preenchem cidade/bairro/UF manualmente.
         httpClient:
-            httpClient ?? MockClient((_) async => http.Response('{}', 404)),
+            httpClient ?? MockClient((_) async => http.Response('{}', 200)),
         healthUnitService: fakeHealthUnitService,
       ),
     ),
@@ -262,7 +263,7 @@ void main() {
               headers: {'content-type': 'application/json; charset=utf-8'},
             );
           }
-          return http.Response('{}', 404);
+          return http.Response('{}', 200);
         });
 
         await tester.pumpWidget(_buildTestApp(
