@@ -588,150 +588,150 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
       body: SafeArea(
         top: false,
         child: Form(
-        key: _formKey,
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
-              _TypeBadge(type: widget.type),
-              const SizedBox(height: 16),
+          key: _formKey,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _TypeBadge(type: widget.type),
+                const SizedBox(height: 16),
 
-              // Seção Notificação (apenas Amarela/Azul)
-              if (widget.type.requiresNotificationNumber) ...[
-                _SectionHeader(
-                  title: 'Numeração da Notificação',
-                  icon: Icons.numbers,
-                  color: widget.type.foregroundColor,
-                ),
-                const SizedBox(height: 8),
-                _NotificationSection(
-                  numberCtrl: _notificationNumberCtrl,
-                  ufCtrl: _notificationUfCtrl,
-                  type: widget.type,
-                ),
-                const SizedBox(height: 20),
-              ],
+                // Seção Notificação (apenas Amarela/Azul)
+                if (widget.type.requiresNotificationNumber) ...[
+                  _SectionHeader(
+                    title: 'Numeração da Notificação',
+                    icon: Icons.numbers,
+                    color: widget.type.foregroundColor,
+                  ),
+                  const SizedBox(height: 8),
+                  _NotificationSection(
+                    numberCtrl: _notificationNumberCtrl,
+                    ufCtrl: _notificationUfCtrl,
+                    type: widget.type,
+                  ),
+                  const SizedBox(height: 20),
+                ],
 
-              // Seção Estabelecimento / Médico
-              const _SectionHeader(
-                title: 'Dados do Prescritor',
-                icon: Icons.person,
-                color: AppColors.primary,
-              ),
-              const SizedBox(height: 8),
-              _DoctorSection(
-                nameCtrl: _doctorNameCtrl,
-                councilCtrl: _doctorCouncilCtrl,
-                councilStateCtrl: _doctorCouncilStateCtrl,
-                specialtyCtrl: _doctorSpecialtyCtrl,
-                cepCtrl: _doctorCepCtrl,
-                isSearchingCep: _isSearchingCep,
-                addressCtrl: _doctorAddressCtrl,
-                cityCtrl: _doctorCityCtrl,
-                stateCtrl: _doctorStateCtrl,
-                phoneCtrl: _doctorPhoneCtrl,
-                clinicCtrl: _clinicNameCtrl,
-                healthUnits: _healthUnits,
-                selectedHealthUnit: _selectedHealthUnit,
-                loadingHealthUnits: _loadingHealthUnits,
-                healthUnitsError: _healthUnitsError,
-                onHealthUnitChanged: _onHealthUnitSelected,
-                onRetryHealthUnits: () {
-                  // Força refetch ignorando o cache do `_lastFetchKey`.
-                  _lastFetchKey = null;
-                  _fetchHealthUnits();
-                },
-              ),
-              const SizedBox(height: 20),
-
-              // Seção Paciente
-              const _SectionHeader(
-                title: 'Dados do Paciente',
-                icon: Icons.people,
-                color: AppColors.primary,
-              ),
-              const SizedBox(height: 8),
-              _PatientSection(
-                nameCtrl: _patientNameCtrl,
-                cpfCtrl: _patientCpfCtrl,
-                addressCtrl: _patientAddressCtrl,
-                cityCtrl: _patientCityCtrl,
-                ageCtrl: _patientAgeCtrl,
-                requireCpf: widget.type.isNotification ||
-                    widget.type == PrescriptionType.controlada,
-                requireAddress: widget.type.isNotification,
-                onPatientSelected: _onPatientSelected,
-                prescriptionService: _prescriptionService,
-              ),
-              const SizedBox(height: 20),
-
-              // Seção Medicamento
-              const _SectionHeader(
-                title: 'Prescrição',
-                icon: Icons.medication,
-                color: AppColors.primary,
-              ),
-              const SizedBox(height: 8),
-              _MedicineSection(
-                medicineCtrl: _medicineCtrl,
-                dosageCtrl: _dosageCtrl,
-                pharmaceuticalFormCtrl: _pharmaceuticalFormCtrl,
-                routeCtrl: _routeCtrl,
-                quantityCtrl: _quantityCtrl,
-                quantityWordsCtrl: _quantityWordsCtrl,
-                instructionsCtrl: _instructionsCtrl,
-                requireQuantityWords: widget.type.isNotification,
-              ),
-              const SizedBox(height: 20),
-
-              // Receita Contínua (apenas Branca)
-              if (widget.type == PrescriptionType.branca) ...[
+                // Seção Estabelecimento / Médico
                 const _SectionHeader(
-                  title: 'Uso Contínuo (RDC 471/2021)',
-                  icon: Icons.repeat,
+                  title: 'Dados do Prescritor',
+                  icon: Icons.person,
                   color: AppColors.primary,
                 ),
                 const SizedBox(height: 8),
-                _ContinuousUseSection(
-                  isContinuousUse: _isContinuousUse,
-                  continuousMonths: _continuousMonths,
-                  onChanged: (val) => setState(() => _isContinuousUse = val),
-                  onMonthsChanged: (val) =>
-                      setState(() => _continuousMonths = val),
+                _DoctorSection(
+                  nameCtrl: _doctorNameCtrl,
+                  councilCtrl: _doctorCouncilCtrl,
+                  councilStateCtrl: _doctorCouncilStateCtrl,
+                  specialtyCtrl: _doctorSpecialtyCtrl,
+                  cepCtrl: _doctorCepCtrl,
+                  isSearchingCep: _isSearchingCep,
+                  addressCtrl: _doctorAddressCtrl,
+                  cityCtrl: _doctorCityCtrl,
+                  stateCtrl: _doctorStateCtrl,
+                  phoneCtrl: _doctorPhoneCtrl,
+                  clinicCtrl: _clinicNameCtrl,
+                  healthUnits: _healthUnits,
+                  selectedHealthUnit: _selectedHealthUnit,
+                  loadingHealthUnits: _loadingHealthUnits,
+                  healthUnitsError: _healthUnitsError,
+                  onHealthUnitChanged: _onHealthUnitSelected,
+                  onRetryHealthUnits: () {
+                    // Força refetch ignorando o cache do `_lastFetchKey`.
+                    _lastFetchKey = null;
+                    _fetchHealthUnits();
+                  },
                 ),
                 const SizedBox(height: 20),
-              ],
 
-              // Aviso legal
-              _LegalWarning(type: widget.type),
-              const SizedBox(height: 20),
+                // Seção Paciente
+                const _SectionHeader(
+                  title: 'Dados do Paciente',
+                  icon: Icons.people,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(height: 8),
+                _PatientSection(
+                  nameCtrl: _patientNameCtrl,
+                  cpfCtrl: _patientCpfCtrl,
+                  addressCtrl: _patientAddressCtrl,
+                  cityCtrl: _patientCityCtrl,
+                  ageCtrl: _patientAgeCtrl,
+                  requireCpf: widget.type.isNotification ||
+                      widget.type == PrescriptionType.controlada,
+                  requireAddress: widget.type.isNotification,
+                  onPatientSelected: _onPatientSelected,
+                  prescriptionService: _prescriptionService,
+                ),
+                const SizedBox(height: 20),
 
-              // Botão de emissão
-              _isSaving
-                  ? const Center(child: CircularProgressIndicator())
-                  : ElevatedButton.icon(
-                      onPressed: _handleSubmit,
-                      icon: const Icon(Icons.receipt_long),
-                      label: const Text(
-                        'Emitir Receita',
-                        style: TextStyle(fontSize: 16),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        // Botão de emissão usa a cor primária do tema
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size(double.infinity, 52),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
+                // Seção Medicamento
+                const _SectionHeader(
+                  title: 'Prescrição',
+                  icon: Icons.medication,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(height: 8),
+                _MedicineSection(
+                  medicineCtrl: _medicineCtrl,
+                  dosageCtrl: _dosageCtrl,
+                  pharmaceuticalFormCtrl: _pharmaceuticalFormCtrl,
+                  routeCtrl: _routeCtrl,
+                  quantityCtrl: _quantityCtrl,
+                  quantityWordsCtrl: _quantityWordsCtrl,
+                  instructionsCtrl: _instructionsCtrl,
+                  requireQuantityWords: widget.type.isNotification,
+                ),
+                const SizedBox(height: 20),
+
+                // Receita Contínua (apenas Branca)
+                if (widget.type == PrescriptionType.branca) ...[
+                  const _SectionHeader(
+                    title: 'Uso Contínuo (RDC 471/2021)',
+                    icon: Icons.repeat,
+                    color: AppColors.primary,
+                  ),
+                  const SizedBox(height: 8),
+                  _ContinuousUseSection(
+                    isContinuousUse: _isContinuousUse,
+                    continuousMonths: _continuousMonths,
+                    onChanged: (val) => setState(() => _isContinuousUse = val),
+                    onMonthsChanged: (val) =>
+                        setState(() => _continuousMonths = val),
+                  ),
+                  const SizedBox(height: 20),
+                ],
+
+                // Aviso legal
+                _LegalWarning(type: widget.type),
+                const SizedBox(height: 20),
+
+                // Botão de emissão
+                _isSaving
+                    ? const Center(child: CircularProgressIndicator())
+                    : ElevatedButton.icon(
+                        onPressed: _handleSubmit,
+                        icon: const Icon(Icons.receipt_long),
+                        label: const Text(
+                          'Emitir Receita',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          // Botão de emissão usa a cor primária do tema
+                          backgroundColor: AppColors.primary,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size(double.infinity, 52),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                          ),
                         ),
                       ),
-                    ),
-              const SizedBox(height: 24),
-            ],
+                const SizedBox(height: 24),
+              ],
+            ),
           ),
         ),
-      ),
       ),
     );
   }

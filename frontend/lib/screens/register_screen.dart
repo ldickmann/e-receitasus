@@ -583,455 +583,463 @@ class _RegisterScreenState extends State<RegisterScreen> {
       body: SafeArea(
         top: false,
         child: Center(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Form(
-            key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                Text(
-                  'Criar Nova Conta',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(24),
+            child: Form(
+              key: _formKey,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    'Criar Nova Conta',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 24),
-                TextFormField(
-                  controller: _firstNameController,
-                  keyboardType: TextInputType.name,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Primeiro Nome',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person_outline),
+                  const SizedBox(height: 24),
+                  TextFormField(
+                    controller: _firstNameController,
+                    keyboardType: TextInputType.name,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Primeiro Nome',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    validator: (value) =>
+                        _validateName(value, 'o primeiro nome'),
                   ),
-                  validator: (value) => _validateName(value, 'o primeiro nome'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _lastNameController,
-                  keyboardType: TextInputType.name,
-                  textCapitalization: TextCapitalization.words,
-                  decoration: const InputDecoration(
-                    labelText: 'Sobrenome',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.person),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _lastNameController,
+                    keyboardType: TextInputType.name,
+                    textCapitalization: TextCapitalization.words,
+                    decoration: const InputDecoration(
+                      labelText: 'Sobrenome',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.person),
+                    ),
+                    validator: (value) => _validateName(value, 'o sobrenome'),
                   ),
-                  validator: (value) => _validateName(value, 'o sobrenome'),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _emailController,
-                  keyboardType: TextInputType.emailAddress,
-                  decoration: const InputDecoration(
-                    labelText: 'E-mail',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.email),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _emailController,
+                    keyboardType: TextInputType.emailAddress,
+                    decoration: const InputDecoration(
+                      labelText: 'E-mail',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.email),
+                    ),
+                    validator: _validateEmail,
                   ),
-                  validator: _validateEmail,
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<ProfessionalType>(
-                  key: const Key('professional-type-dropdown'),
-                  initialValue: _selectedProfessionalType,
-                  decoration: const InputDecoration(
-                    labelText: 'Tipo de Profissional',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.work),
+                  const SizedBox(height: 12),
+                  DropdownButtonFormField<ProfessionalType>(
+                    key: const Key('professional-type-dropdown'),
+                    initialValue: _selectedProfessionalType,
+                    decoration: const InputDecoration(
+                      labelText: 'Tipo de Profissional',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.work),
+                    ),
+                    items: ProfessionalType.values
+                        // Exclui PACIENTE do dropdown — pacientes usam a tela própria
+                        .where((t) => !t.isPatient)
+                        .map(
+                          (type) => DropdownMenuItem<ProfessionalType>(
+                            value: type,
+                            child: Text(type.displayName),
+                          ),
+                        )
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        _selectedProfessionalType = value;
+                        _professionalIdController.clear();
+                        // Limpa UF do conselho ao trocar o tipo de profissional
+                        // para evitar combinações incoerentes (ex: CRM + UF
+                        // selecionada após mudar para ADMINISTRATIVO, que não
+                        // usa registro em conselho).
+                        _selectedCouncilState = null;
+                      });
+                    },
+                    validator: (value) {
+                      if (value == null) {
+                        return 'Selecione o tipo de profissional';
+                      }
+                      return null;
+                    },
                   ),
-                  items: ProfessionalType.values
-                      // Exclui PACIENTE do dropdown — pacientes usam a tela própria
-                      .where((t) => !t.isPatient)
-                      .map(
-                        (type) => DropdownMenuItem<ProfessionalType>(
-                          value: type,
-                          child: Text(type.displayName),
-                        ),
-                      )
-                      .toList(),
-                  onChanged: (value) {
-                    setState(() {
-                      _selectedProfessionalType = value;
-                      _professionalIdController.clear();
-                      // Limpa UF do conselho ao trocar o tipo de profissional
-                      // para evitar combinações incoerentes (ex: CRM + UF
-                      // selecionada após mudar para ADMINISTRATIVO, que não
-                      // usa registro em conselho).
-                      _selectedCouncilState = null;
-                    });
-                  },
-                  validator: (value) {
-                    if (value == null) {
-                      return 'Selecione o tipo de profissional';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 250),
-                  child: _selectedProfessionalType == null
-                      ? const SizedBox.shrink()
-                      : Column(
-                          key: ValueKey<String>(
-                              _selectedProfessionalType!.value),
-                          children: [
-                            TextFormField(
-                              controller: _professionalIdController,
-                              keyboardType: TextInputType.text,
-                              textCapitalization: TextCapitalization.characters,
-                              decoration: InputDecoration(
-                                // Label/hint deixam claro que o campo recebe
-                                // APENAS o número do registro. A UF é coletada
-                                // no Dropdown imediatamente abaixo (TASK 163).
-                                labelText:
-                                    'Número do ${_selectedProfessionalType!.councilName}',
-                                hintText:
-                                    _selectedProfessionalType!.requiresCouncil
-                                        ? 'Ex: 123456'
-                                        : 'Ex: MAT-2024-001',
-                                border: const OutlineInputBorder(),
-                                prefixIcon: const Icon(Icons.badge),
-                                helperText: 'Campo obrigatorio',
-                              ),
-                              // Validação local mínima: não-vazio e tamanho
-                              // mínimo. Validação de UF é responsabilidade do
-                              // Dropdown abaixo, o que evita parsing frágil
-                              // da string "123456-SP".
-                              validator: (value) {
-                                final input = value?.trim() ?? '';
-                                if (input.isEmpty) {
-                                  return 'Informe obrigatoriamente o seu '
-                                      '${_selectedProfessionalType!.councilName}';
-                                }
-                                if (input.length < 3) {
-                                  return '${_selectedProfessionalType!.councilName} '
-                                      'deve ter no minimo 3 caracteres';
-                                }
-                                return null;
-                              },
-                            ),
-                            // Só mostra UF para profissionais que possuem
-                            // registro em conselho (médico, enfermeiro etc.).
-                            // ADMINISTRATIVO/OUTROS usam matrícula interna,
-                            // que não tem UF.
-                            if (_selectedProfessionalType!.requiresCouncil) ...[
-                              const SizedBox(height: 12),
-                              DropdownButtonFormField<String>(
-                                key: const Key('council-state-dropdown'),
-                                initialValue: _selectedCouncilState,
-                                decoration: const InputDecoration(
-                                  labelText: 'UF do Conselho',
-                                  border: OutlineInputBorder(),
-                                  prefixIcon: Icon(Icons.flag_outlined),
+                  const SizedBox(height: 12),
+                  AnimatedSwitcher(
+                    duration: const Duration(milliseconds: 250),
+                    child: _selectedProfessionalType == null
+                        ? const SizedBox.shrink()
+                        : Column(
+                            key: ValueKey<String>(
+                                _selectedProfessionalType!.value),
+                            children: [
+                              TextFormField(
+                                controller: _professionalIdController,
+                                keyboardType: TextInputType.text,
+                                textCapitalization:
+                                    TextCapitalization.characters,
+                                decoration: InputDecoration(
+                                  // Label/hint deixam claro que o campo recebe
+                                  // APENAS o número do registro. A UF é coletada
+                                  // no Dropdown imediatamente abaixo (TASK 163).
+                                  labelText:
+                                      'Número do ${_selectedProfessionalType!.councilName}',
+                                  hintText:
+                                      _selectedProfessionalType!.requiresCouncil
+                                          ? 'Ex: 123456'
+                                          : 'Ex: MAT-2024-001',
+                                  border: const OutlineInputBorder(),
+                                  prefixIcon: const Icon(Icons.badge),
                                   helperText: 'Campo obrigatorio',
                                 ),
-                                items: _ufOptions
-                                    .map(
-                                      (uf) => DropdownMenuItem<String>(
-                                        value: uf,
-                                        child: Text(uf),
-                                      ),
-                                    )
-                                    .toList(),
-                                onChanged: (value) {
-                                  setState(() => _selectedCouncilState = value);
-                                },
-                                // Obrigatório apenas quando o tipo selecionado
-                                // exige registro em conselho. Em runtime o
-                                // dropdown nem é renderizado se !requiresCouncil,
-                                // mas a guarda extra protege contra mudanças
-                                // futuras de fluxo.
+                                // Validação local mínima: não-vazio e tamanho
+                                // mínimo. Validação de UF é responsabilidade do
+                                // Dropdown abaixo, o que evita parsing frágil
+                                // da string "123456-SP".
                                 validator: (value) {
-                                  if (_selectedProfessionalType
-                                          ?.requiresCouncil !=
-                                      true) {
-                                    return null;
+                                  final input = value?.trim() ?? '';
+                                  if (input.isEmpty) {
+                                    return 'Informe obrigatoriamente o seu '
+                                        '${_selectedProfessionalType!.councilName}';
                                   }
-                                  if (value == null || value.isEmpty) {
-                                    return 'Selecione a UF do conselho';
+                                  if (input.length < 3) {
+                                    return '${_selectedProfessionalType!.councilName} '
+                                        'deve ter no minimo 3 caracteres';
                                   }
                                   return null;
                                 },
                               ),
+                              // Só mostra UF para profissionais que possuem
+                              // registro em conselho (médico, enfermeiro etc.).
+                              // ADMINISTRATIVO/OUTROS usam matrícula interna,
+                              // que não tem UF.
+                              if (_selectedProfessionalType!
+                                  .requiresCouncil) ...[
+                                const SizedBox(height: 12),
+                                DropdownButtonFormField<String>(
+                                  key: const Key('council-state-dropdown'),
+                                  initialValue: _selectedCouncilState,
+                                  decoration: const InputDecoration(
+                                    labelText: 'UF do Conselho',
+                                    border: OutlineInputBorder(),
+                                    prefixIcon: Icon(Icons.flag_outlined),
+                                    helperText: 'Campo obrigatorio',
+                                  ),
+                                  items: _ufOptions
+                                      .map(
+                                        (uf) => DropdownMenuItem<String>(
+                                          value: uf,
+                                          child: Text(uf),
+                                        ),
+                                      )
+                                      .toList(),
+                                  onChanged: (value) {
+                                    setState(
+                                        () => _selectedCouncilState = value);
+                                  },
+                                  // Obrigatório apenas quando o tipo selecionado
+                                  // exige registro em conselho. Em runtime o
+                                  // dropdown nem é renderizado se !requiresCouncil,
+                                  // mas a guarda extra protege contra mudanças
+                                  // futuras de fluxo.
+                                  validator: (value) {
+                                    if (_selectedProfessionalType
+                                            ?.requiresCouncil !=
+                                        true) {
+                                      return null;
+                                    }
+                                    if (value == null || value.isEmpty) {
+                                      return 'Selecione a UF do conselho';
+                                    }
+                                    return null;
+                                  },
+                                ),
+                              ],
                             ],
-                          ],
-                        ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _birthDateController,
-                  // readOnly removido — permite digitação direta com máscara
-                  keyboardType: TextInputType.number,
-                  inputFormatters: [_DateMaskFormatter()],
-                  onChanged: (text) {
-                    // Ao completar 10 caracteres (DD/MM/AAAA), parseia e
-                    // atualiza _selectedBirthDate para validação e envio
-                    if (text.length == 10) {
-                      setState(() => _selectedBirthDate = _parseDateText(text));
-                    } else {
-                      // Reseta para forçar nova validação ao limpar o campo
-                      setState(() => _selectedBirthDate = null);
-                    }
-                  },
-                  decoration: InputDecoration(
-                    labelText: 'Data de Nascimento',
-                    hintText: 'DD/MM/AAAA',
-                    border: const OutlineInputBorder(),
-                    prefixIcon: const Icon(Icons.cake_outlined),
-                    // Ícone de calendário mantido para abrir DatePicker
-                    suffixIcon: IconButton(
-                      icon: const Icon(Icons.calendar_today),
-                      tooltip: 'Selecionar data no calendário',
-                      onPressed: _pickBirthDate,
-                    ),
+                          ),
                   ),
-                  validator: (_) => _validateBirthDate(),
-                ),
-                const SizedBox(height: 12),
-                AnimatedSize(
-                  duration: const Duration(milliseconds: 250),
-                  child: _selectedProfessionalType == ProfessionalType.medico ||
-                          _selectedProfessionalType ==
-                              ProfessionalType.dentista ||
-                          _selectedProfessionalType ==
-                              ProfessionalType.psicologo
-                      ? Column(
-                          children: [
-                            TextFormField(
-                              controller: _specialtyController,
-                              textCapitalization: TextCapitalization.words,
-                              decoration: const InputDecoration(
-                                labelText: 'Especialidade',
-                                hintText: 'Ex: Clinica Geral, Pediatria',
-                                border: OutlineInputBorder(),
-                                prefixIcon: Icon(Icons.medical_services),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _birthDateController,
+                    // readOnly removido — permite digitação direta com máscara
+                    keyboardType: TextInputType.number,
+                    inputFormatters: [_DateMaskFormatter()],
+                    onChanged: (text) {
+                      // Ao completar 10 caracteres (DD/MM/AAAA), parseia e
+                      // atualiza _selectedBirthDate para validação e envio
+                      if (text.length == 10) {
+                        setState(
+                            () => _selectedBirthDate = _parseDateText(text));
+                      } else {
+                        // Reseta para forçar nova validação ao limpar o campo
+                        setState(() => _selectedBirthDate = null);
+                      }
+                    },
+                    decoration: InputDecoration(
+                      labelText: 'Data de Nascimento',
+                      hintText: 'DD/MM/AAAA',
+                      border: const OutlineInputBorder(),
+                      prefixIcon: const Icon(Icons.cake_outlined),
+                      // Ícone de calendário mantido para abrir DatePicker
+                      suffixIcon: IconButton(
+                        icon: const Icon(Icons.calendar_today),
+                        tooltip: 'Selecionar data no calendário',
+                        onPressed: _pickBirthDate,
+                      ),
+                    ),
+                    validator: (_) => _validateBirthDate(),
+                  ),
+                  const SizedBox(height: 12),
+                  AnimatedSize(
+                    duration: const Duration(milliseconds: 250),
+                    child: _selectedProfessionalType ==
+                                ProfessionalType.medico ||
+                            _selectedProfessionalType ==
+                                ProfessionalType.dentista ||
+                            _selectedProfessionalType ==
+                                ProfessionalType.psicologo
+                        ? Column(
+                            children: [
+                              TextFormField(
+                                controller: _specialtyController,
+                                textCapitalization: TextCapitalization.words,
+                                decoration: const InputDecoration(
+                                  labelText: 'Especialidade',
+                                  hintText: 'Ex: Clinica Geral, Pediatria',
+                                  border: OutlineInputBorder(),
+                                  prefixIcon: Icon(Icons.medical_services),
+                                ),
                               ),
-                            ),
-                            const SizedBox(height: 12),
-                          ],
-                        )
-                      : const SizedBox.shrink(),
-                ),
-                TextFormField(
-                  controller: _passwordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Senha',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock),
-                  ),
-                  validator: _validatePassword,
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _confirmPasswordController,
-                  obscureText: true,
-                  decoration: const InputDecoration(
-                    labelText: 'Confirmar Senha',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.lock_outline),
-                  ),
-                  validator: (value) {
-                    if ((value ?? '').isEmpty) return 'Confirme sua senha';
-                    if (value != _passwordController.text) {
-                      return 'As senhas nao coincidem';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 20),
-                // --- Seção Endereço ---
-                // Endereço é obrigatório (TASK 225 / PBI 197): a trigger
-                // auto_assign_professional_health_unit usa (district, city) para
-                // resolver a UBS do profissional. Sem isso, o profissional não
-                // consegue buscar pacientes da própria UBS na tela de prescrição.
-                Text(
-                  'Endereço',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _zipCodeController,
-                  keyboardType: TextInputType.number,
-                  maxLength: 8,
-                  // Contador de caracteres desnecessário para CEP — remove-se
-                  // o sufixo de "X/8" que polui o campo visualmente
-                  decoration: InputDecoration(
-                    labelText: 'CEP *',
-                    hintText: '00000000',
-                    border: const OutlineInputBorder(),
-                    counterText: '',
-                    prefixIcon: _isSearchingCep
-                        ? const SizedBox(
-                            width: 20,
-                            height: 20,
-                            child: Padding(
-                              padding: EdgeInsets.all(12),
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
+                              const SizedBox(height: 12),
+                            ],
                           )
-                        : const Icon(Icons.location_on_outlined),
+                        : const SizedBox.shrink(),
                   ),
-                  validator: (v) {
-                    // Obrigatório porque dispara o autopreenchimento de bairro/cidade
-                    // que alimentam a trigger de vínculo à UBS.
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Informe o CEP.';
-                    }
-                    if (v.trim().length != 8) {
-                      return 'CEP deve ter 8 dígitos.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _streetController,
-                  decoration: const InputDecoration(
-                    labelText: 'Logradouro',
-                    hintText:
-                        'Preenchido automaticamente ou digitado manualmente',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.signpost_outlined),
+                  TextFormField(
+                    controller: _passwordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Senha',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.lock),
+                    ),
+                    validator: _validatePassword,
                   ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Flexible(
-                      flex: 2,
-                      child: TextFormField(
-                        controller: _streetNumberController,
-                        keyboardType: TextInputType.streetAddress,
-                        decoration: const InputDecoration(
-                          labelText: 'Número',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: true,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirmar Senha',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.lock_outline),
                     ),
-                    const SizedBox(width: 12),
-                    Flexible(
-                      flex: 3,
-                      child: TextFormField(
-                        controller: _complementController,
-                        decoration: const InputDecoration(
-                          labelText: 'Complemento',
-                          hintText: 'Apto, sala…',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                TextFormField(
-                  controller: _districtController,
-                  decoration: const InputDecoration(
-                    labelText: 'Bairro *',
-                    hintText:
-                        'Preenchido automaticamente ou digitado manualmente',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.map_outlined),
+                    validator: (value) {
+                      if ((value ?? '').isEmpty) return 'Confirme sua senha';
+                      if (value != _passwordController.text) {
+                        return 'As senhas nao coincidem';
+                      }
+                      return null;
+                    },
                   ),
-                  validator: (v) {
-                    // Obrigatório (TASK 225 / PBI 197): chave da trigger de UBS.
-                    // Mantém fallback manual porque ViaCEP pode estar indisponível
-                    // ou não retornar bairro para alguns CEPs.
-                    if (v == null || v.trim().isEmpty) {
-                      return 'Informe o bairro.';
-                    }
-                    return null;
-                  },
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    Flexible(
-                      flex: 3,
-                      child: TextFormField(
-                        controller: _addressCityController,
-                        decoration: const InputDecoration(
-                          labelText: 'Cidade *',
-                          hintText:
-                              'Preenchida automaticamente ou digitada manualmente',
-                          border: OutlineInputBorder(),
-                          prefixIcon: Icon(Icons.location_city_outlined),
-                        ),
-                        validator: (v) {
-                          // Obrigatória (TASK 225 / PBI 197): chave da trigger de UBS.
-                          if (v == null || v.trim().isEmpty) {
-                            return 'Informe a cidade.';
-                          }
-                          return null;
-                        },
-                      ),
+                  const SizedBox(height: 20),
+                  // --- Seção Endereço ---
+                  // Endereço é obrigatório (TASK 225 / PBI 197): a trigger
+                  // auto_assign_professional_health_unit usa (district, city) para
+                  // resolver a UBS do profissional. Sem isso, o profissional não
+                  // consegue buscar pacientes da própria UBS na tela de prescrição.
+                  Text(
+                    'Endereço',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Theme.of(context).colorScheme.primary,
                     ),
-                    const SizedBox(width: 12),
-                    Flexible(
-                      flex: 2,
-                      child: DropdownButtonFormField<String>(
-                        key: const Key('address-state-dropdown'),
-                        initialValue: _addressState,
-                        decoration: const InputDecoration(
-                          labelText: 'UF',
-                          border: OutlineInputBorder(),
-                        ),
-                        items: _ufOptions
-                            .map(
-                              (uf) => DropdownMenuItem<String>(
-                                value: uf,
-                                child: Text(uf),
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _zipCodeController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 8,
+                    // Contador de caracteres desnecessário para CEP — remove-se
+                    // o sufixo de "X/8" que polui o campo visualmente
+                    decoration: InputDecoration(
+                      labelText: 'CEP *',
+                      hintText: '00000000',
+                      border: const OutlineInputBorder(),
+                      counterText: '',
+                      prefixIcon: _isSearchingCep
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: Padding(
+                                padding: EdgeInsets.all(12),
+                                child:
+                                    CircularProgressIndicator(strokeWidth: 2),
                               ),
                             )
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() => _addressState = value);
-                          // PBI 198 / TASK 216 — Mudar UF refaz a busca de UBS.
-                          _scheduleHealthUnitsFetch();
-                        },
-                      ),
+                          : const Icon(Icons.location_on_outlined),
                     ),
-                  ],
-                ),
-                const SizedBox(height: 16),
-                // PBI 198 / TASK 216 — Dropdown de UBS filtrado pela cidade/UF
-                // do endereço do profissional. Obrigatório para finalizar o
-                // cadastro (pré-requisito da RPC search_patients_for_prescription).
-                _HealthUnitField(
-                  units: _healthUnits,
-                  selected: _selectedHealthUnit,
-                  loading: _loadingHealthUnits,
-                  errorMessage: _healthUnitsError,
-                  hasCriteria: _addressCityController.text.trim().isNotEmpty &&
-                      (_addressState ?? '').isNotEmpty,
-                  onChanged: (unit) =>
-                      setState(() => _selectedHealthUnit = unit),
-                  onRetry: _fetchHealthUnits,
-                ),
-                const SizedBox(height: 20),
-                authProvider.isLoading
-                    ? const Center(child: CircularProgressIndicator())
-                    : ElevatedButton(
-                        onPressed: _handleRegister,
-                        child: const Text(
-                          'Cadastrar',
-                          style: TextStyle(fontSize: 18),
+                    validator: (v) {
+                      // Obrigatório porque dispara o autopreenchimento de bairro/cidade
+                      // que alimentam a trigger de vínculo à UBS.
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Informe o CEP.';
+                      }
+                      if (v.trim().length != 8) {
+                        return 'CEP deve ter 8 dígitos.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _streetController,
+                    decoration: const InputDecoration(
+                      labelText: 'Logradouro',
+                      hintText:
+                          'Preenchido automaticamente ou digitado manualmente',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.signpost_outlined),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Flexible(
+                        flex: 2,
+                        child: TextFormField(
+                          controller: _streetNumberController,
+                          keyboardType: TextInputType.streetAddress,
+                          decoration: const InputDecoration(
+                            labelText: 'Número',
+                            border: OutlineInputBorder(),
+                          ),
                         ),
                       ),
-              ],
+                      const SizedBox(width: 12),
+                      Flexible(
+                        flex: 3,
+                        child: TextFormField(
+                          controller: _complementController,
+                          decoration: const InputDecoration(
+                            labelText: 'Complemento',
+                            hintText: 'Apto, sala…',
+                            border: OutlineInputBorder(),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  TextFormField(
+                    controller: _districtController,
+                    decoration: const InputDecoration(
+                      labelText: 'Bairro *',
+                      hintText:
+                          'Preenchido automaticamente ou digitado manualmente',
+                      border: OutlineInputBorder(),
+                      prefixIcon: Icon(Icons.map_outlined),
+                    ),
+                    validator: (v) {
+                      // Obrigatório (TASK 225 / PBI 197): chave da trigger de UBS.
+                      // Mantém fallback manual porque ViaCEP pode estar indisponível
+                      // ou não retornar bairro para alguns CEPs.
+                      if (v == null || v.trim().isEmpty) {
+                        return 'Informe o bairro.';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
+                      Flexible(
+                        flex: 3,
+                        child: TextFormField(
+                          controller: _addressCityController,
+                          decoration: const InputDecoration(
+                            labelText: 'Cidade *',
+                            hintText:
+                                'Preenchida automaticamente ou digitada manualmente',
+                            border: OutlineInputBorder(),
+                            prefixIcon: Icon(Icons.location_city_outlined),
+                          ),
+                          validator: (v) {
+                            // Obrigatória (TASK 225 / PBI 197): chave da trigger de UBS.
+                            if (v == null || v.trim().isEmpty) {
+                              return 'Informe a cidade.';
+                            }
+                            return null;
+                          },
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Flexible(
+                        flex: 2,
+                        child: DropdownButtonFormField<String>(
+                          key: const Key('address-state-dropdown'),
+                          initialValue: _addressState,
+                          decoration: const InputDecoration(
+                            labelText: 'UF',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: _ufOptions
+                              .map(
+                                (uf) => DropdownMenuItem<String>(
+                                  value: uf,
+                                  child: Text(uf),
+                                ),
+                              )
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() => _addressState = value);
+                            // PBI 198 / TASK 216 — Mudar UF refaz a busca de UBS.
+                            _scheduleHealthUnitsFetch();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  // PBI 198 / TASK 216 — Dropdown de UBS filtrado pela cidade/UF
+                  // do endereço do profissional. Obrigatório para finalizar o
+                  // cadastro (pré-requisito da RPC search_patients_for_prescription).
+                  _HealthUnitField(
+                    units: _healthUnits,
+                    selected: _selectedHealthUnit,
+                    loading: _loadingHealthUnits,
+                    errorMessage: _healthUnitsError,
+                    hasCriteria:
+                        _addressCityController.text.trim().isNotEmpty &&
+                            (_addressState ?? '').isNotEmpty,
+                    onChanged: (unit) =>
+                        setState(() => _selectedHealthUnit = unit),
+                    onRetry: _fetchHealthUnits,
+                  ),
+                  const SizedBox(height: 20),
+                  authProvider.isLoading
+                      ? const Center(child: CircularProgressIndicator())
+                      : ElevatedButton(
+                          onPressed: _handleRegister,
+                          child: const Text(
+                            'Cadastrar',
+                            style: TextStyle(fontSize: 18),
+                          ),
+                        ),
+                ],
+              ),
             ),
           ),
         ),
-      ),
       ),
     );
   }
