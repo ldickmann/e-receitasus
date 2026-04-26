@@ -85,134 +85,140 @@ class HomeScreen extends StatelessWidget {
           ),
         ],
       ),
-      body: RefreshIndicator(
-        // Adicionada funcionalidade de "puxar para atualizar"
-        onRefresh: () async => debugPrint('Atualizando dados...'),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
-          physics: const AlwaysScrollableScrollPhysics(),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: <Widget>[
-              // Card de Boas-Vindas Dinâmico
-              Card(
-                elevation: 4,
-                child: Padding(
-                  padding: const EdgeInsets.all(20.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Bem-vindo(a), $userName!',
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+      // SafeArea aplicado por causa do modo edge-to-edge habilitado em main.dart
+      // (PBI #199 / TASK #218): impede que botões/conteúdo sejam ocultados pela
+      // system navigation bar do Android (gesture nav e botões virtuais).
+      body: SafeArea(
+        top: false,
+        child: RefreshIndicator(
+          // Adicionada funcionalidade de "puxar para atualizar"
+          onRefresh: () async => debugPrint('Atualizando dados...'),
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16.0),
+            physics: const AlwaysScrollableScrollPhysics(),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                // Card de Boas-Vindas Dinâmico
+                Card(
+                  elevation: 4,
+                  child: Padding(
+                    padding: const EdgeInsets.all(20.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Bem-vindo(a), $userName!',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Acompanhe abaixo suas prescrições digitais em tempo real.',
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Acompanhe abaixo suas prescrições digitais em tempo real.',
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-              ),
-              const SizedBox(height: 20),
+                const SizedBox(height: 20),
 
-              // Ações Principais
-              ElevatedButton.icon(
-                onPressed: () => _handleSolicitation(context),
-                icon: const Icon(Icons.medical_services_outlined, size: 24),
-                label: const Text('Solicitar Renovação'),
-              ),
-              const SizedBox(height: 10),
+                // Ações Principais
+                ElevatedButton.icon(
+                  onPressed: () => _handleSolicitation(context),
+                  icon: const Icon(Icons.medical_services_outlined, size: 24),
+                  label: const Text('Solicitar Renovação'),
+                ),
+                const SizedBox(height: 10),
 
-              OutlinedButton.icon(
-                // Passa o contexto para permitir a navegação via Navigator
-                onPressed: () => _handleTrack(context),
-                icon: const Icon(Icons.track_changes),
-                label: const Text('Rastrear Status do Pedido'),
-              ),
-              const SizedBox(height: 30),
+                OutlinedButton.icon(
+                  // Passa o contexto para permitir a navegação via Navigator
+                  onPressed: () => _handleTrack(context),
+                  icon: const Icon(Icons.track_changes),
+                  label: const Text('Rastrear Status do Pedido'),
+                ),
+                const SizedBox(height: 30),
 
-              // Seção de acompanhamento dos pedidos de renovação em tempo real
-              const _RenewalSection(),
-              const SizedBox(height: 10),
+                // Seção de acompanhamento dos pedidos de renovação em tempo real
+                const _RenewalSection(),
+                const SizedBox(height: 10),
 
-              // Seção de Prescrições Ativas (Real-time)
-              const Text(
-                'Prescrições Recentes',
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 10),
+                // Seção de Prescrições Ativas (Real-time)
+                const Text(
+                  'Prescrições Recentes',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                ),
+                const SizedBox(height: 10),
 
-              // IMPLEMENTAÇÃO DO STREAMBUILDER (Ponto Crítico da Etapa 2)
-              // Substitui o antigo Placeholder estático
-              StreamBuilder<List<Map<String, dynamic>>>(
-                stream: PrescriptionService().streamPrescriptions(),
-                builder: (context, snapshot) {
-                  // Estado de Carregamento
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(20.0),
-                        child: CircularProgressIndicator(),
-                      ),
-                    );
-                  }
-
-                  // Estado de Erro
-                  if (snapshot.hasError) {
-                    return const Center(
-                      child: Text('Erro ao carregar dados da nuvem.'),
-                    );
-                  }
-
-                  // Estado Vazio (Sem receitas no banco)
-                  if (!snapshot.hasData || snapshot.data!.isEmpty) {
-                    return const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(30.0),
-                        child: Text(
-                          'Nenhuma receita encontrada no sistema.\nSolicite sua primeira prescrição digital!',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: Colors.grey),
-                        ),
-                      ),
-                    );
-                  }
-
-                  // Lista de Receitas Reais — converte Map para modelo antes de renderizar
-                  final prescriptions =
-                      snapshot.data!.map(PrescriptionModel.fromJson).toList();
-
-                  return ListView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    itemCount: prescriptions.length,
-                    itemBuilder: (context, index) {
-                      final prescription = prescriptions[index];
-                      return PrescriptionCard(
-                        prescription: prescription,
-                        onTap: () => Navigator.pushNamed(
-                          context,
-                          '/prescription_view',
-                          arguments: prescription,
+                // IMPLEMENTAÇÃO DO STREAMBUILDER (Ponto Crítico da Etapa 2)
+                // Substitui o antigo Placeholder estático
+                StreamBuilder<List<Map<String, dynamic>>>(
+                  stream: PrescriptionService().streamPrescriptions(),
+                  builder: (context, snapshot) {
+                    // Estado de Carregamento
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(20.0),
+                          child: CircularProgressIndicator(),
                         ),
                       );
-                    },
-                  );
-                },
-              ),
+                    }
 
-              const SizedBox(height: 20),
+                    // Estado de Erro
+                    if (snapshot.hasError) {
+                      return const Center(
+                        child: Text('Erro ao carregar dados da nuvem.'),
+                      );
+                    }
 
-              TextButton.icon(
-                onPressed: () => _handleHistory(context),
-                icon: const Icon(Icons.history),
-                label: const Text('Acessar Histórico Completo'),
-              ),
-            ],
+                    // Estado Vazio (Sem receitas no banco)
+                    if (!snapshot.hasData || snapshot.data!.isEmpty) {
+                      return const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(30.0),
+                          child: Text(
+                            'Nenhuma receita encontrada no sistema.\nSolicite sua primeira prescrição digital!',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(color: Colors.grey),
+                          ),
+                        ),
+                      );
+                    }
+
+                    // Lista de Receitas Reais — converte Map para modelo antes de renderizar
+                    final prescriptions =
+                        snapshot.data!.map(PrescriptionModel.fromJson).toList();
+
+                    return ListView.builder(
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                      itemCount: prescriptions.length,
+                      itemBuilder: (context, index) {
+                        final prescription = prescriptions[index];
+                        return PrescriptionCard(
+                          prescription: prescription,
+                          onTap: () => Navigator.pushNamed(
+                            context,
+                            '/prescription_view',
+                            arguments: prescription,
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                TextButton.icon(
+                  onPressed: () => _handleHistory(context),
+                  icon: const Icon(Icons.history),
+                  label: const Text('Acessar Histórico Completo'),
+                ),
+              ],
+            ),
           ),
         ),
       ),

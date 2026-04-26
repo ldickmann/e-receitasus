@@ -20,7 +20,10 @@ class PrescriptionTypeScreen extends StatelessWidget {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -37,6 +40,7 @@ class PrescriptionTypeScreen extends StatelessWidget {
             const _AnvisaLegalNote(),
           ],
         ),
+      ),
       ),
     );
   }

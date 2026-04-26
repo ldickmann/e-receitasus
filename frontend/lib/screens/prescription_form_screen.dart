@@ -584,7 +584,10 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
         backgroundColor: _appBarBg(),
         foregroundColor: _appBarFg(),
       ),
-      body: Form(
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: Form(
         key: _formKey,
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
@@ -728,6 +731,7 @@ class _PrescriptionFormScreenState extends State<PrescriptionFormScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }

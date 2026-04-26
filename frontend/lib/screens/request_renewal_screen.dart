@@ -88,7 +88,10 @@ class _RequestRenewalScreenState extends State<RequestRenewalScreen> {
       appBar: AppBar(
         title: const Text('Solicitar Renovação'),
       ),
-      body: Column(
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: Column(
         children: [
           // Lista de prescrições ativas carregada em tempo real via Supabase
           Expanded(
@@ -178,6 +181,7 @@ class _RequestRenewalScreenState extends State<RequestRenewalScreen> {
             onSubmit: _submitRenewal,
           ),
         ],
+      ),
       ),
     );
   }

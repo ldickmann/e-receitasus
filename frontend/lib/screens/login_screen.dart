@@ -93,7 +93,10 @@ class _LoginScreenState extends State<LoginScreen> {
       appBar: AppBar(
         title: const Text('App E-ReceitaSUS'),
       ),
-      body: Center(
+      // SafeArea: edge-to-edge habilitado em main.dart (PBI #199 / TASK #218).
+      body: SafeArea(
+        top: false,
+        child: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(32.0),
           child: Form(
@@ -212,6 +215,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ),
           ),
         ),
+      ),
       ),
     );
   }
