@@ -48,7 +48,7 @@ Elimina papéis físicos e filas desnecessárias, garante rastreabilidade das pr
     - [Entidade `prescriptions` (BaaS)](#entidade-prescriptions-baas)
     - [Entidade `RenewalRequest`](#entidade-renewalrequest)
     - [Enums](#enums)
-    - [Histórico de Migrations (20)](#histórico-de-migrations-20)
+    - [Histórico de Migrations (26)](#histórico-de-migrations-26)
   - [⚙️ CI/CD Pipeline](#️-cicd-pipeline)
     - [`ci.yml` — Integração Contínua](#ciyml--integração-contínua)
     - [`main.yml` — Entrega Contínua](#mainyml--entrega-contínua)
@@ -65,7 +65,7 @@ Elimina papéis físicos e filas desnecessárias, garante rastreabilidade das pr
     - [Backend (API)](#backend-api)
     - [Frontend (App Flutter)](#frontend-app-flutter)
   - [🧪 Testes](#-testes)
-    - [Backend (Express)](#backend-express-1)
+    - [Backend (Express) Tests](#backend-express-tests)
     - [Frontend (Flutter Test)](#frontend-flutter-test)
   - [📜 Scripts do Backend](#-scripts-do-backend)
   - [🎓 Contexto Acadêmico](#-contexto-acadêmico)
@@ -181,7 +181,7 @@ Paciente                 Enfermeiro (UBS)              Médico (UBS)
 
 - **TDD** (Test-Driven Development) no backend e no frontend — toda service Dart expõe interface abstrata para mockagem.
 - **TypeScript strict mode** — proibido `any`; uso de `unknown` com type narrowing.
-- **20 migrations versionadas** com Prisma + RLS aplicado via SQL nativo.
+- **26 migrations versionadas** com Prisma + RLS aplicado via SQL nativo.
 - **Arquitetura em camadas** (Presentation → Business → Data → Database).
 - **GitHub Actions** com pipelines de CI, CD e Release Android separados.
 
@@ -239,11 +239,13 @@ O projeto segue arquitetura em camadas estrita, garantindo separação de respon
 
 ### Telas por perfil de acesso
 
-| Perfil                | Telas disponíveis                                                                                                                                  |
-| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Médico / Dentista** | Splash → Login → `DoctorHomeScreen` → `PrescriptionTypeScreen` → `PrescriptionFormScreen` → `RenewalPrescriptionScreen` → `PrescriptionViewScreen` |
-| **Enfermeiro**        | Splash → Login → `NurseHomeScreen` → `TriageDetailScreen`                                                                                          |
-| **Paciente**          | Splash → Login / Register → `PatientRegisterScreen` → `HomeScreen` → `RequestRenewalScreen` → `HistoryScreen` → `PrescriptionViewScreen`           |
+| Perfil                | Telas disponíveis                                                                                                                                                  |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **Médico / Dentista** | Splash → Login → `DoctorHomeScreen` → `PrescriptionTypeScreen` → `PrescriptionFormScreen` → `RenewalPrescriptionScreen` → `PrescriptionViewScreen`                 |
+| **Enfermeiro**        | Splash → Login → `NurseHomeScreen` → `TriageDetailScreen`                                                                                                          |
+| **Paciente**          | Splash → Login / Register → `PatientRegisterScreen` → `HomeScreen` → `RequestRenewalScreen` → `RenewalTrackingScreen` → `HistoryScreen` → `PrescriptionViewScreen` |
+
+> Todos os perfis compõem a UI a partir do tema central (`AppTheme`), com suporte a **tema claro e escuro** via `ThemeProvider` (alternado manualmente pelo usuário).
 
 ---
 
@@ -262,11 +264,13 @@ O projeto segue arquitetura em camadas estrita, garantindo separação de respon
 
 **Base URL (desenvolvimento):** `http://localhost:3333`
 
-| Método | Rota             | Autenticação | Descrição                                                         |
-| ------ | ---------------- | :----------: | ----------------------------------------------------------------- |
-| `POST` | `/auth/register` |      ❌      | ⚠️ Legado — retorna `410 Gone`                                    |
-| `POST` | `/auth/login`    |      ❌      | ⚠️ Legado — retorna `410 Gone`                                    |
-| `GET`  | `/users/me`      |      ✅      | Retorna o perfil do usuário autenticado (Patient ou Professional) |
+| Método | Rota             | Autenticação | Descrição                                                                 |
+| ------ | ---------------- | :----------: | ------------------------------------------------------------------------- |
+| `POST` | `/auth/register` |      ❌      | ⚠️ Legado — retorna `410 Gone`                                            |
+| `POST` | `/auth/login`    |      ❌      | ⚠️ Legado — retorna `410 Gone`                                            |
+| `GET`  | `/user/me`       |      ✅      | Retorna o perfil do usuário autenticado (Patient ou Professional)         |
+| `GET`  | `/health-units`  |      ✅      | Lista UBS filtradas por município (`city` obrigatório, `state` opcional)  |
+| `GET`  | `/health`        |      ❌      | Health check para monitoramento/probes externos (`{ status, timestamp }`) |
 
 > **Por que o backend tem poucos endpoints?** O fluxo de prescrições e renovações é gerenciado **diretamente via Supabase PostgREST** (com RLS), aproveitando Realtime para atualização imediata no app. O backend Express atua como **resource server complementar**, expondo apenas endpoints que exigem lógica de negócio fora do alcance do PostgREST.
 
@@ -276,14 +280,14 @@ O projeto segue arquitetura em camadas estrita, garantindo separação de respon
 
 As operações abaixo são executadas pelo Flutter **sem passar pelo backend Express**, usando o SDK `supabase_flutter` com isolamento garantido por **Row Level Security**:
 
-| Operação                       | Tabela / Recurso    | Origem (Flutter)            |
-| ------------------------------ | ------------------- | --------------------------- |
-| Listar prescrições do paciente | `prescriptions`     | `prescription_service.dart` |
-| Stream realtime de prescrições | `prescriptions`     | `home_screen.dart`          |
-| Emitir nova prescrição         | `prescriptions`     | `prescription_service.dart` |
-| Solicitar renovação            | `renewal_requests`  | `renewal_service.dart`      |
-| Triagem pelo enfermeiro        | `renewal_requests`  | `triage_provider.dart`      |
-| Buscar pacientes (RPC)         | `search_patients()` | `renewal_service.dart`      |
+| Operação                       | Tabela / Recurso                     | Origem (Flutter)            |
+| ------------------------------ | ------------------------------------ | --------------------------- |
+| Listar prescrições do paciente | `prescriptions`                      | `prescription_service.dart` |
+| Stream realtime de prescrições | `prescriptions`                      | `home_screen.dart`          |
+| Emitir nova prescrição         | `prescriptions`                      | `prescription_service.dart` |
+| Solicitar renovação            | `renewal_requests`                   | `renewal_service.dart`      |
+| Triagem pelo enfermeiro        | `renewal_requests`                   | `triage_provider.dart`      |
+| Buscar pacientes (RPC)         | `search_patients_for_prescription()` | `renewal_service.dart`      |
 
 > Todas as policies RLS exigem `auth.uid()` correspondente ao `patient_user_id` ou `doctor_user_id`. A `service_role` key **nunca** é usada no frontend.
 
@@ -393,7 +397,7 @@ Pedido de renovação de prescrição. Percorre o ciclo `PENDING_TRIAGE → TRIA
 | `EXPIRED`   | Receita com prazo de validade vencido    |
 | `CANCELLED` | Receita cancelada pelo médico prescritor |
 
-### Histórico de Migrations (20)
+### Histórico de Migrations (26)
 
 | #   | Migration                                       |
 | --- | ----------------------------------------------- |
@@ -417,6 +421,12 @@ Pedido de renovação de prescrição. Percorre o ciclo `PENDING_TRIAGE → TRIA
 | 18  | `add_health_units_and_backfill_users`           |
 | 19  | `split_user_patients_professionals`             |
 | 20  | `rls_update_own_profile_patients_professionals` |
+| 21  | `auto_assign_professional_health_unit`          |
+| 22  | `seed_medico_address_for_autocomplete`          |
+| 23  | `add_char2_constraint_professional_state`       |
+| 24  | `increase_max_professionals_per_ubs`            |
+| 25  | `renewal_request_defaults`                      |
+| 26  | `seed_health_units_blumenau`                    |
 
 ---
 
@@ -526,21 +536,28 @@ e-receitasus/
 │   │   │   ├── auth.middleware.ts        # Validação JWT via JWKS
 │   │   │   └── request-logger.middleware.ts
 │   │   ├── repositories/
-│   │   │   └── user.repository.ts        # Único acesso ao Prisma Client
+│   │   │   ├── user.repository.ts        # Único acesso ao Prisma Client
+│   │   │   └── healthUnit.repository.ts  # Consulta de UBS por município
 │   │   ├── routes/
 │   │   │   ├── auth.routes.ts            # ⚠️ Legado (410 Gone)
-│   │   │   └── user.routes.ts            # GET /users/me
+│   │   │   ├── user.routes.ts            # GET /user/me
+│   │   │   └── healthUnit.routes.ts      # GET /health-units
 │   │   ├── services/
-│   │   │   └── auth.service.ts
+│   │   │   ├── auth.service.ts
+│   │   │   └── healthUnit.service.ts
 │   │   ├── utils/
 │   │   │   └── prismaClient.ts
 │   │   ├── app.ts                        # Configuração Express
 │   │   └── server.ts                     # Bootstrap HTTP
 │   ├── prisma/
 │   │   ├── schema.prisma                 # Patient, Professional, HealthUnit, RenewalRequest
-│   │   └── migrations/                   # 20 migrations versionadas
+│   │   └── migrations/                   # 26 migrations versionadas
 │   ├── tests/
-│   │   └── auth.test.ts
+│   │   ├── auth.test.ts
+│   │   ├── cors.test.ts
+│   │   ├── healthUnit.repository.test.ts
+│   │   ├── healthUnit.routes.test.ts
+│   │   └── healthUnit.service.test.ts
 │   ├── jest.config.cjs
 │   ├── prisma.config.ts
 │   ├── tsconfig.json
@@ -549,13 +566,13 @@ e-receitasus/
 └── frontend/
     ├── lib/
     │   ├── main.dart                     # Bootstrap + Supabase.initialize
-    │   ├── models/                       # 9 data classes (Patient, Professional, Prescription, RenewalRequest, HealthUnit, ...)
-    │   ├── providers/                    # AuthProvider, RenewalProvider, TriageProvider
-    │   ├── services/                     # AuthService, PrescriptionService, RenewalService (com interfaces abstratas)
-    │   ├── screens/                      # 14 telas (Splash, Login, Register, Patient/Doctor/NurseHome, Triage, ...)
+    │   ├── models/                       # 9 data classes (Patient, Professional, Prescription, RenewalRequest, HealthUnit, PatientSearchResult, ...)
+    │   ├── providers/                    # AuthProvider, PrescriptionProvider, RenewalProvider, TriageProvider, ThemeProvider
+    │   ├── services/                     # AuthService, PrescriptionService, RenewalService, HealthUnitService, ViaCepService (com interfaces abstratas)
+    │   ├── screens/                      # 15 telas (Splash, Login, Register, Patient/Doctor/NurseHome, Triage, RenewalTracking, ...)
     │   ├── widgets/                      # PrescriptionCard
     │   └── theme/                        # AppColors, AppTextStyles, AppTheme
-    ├── test/                             # 10 arquivos de teste (services, providers, screens, models)
+    ├── test/                             # Suíte de testes (services, providers, screens, models)
     ├── android/
     ├── ios/
     ├── web/
@@ -590,6 +607,8 @@ Crie o arquivo `backend/.env`:
 DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE"
 DIRECT_URL="postgresql://USER:PASSWORD@HOST:5432/DATABASE"
 SUPABASE_URL="https://<project-ref>.supabase.co"
+# Origens autorizadas para CORS (separadas por vírgula). Sem valor = nenhuma origem permitida.
+ALLOWED_ORIGINS="http://localhost:8080,https://app.exemplo.com"
 PORT=3333
 ```
 
@@ -615,7 +634,7 @@ flutter run
 
 ## 🧪 Testes
 
-### Backend (Express)
+### Backend (Express) Tests
 
 ```bash
 cd backend
@@ -631,7 +650,7 @@ cd frontend
 flutter test
 ```
 
-O frontend possui **10 arquivos de teste** cobrindo: `AuthProvider`, `AuthService`, `LoginScreen`, cadastro de paciente (CEP e validações), `PrescriptionCard`, `PrescriptionModel`, `ProfessionalType`, `RenewalProvider` e `TriageProvider`. Toda service expõe interface abstrata para mockagem com **Mockito**:
+O frontend possui uma suíte de testes abrangente cobrindo: `AuthProvider`, `AuthService`, `HealthUnitService`, `LoginScreen`, cadastro de paciente (CEP, ViaCEP, UF e validações), vinculação de UBS no formulário de prescrição, busca de pacientes, `PrescriptionCard`, `PrescriptionModel`, `ProfessionalType`, `RenewalProvider`, `TriageProvider` e alternância de tema (`ThemeMode`). Toda service expõe interface abstrata para mockagem com **Mockito**:
 
 ```bash
 flutter pub run build_runner build --delete-conflicting-outputs
@@ -657,7 +676,7 @@ flutter pub run build_runner build --delete-conflicting-outputs
 
 ## 🎓 Contexto Acadêmico
 
-**Disciplina:** Hands On Work IX  
+**Disciplina:** Hands On Work X  
 **Professor:** Mestre [Ewerton Eyre](https://www.linkedin.com/in/ewertoneyre/)  
 **Curso:** Análise e Desenvolvimento de Sistemas  
 **Instituição:** UNIVALI – Universidade do Vale do Itajaí  
