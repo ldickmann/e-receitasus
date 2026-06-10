@@ -17,7 +17,15 @@ import '../services/prescription_service.dart';
 /// 6. Sucesso: SnackBar verde + retorno para a tela anterior.
 /// 7. Erro: SnackBar vermelho com mensagem humanizada (sem stack trace — LGPD).
 class RequestRenewalScreen extends StatefulWidget {
-  const RequestRenewalScreen({super.key});
+  /// Serviço de prescrições injetável (opcional).
+  ///
+  /// Em produção permanece `null` e a tela instancia [PrescriptionService]
+  /// com o singleton do Supabase. Em testes, injete um serviço com
+  /// [SupabaseClient] falso (ou um stub do stream) para validar a tela sem
+  /// rede — mesmo padrão já adotado por [PrescriptionFormScreen].
+  final PrescriptionService? prescriptionService;
+
+  const RequestRenewalScreen({super.key, this.prescriptionService});
 
   @override
   State<RequestRenewalScreen> createState() => _RequestRenewalScreenState();
@@ -25,7 +33,10 @@ class RequestRenewalScreen extends StatefulWidget {
 
 class _RequestRenewalScreenState extends State<RequestRenewalScreen> {
   /// Serviço de prescrições para carregar a lista via stream em tempo real.
-  final _prescriptionService = PrescriptionService();
+  /// Usa o injetado (testes) ou cria o padrão com o singleton do Supabase
+  /// (produção) — preserva o comportamento original quando nada é injetado.
+  late final PrescriptionService _prescriptionService =
+      widget.prescriptionService ?? PrescriptionService();
 
   /// ID da prescrição selecionada pelo paciente. Nulo enquanto nenhuma for escolhida.
   String? _selectedPrescriptionId;
