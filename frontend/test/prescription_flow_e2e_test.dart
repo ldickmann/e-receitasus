@@ -21,7 +21,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mockito/annotations.dart';
 import 'package:mockito/mockito.dart';
 
-import 'package:e_receitasus/models/renewal_request_model.dart';
 import 'package:e_receitasus/providers/renewal_provider.dart';
 import 'package:e_receitasus/providers/triage_provider.dart';
 import 'package:e_receitasus/services/renewal_service.dart';
@@ -58,7 +57,7 @@ void main() {
       // ===== Fase 1 — PACIENTE cria a solicitação (PENDING_TRIAGE) ==========
       when(service.requestRenewal(any, notes: anyNamed('notes')))
           .thenAnswer((_) async {
-        return null;
+        return;
       });
 
       final renewalProvider = RenewalProvider(service);
@@ -86,7 +85,7 @@ void main() {
         nurseNotes: anyNamed('nurseNotes'),
         doctorUserId: anyNamed('doctorUserId'),
       )).thenAnswer((_) async {
-        return null;
+        return;
       });
 
       final triageProvider = TriageProvider(service);
@@ -114,7 +113,7 @@ void main() {
       // markAsPrescribed não é encapsulado por provider (a tela chama o
       // service diretamente), então validamos o contrato no nível do service.
       when(service.markAsPrescribed(any, any)).thenAnswer((_) async {
-        return null;
+        return;
       });
 
       await service.markAsPrescribed(renewalId, renewedPrescriptionId);
@@ -131,7 +130,7 @@ void main() {
         () async {
       when(service.rejectTriage(any, nurseNotes: anyNamed('nurseNotes')))
           .thenAnswer((_) async {
-        return null;
+        return;
       });
 
       final triageProvider = TriageProvider(service);

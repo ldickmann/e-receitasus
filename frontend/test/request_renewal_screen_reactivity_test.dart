@@ -122,9 +122,7 @@ void main() {
     testWidgets('sucesso chama requestRenewal e exibe SnackBar verde',
         (tester) async {
       when(service.requestRenewal(any, notes: anyNamed('notes')))
-          .thenAnswer((_) async {
-            return null;
-          });
+          .thenAnswer((_) async {});
 
       await pumpScreen(tester, rows: [activePrescription()]);
 

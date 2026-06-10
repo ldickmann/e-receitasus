@@ -174,9 +174,7 @@ void main() {
         any,
         nurseNotes: anyNamed('nurseNotes'),
         doctorUserId: anyNamed('doctorUserId'),
-      )).thenAnswer((_) async {
-        return null;
-      });
+      )).thenAnswer((_) async {});
 
       await pumpScreen(tester);
 
@@ -247,9 +245,7 @@ void main() {
         (tester) async {
       when(service.fetchDoctors()).thenAnswer((_) async => [doctor]);
       when(service.rejectTriage(any, nurseNotes: anyNamed('nurseNotes')))
-          .thenAnswer((_) async {
-        return null;
-      });
+          .thenAnswer((_) async {});
 
       await pumpScreen(tester);
 
