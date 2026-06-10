@@ -204,4 +204,39 @@ void main() {
       expect(notifications, 1);
     });
   });
+
+  group('RenewalProvider — reatividade (notifyListeners)', () {
+    test('requestRenewal alterna isSubmitting e notifica os ouvintes',
+        () async {
+      // ARRANGE — captura o valor de isSubmitting a cada notificacao para
+      // garantir que a UI observa o ciclo loading=true -> loading=false.
+      when(mockService.requestRenewal(any, notes: anyNamed('notes')))
+          .thenAnswer((_) async {});
+      final observed = <bool>[];
+      provider.addListener(() => observed.add(provider.isSubmitting));
+
+      // ACT
+      final result = await provider.requestRenewal(prescriptionId: 'p-react');
+
+      // ASSERT — pelo menos uma notificacao com true (inicio) e o estado
+      // final estabiliza em false (fim), com sucesso.
+      expect(result, isTrue);
+      expect(observed, contains(true));
+      expect(provider.isSubmitting, isFalse);
+    });
+
+    test('falha tambem encerra isSubmitting em false apos notificar',
+        () async {
+      when(mockService.requestRenewal(any, notes: anyNamed('notes')))
+          .thenThrow(RenewalRequestException('erro', code: '42501'));
+      var notifications = 0;
+      provider.addListener(() => notifications++);
+
+      final result = await provider.requestRenewal(prescriptionId: 'p-fail');
+
+      expect(result, isFalse);
+      expect(notifications, greaterThanOrEqualTo(1));
+      expect(provider.isSubmitting, isFalse);
+    });
+  });
 }

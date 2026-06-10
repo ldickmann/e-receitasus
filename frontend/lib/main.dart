@@ -57,7 +57,7 @@ void main() async {
   // Esta configuração conecta o app diretamente ao backend-as-a-service na nuvem
   await Supabase.initialize(
     url: 'https://shnahlongybxxilworck.supabase.co',
-    anonKey: 'sb_publishable_NMJeKsT7rEJ8-l7vefZcDA_ggy3EKAj',
+    publishableKey: 'sb_publishable_NMJeKsT7rEJ8-l7vefZcDA_ggy3EKAj',
   );
 
   // 3. Executa a aplicação Flutter

@@ -14,96 +14,96 @@ A autenticação é delegada ao **Supabase Auth** (BaaS), e o backend Express at
 
 Elimina papéis físicos e filas desnecessárias, garante rastreabilidade das prescrições, organiza o histórico de medicamentos do paciente SUS e estrutura a comunicação entre pacientes, enfermeiros e médicos dentro da UBS.
 
----
+***
 
 ## 📑 Índice
 
-- [📱 E-ReceitaSUS](#-e-receitasus)
-  - [💡 Sobre o Projeto](#-sobre-o-projeto)
-    - [🎯 Problema Resolvido](#-problema-resolvido)
-  - [📑 Índice](#-índice)
-  - [✨ Principais Funcionalidades](#-principais-funcionalidades)
-    - [👨‍⚕️ Médico / Dentista (Prescritor)](#️-médico--dentista-prescritor)
-    - [🩺 Enfermeiro (Triagem)](#-enfermeiro-triagem)
-    - [🧑‍🤝‍🧑 Paciente](#-paciente)
-    - [🔐 Infraestrutura](#-infraestrutura)
-  - [🔄 Fluxo de Renovação de Receitas](#-fluxo-de-renovação-de-receitas)
-    - [📊 Status do Fluxo de Renovação](#-status-do-fluxo-de-renovação)
-  - [🛠 Stack Tecnológico](#-stack-tecnológico)
-    - [Backend](#backend)
-    - [Frontend](#frontend)
-    - [Qualidade e Engenharia](#qualidade-e-engenharia)
-  - [🏗 Arquitetura](#-arquitetura)
-    - [Backend (Express)](#backend-express)
-    - [Frontend (Flutter)](#frontend-flutter)
-    - [Fluxo híbrido de dados](#fluxo-híbrido-de-dados)
-    - [Telas por perfil de acesso](#telas-por-perfil-de-acesso)
-  - [🔐 Autenticação](#-autenticação)
-  - [🌐 API REST — Backend Express](#-api-rest--backend-express)
-  - [🗄 Acesso Direto ao Supabase (BaaS)](#-acesso-direto-ao-supabase-baas)
-  - [🧩 Modelagem de Dados](#-modelagem-de-dados)
-    - [Entidade `Patient`](#entidade-patient)
-    - [Entidade `Professional`](#entidade-professional)
-    - [Entidade `HealthUnit`](#entidade-healthunit)
-    - [Entidade `prescriptions` (BaaS)](#entidade-prescriptions-baas)
-    - [Entidade `RenewalRequest`](#entidade-renewalrequest)
-    - [Enums](#enums)
-    - [Histórico de Migrations (26)](#histórico-de-migrations-26)
-  - [⚙️ CI/CD Pipeline](#️-cicd-pipeline)
-    - [`ci.yml` — Integração Contínua](#ciyml--integração-contínua)
-    - [`main.yml` — Entrega Contínua](#mainyml--entrega-contínua)
-    - [`release.yml` — Release Android](#releaseyml--release-android)
-    - [Secrets Necessários](#secrets-necessários)
-  - [📝 Padrão de Commits](#-padrão-de-commits)
-    - [Formato](#formato)
-    - [Tipos Aceitos](#tipos-aceitos)
-    - [Exemplos](#exemplos)
-  - [📂 Estrutura do Projeto](#-estrutura-do-projeto)
-  - [🚀 Como Executar](#-como-executar)
-    - [Pré-requisitos](#pré-requisitos)
-    - [Variáveis de Ambiente — Backend](#variáveis-de-ambiente--backend)
-    - [Backend (API)](#backend-api)
-    - [Frontend (App Flutter)](#frontend-app-flutter)
-  - [🧪 Testes](#-testes)
-    - [Backend (Express) Tests](#backend-express-tests)
-    - [Frontend (Flutter Test)](#frontend-flutter-test)
-  - [📜 Scripts do Backend](#-scripts-do-backend)
-  - [🎓 Contexto Acadêmico](#-contexto-acadêmico)
-  - [👨‍💻 Aluno e Desenvolvedor](#-aluno-e-desenvolvedor)
+* [📱 E-ReceitaSUS](#-e-receitasus)
+  * [💡 Sobre o Projeto](#-sobre-o-projeto)
+    * [🎯 Problema Resolvido](#-problema-resolvido)
+  * [📑 Índice](#-índice)
+  * [✨ Principais Funcionalidades](#-principais-funcionalidades)
+    * [👨‍⚕️ Médico / Dentista (Prescritor)](#️-médico--dentista-prescritor)
+    * [🩺 Enfermeiro (Triagem)](#-enfermeiro-triagem)
+    * [🧑‍🤝‍🧑 Paciente](#-paciente)
+    * [🔐 Infraestrutura](#-infraestrutura)
+  * [🔄 Fluxo de Renovação de Receitas](#-fluxo-de-renovação-de-receitas)
+    * [📊 Status do Fluxo de Renovação](#-status-do-fluxo-de-renovação)
+  * [🛠 Stack Tecnológico](#-stack-tecnológico)
+    * [Backend](#backend)
+    * [Frontend](#frontend)
+    * [Qualidade e Engenharia](#qualidade-e-engenharia)
+  * [🏗 Arquitetura](#-arquitetura)
+    * [Backend (Express)](#backend-express)
+    * [Frontend (Flutter)](#frontend-flutter)
+    * [Fluxo híbrido de dados](#fluxo-híbrido-de-dados)
+    * [Telas por perfil de acesso](#telas-por-perfil-de-acesso)
+  * [🔐 Autenticação](#-autenticação)
+  * [🌐 API REST — Backend Express](#-api-rest--backend-express)
+  * [🗄 Acesso Direto ao Supabase (BaaS)](#-acesso-direto-ao-supabase-baas)
+  * [🧩 Modelagem de Dados](#-modelagem-de-dados)
+    * [Entidade `Patient`](#entidade-patient)
+    * [Entidade `Professional`](#entidade-professional)
+    * [Entidade `HealthUnit`](#entidade-healthunit)
+    * [Entidade `prescriptions` (BaaS)](#entidade-prescriptions-baas)
+    * [Entidade `RenewalRequest`](#entidade-renewalrequest)
+    * [Enums](#enums)
+    * [Histórico de Migrations (26)](#histórico-de-migrations-26)
+  * [⚙️ CI/CD Pipeline](#️-cicd-pipeline)
+    * [`ci.yml` — Integração Contínua](#ciyml--integração-contínua)
+    * [`main.yml` — Entrega Contínua](#mainyml--entrega-contínua)
+    * [`release.yml` — Release Android](#releaseyml--release-android)
+    * [Secrets Necessários](#secrets-necessários)
+  * [📝 Padrão de Commits](#-padrão-de-commits)
+    * [Formato](#formato)
+    * [Tipos Aceitos](#tipos-aceitos)
+    * [Exemplos](#exemplos)
+  * [📂 Estrutura do Projeto](#-estrutura-do-projeto)
+  * [🚀 Como Executar](#-como-executar)
+    * [Pré-requisitos](#pré-requisitos)
+    * [Variáveis de Ambiente — Backend](#variáveis-de-ambiente--backend)
+    * [Backend (API)](#backend-api)
+    * [Frontend (App Flutter)](#frontend-app-flutter)
+  * [🧪 Testes](#-testes)
+    * [Backend (Express) Tests](#backend-express-tests)
+    * [Frontend (Flutter Test)](#frontend-flutter-test)
+  * [📜 Scripts do Backend](#-scripts-do-backend)
+  * [🎓 Contexto Acadêmico](#-contexto-acadêmico)
+  * [👨‍💻 Aluno e Desenvolvedor](#-aluno-e-desenvolvedor)
 
----
+***
 
 ## ✨ Principais Funcionalidades
 
 ### 👨‍⚕️ Médico / Dentista (Prescritor)
 
-- Emissão de **novas receitas digitais** com formulário completo conforme padrões ANVISA.
-- **Renovação de receitas** existentes: cria uma nova prescrição com os mesmos dados clínicos e data atualizada.
-- Visualização em tempo real (Supabase Realtime) de todas as receitas emitidas pelo profissional autenticado.
-- **Autorização obrigatória** das solicitações de renovação encaminhadas pelo enfermeiro.
+* Emissão de **novas receitas digitais** com formulário completo conforme padrões ANVISA.
+* **Renovação de receitas** existentes: cria uma nova prescrição com os mesmos dados clínicos e data atualizada.
+* Visualização em tempo real (Supabase Realtime) de todas as receitas emitidas pelo profissional autenticado.
+* **Autorização obrigatória** das solicitações de renovação encaminhadas pelo enfermeiro.
 
 ### 🩺 Enfermeiro (Triagem)
 
-- Recebimento das solicitações de renovação enviadas pelos pacientes.
-- **Triagem clínica**: avalia se a renovação é de fato necessária antes de encaminhar ao médico.
-- Encaminhamento da solicitação ao médico responsável pela UBS quando confirmada a necessidade.
+* Recebimento das solicitações de renovação enviadas pelos pacientes.
+* **Triagem clínica**: avalia se a renovação é de fato necessária antes de encaminhar ao médico.
+* Encaminhamento da solicitação ao médico responsável pela UBS quando confirmada a necessidade.
 
 ### 🧑‍🤝‍🧑 Paciente
 
-- **Solicitação de renovação de receita** via formulário dedicado (restrita a receitas com status elegível).
-- Acompanhamento do **status da solicitação** em tempo real.
-- **Histórico completo de prescrições** com filtro por status.
+* **Solicitação de renovação de receita** via formulário dedicado (restrita a receitas com status elegível).
+* Acompanhamento do **status da solicitação** em tempo real.
+* **Histórico completo de prescrições** com filtro por status.
 
 ### 🔐 Infraestrutura
 
-- Autenticação com **Supabase Auth** — tokens JWT validados no backend via **JWKS** (RS256/ES256).
-- **Cadastro distinto** para profissionais de saúde e pacientes SUS, com roteamento automático por trigger SQL para as tabelas `professionals` ou `patients`.
-- **Vínculo automático à UBS** baseado no bairro do endereço informado.
-- Suporte aos **4 tipos de receita ANVISA**: Branca, Controle Especial, Notificação A (Amarela) e Notificação B (Azul).
-- **Row Level Security** habilitado em todas as tabelas sensíveis.
-- Cancelamento de receita restrito ao médico prescritor.
+* Autenticação com **Supabase Auth** — tokens JWT validados no backend via **JWKS** (RS256/ES256).
+* **Cadastro distinto** para profissionais de saúde e pacientes SUS, com roteamento automático por trigger SQL para as tabelas `professionals` ou `patients`.
+* **Vínculo automático à UBS** baseado no bairro do endereço informado.
+* Suporte aos **4 tipos de receita ANVISA**: Branca, Controle Especial, Notificação A (Amarela) e Notificação B (Azul).
+* **Row Level Security** habilitado em todas as tabelas sensíveis.
+* Cancelamento de receita restrito ao médico prescritor.
 
----
+***
 
 ## 🔄 Fluxo de Renovação de Receitas
 
@@ -138,13 +138,13 @@ Paciente                 Enfermeiro (UBS)              Médico (UBS)
 
 > **Regras de negócio:**
 >
-> - A renovação **sempre** exige autorização do médico — sem exceções.
-> - O médico vinculado ao paciente é o da **UBS (Unidade Básica de Saúde)** onde ele está cadastrado.
-> - A renovação gera uma **nova prescrição** (novo `id`, nova `issued_at`, nova `valid_until`) com os mesmos dados clínicos da original.
-> - Apenas receitas com status elegível podem ser alvo de solicitação de renovação pelo paciente.
-> - Somente **médicos** e **dentistas** têm autoridade legal para emitir e renovar prescrições (Lei Federal).
+> * A renovação **sempre** exige autorização do médico — sem exceções.
+> * O médico vinculado ao paciente é o da **UBS (Unidade Básica de Saúde)** onde ele está cadastrado.
+> * A renovação gera uma **nova prescrição** (novo `id`, nova `issued_at`, nova `valid_until`) com os mesmos dados clínicos da original.
+> * Apenas receitas com status elegível podem ser alvo de solicitação de renovação pelo paciente.
+> * Somente **médicos** e **dentistas** têm autoridade legal para emitir e renovar prescrições (Lei Federal).
 
----
+***
 
 ## 🛠 Stack Tecnológico
 
@@ -169,23 +169,23 @@ Paciente                 Enfermeiro (UBS)              Médico (UBS)
 | Tecnologia                     | Versão      | Papel                                              |
 | ------------------------------ | ----------- | -------------------------------------------------- |
 | **Flutter** + **Dart**         | SDK ≥ 3.4.0 | Framework multiplataforma                          |
-| **supabase_flutter**           | ^2.0.0      | Auth + PostgREST + Realtime                        |
+| **supabase\_flutter**           | ^2.0.0      | Auth + PostgREST + Realtime                        |
 | **Provider**                   | 6.1.1       | Gerenciamento de estado                            |
 | **http**                       | ^1.6.0      | Requisições HTTP ao backend Express                |
-| **flutter_secure_storage**     | ^9.2.2      | Armazenamento seguro de tokens (Keychain/Keystore) |
-| **cupertino_icons**            | ^1.0.6      | Ícones iOS                                         |
-| **mockito** + **build_runner** | ^5.4 / ^2.4 | Mocks para TDD                                     |
-| **flutter_launcher_icons**     | ^0.14.3     | Geração de ícones de launcher                      |
+| **flutter\_secure\_storage**     | ^9.2.2      | Armazenamento seguro de tokens (Keychain/Keystore) |
+| **cupertino\_icons**            | ^1.0.6      | Ícones iOS                                         |
+| **mockito** + **build\_runner** | ^5.4 / ^2.4 | Mocks para TDD                                     |
+| **flutter\_launcher\_icons**     | ^0.14.3     | Geração de ícones de launcher                      |
 
 ### Qualidade e Engenharia
 
-- **TDD** (Test-Driven Development) no backend e no frontend — toda service Dart expõe interface abstrata para mockagem.
-- **TypeScript strict mode** — proibido `any`; uso de `unknown` com type narrowing.
-- **26 migrations versionadas** com Prisma + RLS aplicado via SQL nativo.
-- **Arquitetura em camadas** (Presentation → Business → Data → Database).
-- **GitHub Actions** com pipelines de CI, CD e Release Android separados.
+* **TDD** (Test-Driven Development) no backend e no frontend — toda service Dart expõe interface abstrata para mockagem.
+* **TypeScript strict mode** — proibido `any`; uso de `unknown` com type narrowing.
+* **26 migrations versionadas** com Prisma + RLS aplicado via SQL nativo.
+* **Arquitetura em camadas** (Presentation → Business → Data → Database).
+* **GitHub Actions** com pipelines de CI, CD e Release Android separados.
 
----
+***
 
 ## 🏗 Arquitetura
 
@@ -195,12 +195,12 @@ O projeto segue arquitetura em camadas estrita, garantindo separação de respon
 
 | Camada           | Componentes                                         |
 | ---------------- | --------------------------------------------------- |
-| **Presentation** | Routes, Controllers, Middlewares (`auth`, `logger`) |
+| **Presentation** | Routes (handlers inline), Middlewares (`auth`, `logger`) |
 | **Business**     | Services (regras de domínio)                        |
 | **Data**         | Repositories (único acesso ao Prisma Client)        |
 | **Database**     | PostgreSQL hospedado no Supabase                    |
 
-> Apenas a camada `repositories/` acessa o `PrismaClient`. Routes nunca chamam services diretamente sem passar por controllers.
+> Apenas a camada `repositories/` acessa o `PrismaClient`. As rotas chamam os services para execução da lógica de negócio.
 
 ### Frontend (Flutter)
 
@@ -247,18 +247,18 @@ O projeto segue arquitetura em camadas estrita, garantindo separação de respon
 
 > Todos os perfis compõem a UI a partir do tema central (`AppTheme`), com suporte a **tema claro e escuro** via `ThemeProvider` (alternado manualmente pelo usuário).
 
----
+***
 
 ## 🔐 Autenticação
 
-- O frontend autentica o usuário via **Supabase Auth** e recebe um access token JWT.
-- O token é armazenado com **`flutter_secure_storage`** (Keychain no iOS, Keystore no Android) — **nunca** em `SharedPreferences`.
-- O backend **não armazena** segredos de sessão — valida o token consultando o endpoint público JWKS do Supabase (`/auth/v1/.well-known/jwks.json`).
-- O resolver JWKS é **cacheado em memória** para evitar requisições redundantes.
-- O middleware `auth.middleware.ts` injeta `req.userId` (claim `sub` do token) para uso nos controllers.
-- Endpoints legados em `/auth/register` e `/auth/login` retornam **`HTTP 410 Gone`**, orientando a migração para o fluxo Supabase.
+* O frontend autentica o usuário via **Supabase Auth** e recebe um access token JWT.
+* O token é armazenado com **`flutter_secure_storage`** (Keychain no iOS, Keystore no Android) — **nunca** em `SharedPreferences`.
+* O backend **não armazena** segredos de sessão — valida o token consultando o endpoint público JWKS do Supabase (`/auth/v1/.well-known/jwks.json`).
+* O resolver JWKS é **cacheado em memória** para evitar requisições redundantes.
+* O middleware `auth.middleware.ts` injeta `req.userId` (claim `sub` do token) para uso nos controllers.
+* Endpoints legados em `/auth/register` e `/auth/login` retornam **`HTTP 410 Gone`**, orientando a migração para o fluxo Supabase.
 
----
+***
 
 ## 🌐 API REST — Backend Express
 
@@ -274,7 +274,7 @@ O projeto segue arquitetura em camadas estrita, garantindo separação de respon
 
 > **Por que o backend tem poucos endpoints?** O fluxo de prescrições e renovações é gerenciado **diretamente via Supabase PostgREST** (com RLS), aproveitando Realtime para atualização imediata no app. O backend Express atua como **resource server complementar**, expondo apenas endpoints que exigem lógica de negócio fora do alcance do PostgREST.
 
----
+***
 
 ## 🗄 Acesso Direto ao Supabase (BaaS)
 
@@ -291,7 +291,7 @@ As operações abaixo são executadas pelo Flutter **sem passar pelo backend Exp
 
 > Todas as policies RLS exigem `auth.uid()` correspondente ao `patient_user_id` ou `doctor_user_id`. A `service_role` key **nunca** é usada no frontend.
 
----
+***
 
 ## 🧩 Modelagem de Dados
 
@@ -389,7 +389,7 @@ Pedido de renovação de prescrição. Percorre o ciclo `PENDING_TRIAGE → TRIA
 | `PRESCRIBED`     | Médico emitiu a nova prescrição                      |
 | `REJECTED`       | Solicitação rejeitada pelo enfermeiro ou pelo médico |
 
-**`PrescriptionStatus`** _(tabela BaaS)_
+**`PrescriptionStatus`** *(tabela BaaS)*
 
 | Valor       | Descrição                                |
 | ----------- | ---------------------------------------- |
@@ -428,7 +428,7 @@ Pedido de renovação de prescrição. Percorre o ciclo `PENDING_TRIAGE → TRIA
 | 25  | `renewal_request_defaults`                      |
 | 26  | `seed_health_units_blumenau`                    |
 
----
+***
 
 ## ⚙️ CI/CD Pipeline
 
@@ -483,7 +483,11 @@ Executa **três jobs em sequência**:
 
 > Nenhuma credencial é exposta no código-fonte. O backend valida tokens via JWKS público, sem necessidade de `SUPABASE_JWT_SECRET`.
 
----
+***
+
+## Azure Boards
+
+[![Board Status](https://dev.azure.com/LuksDickmannOrg/3875d22d-5c39-4cf3-bbc5-5aacc10584e0/47b8c04f-5b27-4e76-a77c-6c34aac29f88/_apis/work/boardbadge/41a4671e-43f5-4f82-afb2-b33d033a329b)](https://dev.azure.com/LuksDickmannOrg/3875d22d-5c39-4cf3-bbc5-5aacc10584e0/_boards/board/t/47b8c04f-5b27-4e76-a77c-6c34aac29f88/Backlog%20items/)
 
 ## 📝 Padrão de Commits
 
@@ -518,7 +522,7 @@ fix(ci): adicionar contents:write para publicar GitHub Release
 docs: atualizar README com seção de CI/CD e padrão de commits AB#87
 ```
 
----
+***
 
 ## 📂 Estrutura do Projeto
 
@@ -583,15 +587,15 @@ e-receitasus/
     └── pubspec.yaml
 ```
 
----
+***
 
 ## 🚀 Como Executar
 
 ### Pré-requisitos
 
-- Node.js 22+
-- PostgreSQL 14+ (ou projeto Supabase configurado)
-- Flutter SDK 3.4+
+* Node.js 22+
+* PostgreSQL 14+ (ou projeto Supabase configurado)
+* Flutter SDK 3.4+
 
 Dependências extras para build Linux (quando necessário):
 
@@ -630,7 +634,7 @@ flutter pub get
 flutter run
 ```
 
----
+***
 
 ## 🧪 Testes
 
@@ -653,10 +657,10 @@ flutter test
 O frontend possui uma suíte de testes abrangente cobrindo: `AuthProvider`, `AuthService`, `HealthUnitService`, `LoginScreen`, cadastro de paciente (CEP, ViaCEP, UF e validações), vinculação de UBS no formulário de prescrição, busca de pacientes, `PrescriptionCard`, `PrescriptionModel`, `ProfessionalType`, `RenewalProvider`, `TriageProvider` e alternância de tema (`ThemeMode`). Toda service expõe interface abstrata para mockagem com **Mockito**:
 
 ```bash
-flutter pub run build_runner build --delete-conflicting-outputs
+dart run build_runner build
 ```
 
----
+***
 
 ## 📜 Scripts do Backend
 
@@ -672,17 +676,17 @@ flutter pub run build_runner build --delete-conflicting-outputs
 | `npm run prisma:migrate`  | Aplica migrations no ambiente local (`migrate dev`) |
 | `npm run prisma:studio`   | Abre interface visual do banco de dados             |
 
----
+***
 
 ## 🎓 Contexto Acadêmico
 
-**Disciplina:** Hands On Work X  
-**Professor:** Mestre [Ewerton Eyre](https://www.linkedin.com/in/ewertoneyre/)  
-**Curso:** Análise e Desenvolvimento de Sistemas  
-**Instituição:** UNIVALI – Universidade do Vale do Itajaí  
+**Disciplina:** Hands On Work X\
+**Professor:** Mestre [Ewerton Eyre](https://www.linkedin.com/in/ewertoneyre/)\
+**Curso:** Análise e Desenvolvimento de Sistemas\
+**Instituição:** UNIVALI – Universidade do Vale do Itajaí\
 **Desenvolvedor:** Lucas Elias Dickmann
 
----
+***
 
 ## 👨‍💻 Aluno e Desenvolvedor
 

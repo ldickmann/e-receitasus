@@ -1,9 +1,12 @@
 import { jest } from '@jest/globals';
 import request from 'supertest';
-import { prisma } from '../src/utils/prismaClient.js';
 
 const jwtVerifyMock = jest.fn<
   (token: unknown, key: unknown, options?: unknown) => Promise<{ payload: { sub: string; aud: string } }>
+>();
+
+const findUniqueMock = jest.fn<
+  (args: any) => Promise<any>
 >();
 
 jest.unstable_mockModule('jose', async () => ({
@@ -11,8 +14,21 @@ jest.unstable_mockModule('jose', async () => ({
   jwtVerify: jwtVerifyMock,
 }));
 
-// Dynamic import APÓS o mock para garantir que app.ts já resolve jose mockado
+jest.unstable_mockModule('../src/utils/prismaClient.js', () => ({
+  prisma: {
+    patient: { findUnique: jest.fn().mockResolvedValue(null) },
+    professional: {
+      findUnique: findUniqueMock,
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      create: jest.fn().mockResolvedValue({}),
+    },
+    $disconnect: jest.fn().mockResolvedValue(undefined),
+  },
+}));
+
+// Dynamic import APÓS os mocks para garantir que app.ts e prisma já resolvam os mocks
 const { app } = await import('../src/app.js');
+const { prisma } = await import('../src/utils/prismaClient.js');
 
 /**
  * Configura mock de token valido para um usuario especifico.
@@ -54,6 +70,8 @@ describe('Auth Flow Hibrido (JWT Supabase + rota protegida)', () => {
 
   beforeEach(() => {
     jwtVerifyMock.mockReset();
+    findUniqueMock.mockReset();
+    findUniqueMock.mockResolvedValue(user);
   });
 
   it('deve retornar 200 no GET /user/me com token valido', async () => {
