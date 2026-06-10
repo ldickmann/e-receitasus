@@ -176,4 +176,39 @@ void main() {
       expect(provider.errorMessage, contains('lista de médicos'));
     });
   });
+
+  group('TriageProvider — reatividade (notifyListeners)', () {
+    test('approveTriage alterna isLoading e notifica os ouvintes', () async {
+      // ARRANGE — observa isLoading a cada notificacao para confirmar que a
+      // tela enxerga o ciclo loading=true -> loading=false na transicao.
+      when(mockService.approveTriage(any,
+              nurseNotes: anyNamed('nurseNotes'),
+              doctorUserId: anyNamed('doctorUserId')))
+          .thenAnswer((_) async {});
+      final observed = <bool>[];
+      provider.addListener(() => observed.add(provider.isLoading));
+
+      // ACT
+      final result =
+          await provider.approveTriage(id: 'r-react', doctorUserId: 'doc-1');
+
+      // ASSERT
+      expect(result, isTrue);
+      expect(observed, contains(true));
+      expect(provider.isLoading, isFalse);
+    });
+
+    test('validacao de medico ausente notifica sem acionar loading', () async {
+      // doctorUserId vazio falha na borda do provider, antes do service.
+      var notifications = 0;
+      provider.addListener(() => notifications++);
+
+      final result = await provider.approveTriage(id: 'r-1', doctorUserId: ' ');
+
+      expect(result, isFalse);
+      // Notifica para exibir a mensagem de validacao, mas nunca entrou em loading.
+      expect(notifications, greaterThanOrEqualTo(1));
+      expect(provider.isLoading, isFalse);
+    });
+  });
 }
