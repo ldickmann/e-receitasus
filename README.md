@@ -195,12 +195,12 @@ O projeto segue arquitetura em camadas estrita, garantindo separação de respon
 
 | Camada           | Componentes                                         |
 | ---------------- | --------------------------------------------------- |
-| **Presentation** | Routes, Controllers, Middlewares (`auth`, `logger`) |
+| **Presentation** | Routes (handlers inline), Middlewares (`auth`, `logger`) |
 | **Business**     | Services (regras de domínio)                        |
 | **Data**         | Repositories (único acesso ao Prisma Client)        |
 | **Database**     | PostgreSQL hospedado no Supabase                    |
 
-> Apenas a camada `repositories/` acessa o `PrismaClient`. Routes nunca chamam services diretamente sem passar por controllers.
+> Apenas a camada `repositories/` acessa o `PrismaClient`. As rotas chamam os services para execução da lógica de negócio.
 
 ### Frontend (Flutter)
 
@@ -657,7 +657,7 @@ flutter test
 O frontend possui uma suíte de testes abrangente cobrindo: `AuthProvider`, `AuthService`, `HealthUnitService`, `LoginScreen`, cadastro de paciente (CEP, ViaCEP, UF e validações), vinculação de UBS no formulário de prescrição, busca de pacientes, `PrescriptionCard`, `PrescriptionModel`, `ProfessionalType`, `RenewalProvider`, `TriageProvider` e alternância de tema (`ThemeMode`). Toda service expõe interface abstrata para mockagem com **Mockito**:
 
 ```bash
-flutter pub run build_runner build --delete-conflicting-outputs
+dart run build_runner build
 ```
 
 ***
