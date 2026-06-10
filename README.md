@@ -589,6 +589,34 @@ e-receitasus/
 
 ***
 
+## ⚡ Quickstart (desenvolvimento local)
+
+Siga estas etapas rápidas para subir o backend e o frontend em modo de desenvolvimento local (ambiente mínimo):
+
+1. Configure variáveis de ambiente para o backend em `backend/.env` (veja a seção "Variáveis de Ambiente — Backend" abaixo).
+2. No terminal 1 — iniciar backend em modo watch:
+
+```bash
+cd backend
+npm install
+npm run prisma:generate
+npm run prisma:migrate
+npm run dev
+```
+
+3. No terminal 2 — iniciar o app Flutter (emulador ou dispositivo):
+
+```bash
+cd frontend
+flutter pub get
+flutter run
+```
+
+Observações:
+
+* Se estiver usando Supabase local ou remoto, ajuste `SUPABASE_URL` e `DATABASE_URL` no `backend/.env` conforme necessário.
+* Para execução dos testes veja a seção `🧪 Testes` mais abaixo.
+
 ## 🚀 Como Executar
 
 ### Pré-requisitos

@@ -1,17 +1,17 @@
-# E-ReceitaSUS
+## E-ReceitaSUS (Wiki)
 
 - [[Home]]
 - [[Visão Geral|Visao-Geral-do-Sistema]]
 - [[Stack Tecnológica|Stack-Tecnologica]]
 - [[Arquitetura|Arquitetura]]
-- [[Configuração do Ambiente|Configuracao-do-Ambiente]]
 - [[Modelagem de Dados|Modelagem-de-Dados]]
 - [[Banco e Migrations|Banco-de-Dados-e-Migrations]]
-- [[Autenticação|Autenticacao-e-Autorizacao]]
+- [[Autenticação e Autorização|Autenticacao-e-Autorizacao]]
 - [[API REST|API-REST]]
+- [[Configuração do Ambiente|Configuracao-do-Ambiente]]
 - [[Testes|Testes]]
 - [[CI/CD|CI-CD]]
-- [[Commits|Padrao-de-Commits]]
+- [[Padrão de Commits|Padrao-de-Commits]]
 - [[Contribuindo|Contribuindo]]
 - [[Manutenção da Wiki|Manutencao-da-Wiki]]
-- [[Lacunas|Lacunas-de-Documentacao]]
+- [[Lacunas de Documentação|Lacunas-de-Documentacao]]
