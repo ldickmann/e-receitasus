@@ -1,32 +1,41 @@
 # Testes
 
-O projeto adota TDD no backend e no frontend. O README destaca que services Dart expõem interfaces abstratas para mockagem e que o backend usa Jest/Supertest (`README.md`, linhas 180–185 e 616–638).
+O projeto adota TDD no backend e no frontend. As services do Flutter expõem interfaces para facilitar mockagem; o backend usa Jest + Supertest com `@swc/jest` para compilação rápida.
 
-## Backend
+## Backend — executar testes
 
 ```bash
 cd backend
+npm install
 npm test
 npm run test:coverage
 ```
 
-Scripts definidos em `backend/package.json`, linhas 11–13.
+Notas:
 
-A suíte usa Jest com `@swc/jest`, Supertest e banco PostgreSQL temporário em CI (`README.md`, linhas 618–625).
+* A suíte de integração usa um PostgreSQL efêmero em CI. O mock da validação de JWT é feito via `jest.unstable_mockModule` nas fixtures de teste.
+* Para rodar um único teste em modo watch: `npm run test:watch`.
 
-## Frontend
+## Frontend — executar testes
 
 ```bash
 cd frontend
-flutter test
+flutter pub get
+flutter test --reporter=expanded
 ```
 
-A pasta `frontend/test/` contém testes de providers, services, telas, modelos e widgets, incluindo autenticação, cadastro de paciente, prescrição, renovação e triagem.
+O diretório `frontend/test/` contém unit e widget tests para `AuthProvider`, `AuthService`, `HealthUnitService`, telas de login/registro, fluxo de prescrição e renovação.
 
-## Mocks
+## Gerar/atualizar mocks
 
-Para atualizar mocks gerados:
+Se o projeto usa Mockito para gerar mocks, atualize com:
 
 ```bash
+cd frontend
 flutter pub run build_runner build --delete-conflicting-outputs
 ```
+
+## Dicas para integração/CI
+
+* Em CI, prefira banco temporário (container) e evite conectar ao Supabase real para testes automatizados.
+* Verifique que a mock do JWKS/JWT esteja ativa para evitar chamadas externas no teste unitário/integrado.
