@@ -5,6 +5,7 @@ import '../models/prescription_model.dart';
 import '../models/prescription_type.dart';
 import '../providers/renewal_provider.dart';
 import '../services/prescription_service.dart';
+import 'renewal_tracking_screen.dart';
 
 /// Tela para o paciente solicitar a renovação de uma prescrição ativa.
 ///
@@ -16,6 +17,9 @@ import '../services/prescription_service.dart';
 /// 5. Confirma o envio via [RenewalProvider.requestRenewal].
 /// 6. Sucesso: SnackBar verde + retorno para a tela anterior.
 /// 7. Erro: SnackBar vermelho com mensagem humanizada (sem stack trace — LGPD).
+/// 8. Duplicata ([RenewalProvider.isDuplicate]): AlertDialog com ação
+///    "Ver rastreamento" que navega para [RenewalTrackingScreen] — o botão
+///    de envio volta a ficar habilitado para nova tentativa em outra receita.
 class RequestRenewalScreen extends StatefulWidget {
   /// Serviço de prescrições injetável (opcional).
   ///
@@ -79,18 +83,62 @@ class _RequestRenewalScreenState extends State<RequestRenewalScreen> {
       );
       Navigator.pop(context);
     } else {
+      // Captura mensagem e flag ANTES do clearError — ele reseta isDuplicate.
+      final isDuplicate = provider.isDuplicate;
       // Mensagem humanizada sem expor detalhes internos (LGPD)
       final errorMessage =
           provider.errorMessage ?? 'Erro ao enviar pedido. Tente novamente.';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(errorMessage),
-          backgroundColor: Colors.red,
-        ),
-      );
-      // Limpa o erro após exibição para evitar re-exibição em rebuilds futuros
+      // Limpa o erro após capturar para evitar re-exibição em rebuilds futuros
       provider.clearError();
+
+      if (isDuplicate) {
+        // Duplicata: diálogo modal com ação de navegação ao rastreamento —
+        // mais visível que SnackBar e dá ao paciente uma escolha clara.
+        await _showDuplicateDialog(errorMessage);
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
+  }
+
+  /// Exibe o diálogo do cenário de solicitação duplicada, com ação
+  /// "Ver rastreamento" que navega para [RenewalTrackingScreen].
+  ///
+  /// A tela não trava: ao fechar o diálogo (qualquer ação), o botão de envio
+  /// já está reabilitado, pois [RenewalProvider.isSubmitting] voltou a false.
+  Future<void> _showDuplicateDialog(String message) {
+    return showDialog<void>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Solicitação em andamento'),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Fechar'),
+          ),
+          TextButton(
+            onPressed: () {
+              // Fecha o diálogo antes de navegar para que o "voltar" da tela
+              // de rastreamento retorne direto a esta tela, sem diálogo órfão.
+              Navigator.pop(dialogContext);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RenewalTrackingScreen(),
+                ),
+              );
+            },
+            child: const Text('Ver rastreamento'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
