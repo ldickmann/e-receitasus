@@ -2,6 +2,9 @@ plugins {
     id "com.android.application"
     id "kotlin-android"
     id "dev.flutter.flutter-gradle-plugin"
+    // Lê google-services.json (já versionado em android/app) para configurar
+    // o Firebase Cloud Messaging — notificações push (PBI #244 / TASK #258).
+    id "com.google.gms.google-services"
 }
 
 def localProperties = new Properties()

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import '../models/user_model.dart';
 import '../models/professional_type.dart';
 import '../services/auth_service.dart';
 import '../services/auth_exceptions.dart';
+import '../services/fcm_token_service.dart';
 
 /// Resultado de uma operação de cadastro.
 ///
@@ -27,11 +30,17 @@ enum RegistrationOutcome {
 class AuthProvider with ChangeNotifier {
   final IAuthService _authService;
 
+  /// Registro do token FCM do dispositivo (push notifications — TASK #258).
+  /// Opcional para não quebrar testes existentes que constroem o provider
+  /// apenas com o auth service; nulo → registro de token é pulado.
+  final IFcmTokenService? _fcmTokenService;
+
   UserModel? _user;
   bool _isLoading = false;
   String? _errorMessage;
 
-  AuthProvider(this._authService);
+  AuthProvider(this._authService, {IFcmTokenService? fcmTokenService})
+      : _fcmTokenService = fcmTokenService;
 
   UserModel? get user => _user;
   bool get isLoading => _isLoading;
@@ -74,6 +83,10 @@ class AuthProvider with ChangeNotifier {
           token: session.accessToken,
           tokenExpiry: _parseTokenExpiry(session.expiresAt),
         );
+
+        // Sessão restaurada (app reaberto sem novo login) também precisa
+        // garantir o token FCM atualizado no banco — tokens rotacionam.
+        _registerFcmToken();
       }
     } catch (e) {
       _errorMessage = 'Erro ao recuperar sessao: ${e.toString()}';
@@ -89,6 +102,8 @@ class AuthProvider with ChangeNotifier {
 
     try {
       _user = await _authService.login(email, password);
+      // Registra o token FCM do dispositivo após autenticar (TASK #258).
+      _registerFcmToken();
       _setLoading(false);
       return true;
     } catch (e) {
@@ -257,6 +272,9 @@ class AuthProvider with ChangeNotifier {
 
   Future<void> logout() async {
     try {
+      // Para de ouvir rotação de token FCM — evita persistir token para a
+      // conta errada caso outro usuário faça login no mesmo dispositivo.
+      await _fcmTokenService?.dispose();
       await _authService.logout();
       _user = null;
       _clearError();
@@ -264,6 +282,20 @@ class AuthProvider with ChangeNotifier {
     } catch (e) {
       debugPrint('Erro no logout: $e');
     }
+  }
+
+  /// Dispara o registro do token FCM em fire-and-forget: o login NUNCA é
+  /// bloqueado nem falha por problemas de push (rede, permissão negada, etc.).
+  /// O service interno já trata plataformas não suportadas (web/desktop)
+  /// como no-op e loga falhas sem propagar exceções.
+  void _registerFcmToken() {
+    final user = _user;
+    final service = _fcmTokenService;
+    if (user == null || service == null) return;
+    unawaited(service.register(
+      userId: user.id,
+      isPatient: user.professionalType.isPatient,
+    ));
   }
 
   void _setLoading(bool value) {
