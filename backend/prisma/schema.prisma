@@ -84,6 +84,10 @@ model Patient {
   healthUnitId     String?   @db.Uuid
   healthUnit       HealthUnit? @relation("PatientHealthUnit", fields: [healthUnitId], references: [id], onDelete: SetNull)
 
+  /// Token FCM do dispositivo — registrado pelo app ao inicializar firebase_messaging.
+  /// Null quando o usuário não concedeu permissão de notificação ou nunca fez login no app.
+  fcmToken         String?
+
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
@@ -128,6 +132,10 @@ model Professional {
   /// UBS vinculada — máx. 3 por UBS (garantido por trigger)
   healthUnitId       String?          @db.Uuid
   healthUnit         HealthUnit?      @relation("ProfessionalHealthUnit", fields: [healthUnitId], references: [id], onDelete: SetNull)
+
+  /// Token FCM do dispositivo — registrado pelo app ao inicializar firebase_messaging.
+  /// Null quando o usuário não concedeu permissão de notificação ou nunca fez login no app.
+  fcmToken           String?
 
   createdAt          DateTime         @default(now())
   updatedAt          DateTime         @updatedAt

@@ -169,8 +169,11 @@ backend/**/*.d.ts.map
 
 # ----------------------------------------
 # SUPABASE
+# Versiona o código (functions/); ignora apenas artefatos locais da CLI.
 # ----------------------------------------
-supabase*
+supabase/.branches/
+supabase/.temp/
+supabase/.env
 
 # -----------------------------------------
 # MCP

@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "792592355974",
+    "project_id": "e-receitasus",
+    "storage_bucket": "e-receitasus.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:792592355974:android:4a6fe90485f069cb653707",
+        "android_client_info": {
+          "package_name": "br.com.e_receitasus"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB6UHWULrPNkMjo-VK1wRjzjTS8Tgzf-WA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
