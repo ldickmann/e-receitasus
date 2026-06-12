@@ -25,8 +25,15 @@ class RenewalRequestException implements Exception {
   /// telemetria/log interno. Nunca deve ser exibido ao usuário.
   final String? code;
 
+  /// Verdadeiro quando o banco bloqueou o INSERT por já existir uma
+  /// solicitação ativa para a mesma prescrição (trigger
+  /// `trg_block_duplicate_renewal` → `RAISE EXCEPTION
+  /// 'DUPLICATE_RENEWAL_REQUEST'`). Permite que a UI ofereça navegação
+  /// direta para a tela de rastreamento em vez de um erro genérico.
+  final bool isDuplicate;
+
   /// Construtor padrão.
-  RenewalRequestException(this.message, {this.code});
+  RenewalRequestException(this.message, {this.code, this.isDuplicate = false});
 
   @override
   String toString() => 'RenewalRequestException($code): $message';
@@ -144,6 +151,17 @@ class RenewalService implements IRenewalService {
   /// Tabela de profissionais — alterada na migration split_user_patients_professionals.
   static const String _userTable = 'professionals';
 
+  /// Token lançado pelo trigger `trg_block_duplicate_renewal` via
+  /// `RAISE EXCEPTION` quando já existe solicitação ativa (PENDING_TRIAGE ou
+  /// TRIAGED) para a mesma prescrição do mesmo paciente.
+  static const String _duplicateRenewalToken = 'DUPLICATE_RENEWAL_REQUEST';
+
+  /// Mensagem amigável exibida ao paciente no cenário de duplicata.
+  /// Pública para reuso na UI e nos testes — única fonte da verdade do texto.
+  static const String duplicateRenewalMessage =
+      'Você já possui uma solicitação de renovação em andamento para esta '
+      'receita. Acompanhe o status na tela de rastreamento.';
+
   /// Construtor que aceita [SupabaseClient] opcional para facilitar injeção
   /// em testes unitários sem precisar instanciar o Supabase real.
   RenewalService({SupabaseClient? supabase})
@@ -252,9 +270,13 @@ class RenewalService implements IRenewalService {
         name: 'RenewalService',
         error: 'code=${e.code} message=${e.message}',
       );
+      // Detecção pelo message (e não só pelo SQLSTATE P0001) porque qualquer
+      // trigger PL/pgSQL compartilha o mesmo código genérico de RAISE EXCEPTION.
+      final isDuplicate = e.message.contains(_duplicateRenewalToken);
       throw RenewalRequestException(
-        _mapPostgrestErrorToUserMessage(e),
+        isDuplicate ? duplicateRenewalMessage : _mapPostgrestErrorToUserMessage(e),
         code: e.code,
+        isDuplicate: isDuplicate,
       );
     }
   }
@@ -268,6 +290,8 @@ class RenewalService implements IRenewalService {
     switch (e.code) {
       // Trigger PL/pgSQL com RAISE EXCEPTION — mensagem já é humanizada
       // pelo backend (ex.: validações customizadas em triggers futuros).
+      // O token DUPLICATE_RENEWAL_REQUEST é interceptado antes deste mapeador
+      // (ver requestRenewal) e nunca chega cru à UI.
       case 'P0001':
         return e.message;
       // RLS negou a operação (paciente_insere_pedido) — sessão expirada,
