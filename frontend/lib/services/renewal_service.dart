@@ -423,6 +423,10 @@ class RenewalService implements IRenewalService {
             .from(_table)
             .select('*, prescription:prescriptions(medicine_name, type)')
             .eq('doctorUserId', userId)
+            // Apenas TRIAGED: sem este filtro, pedidos já PRESCRIBED/REJECTED
+            // atribuídos ao médico continuariam na fila (a policy
+            // profissional_ve_atribuidos os mantém visíveis em qualquer status).
+            .eq('status', RenewalStatus.triaged.value)
             .order('createdAt', ascending: true);
         if (!controller.isClosed) {
           controller.add(_mapToModels(List<Map<String, dynamic>>.from(rows)));
