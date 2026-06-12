@@ -32,6 +32,12 @@ class RenewalProvider with ChangeNotifier {
   /// Nula quando não há erro ativo. Limpar após exibir com [clearError].
   String? _errorMessage;
 
+  /// Verdadeiro quando a última falha de [requestRenewal] foi causada por
+  /// solicitação duplicada (trigger anti-duplicidade do banco). A tela usa
+  /// este flag para oferecer ação de navegação à RenewalTrackingScreen em
+  /// vez de exibir apenas um erro genérico.
+  bool _isDuplicate = false;
+
   // ── Construtor ──────────────────────────────────────────────────────────
 
   /// Cria o provider com [service] injetado.
@@ -47,6 +53,10 @@ class RenewalProvider with ChangeNotifier {
 
   /// Mensagem de erro pronta para exibição ou nula se não houver erro.
   String? get errorMessage => _errorMessage;
+
+  /// Verdadeiro quando o erro ativo é de solicitação duplicada
+  /// (DUPLICATE_RENEWAL_REQUEST). Sempre falso quando [errorMessage] é nulo.
+  bool get isDuplicate => _isDuplicate;
 
   // ── Métodos públicos ────────────────────────────────────────────────────
 
@@ -73,7 +83,10 @@ class RenewalProvider with ChangeNotifier {
   /// Tratamento de erros:
   /// - [RenewalRequestException]: erro previsível mapeado pelo service —
   ///   a mensagem já vem humanizada em PT-BR (RLS, FK, unique, NOT NULL,
-  ///   tabela inexistente). É repassada direto para a UI.
+  ///   tabela inexistente). É repassada direto para a UI. Quando
+  ///   [RenewalRequestException.isDuplicate] é verdadeiro (trigger
+  ///   anti-duplicidade), o getter [isDuplicate] fica ativo para a tela
+  ///   oferecer navegação direta à tela de rastreamento.
   /// - [StateError] (`usuario_nao_autenticado`): sessão expirou — pede relogin.
   /// - Outros: mensagem genérica sem vazar detalhes internos (LGPD).
   Future<bool> requestRenewal({
@@ -90,6 +103,9 @@ class RenewalProvider with ChangeNotifier {
     } on RenewalRequestException catch (e) {
       // Mensagem já vem humanizada do service (ver _mapPostgrestErrorToUserMessage).
       _errorMessage = e.message;
+      // Flag tipado — a tela decide exibir ação "Ver rastreamento" sem
+      // precisar inspecionar code/message (nenhum SQLSTATE vaza para a UI).
+      _isDuplicate = e.isDuplicate;
       // Loga apenas o código SQLSTATE — sem prescriptionId nem dados do paciente.
       debugPrint('RenewalProvider.requestRenewal: ${e.code ?? 'sem-codigo'}');
       _setSubmitting(false);
@@ -130,5 +146,6 @@ class RenewalProvider with ChangeNotifier {
   /// Limpa o erro sem notificar ouvintes (uso interno antes de operações).
   void _clearError() {
     _errorMessage = null;
+    _isDuplicate = false;
   }
 }
