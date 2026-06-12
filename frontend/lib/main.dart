@@ -25,8 +25,10 @@ import 'models/prescription_type.dart';
 import 'models/prescription_model.dart';
 import 'models/renewal_request_model.dart';
 import 'services/renewal_service.dart';
+import 'services/notification_service.dart';
 import 'providers/renewal_provider.dart';
 import 'providers/triage_provider.dart';
+import 'providers/notification_provider.dart';
 import 'providers/theme_provider.dart';
 import 'theme/app_theme.dart';
 
@@ -94,6 +96,12 @@ class MyApp extends StatelessWidget {
             create: (_) => RenewalProvider(RenewalService())),
         // Provider de triagem: utilizado pelo enfermeiro para aprovar ou rejeitar pedidos
         ChangeNotifierProvider(create: (_) => TriageProvider(RenewalService())),
+        // Provider de notificações in-app (Supabase Realtime sobre RenewalRequest).
+        // A inscrição (start) é disparada pelas telas após o login (TASK #256);
+        // aqui apenas registramos a instância com o serviço concreto.
+        ChangeNotifierProvider(
+          create: (_) => NotificationProvider(NotificationService()),
+        ),
       ],
       // Consumer cirúrgico: só reconstrói o MaterialApp quando o tema muda,
       // sem afetar a árvore de providers acima nem os filhos da navegação.
