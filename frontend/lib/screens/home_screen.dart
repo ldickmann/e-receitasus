@@ -3,10 +3,13 @@ import 'package:provider/provider.dart';
 import '../models/renewal_request_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/notification_provider.dart';
 import '../models/prescription_model.dart';
 import '../providers/renewal_provider.dart';
 import '../services/prescription_service.dart'; // Importação do novo serviço
+import '../services/notification_service.dart';
 import '../widgets/prescription_card.dart';
+import '../widgets/notification_bell.dart';
 import 'history_screen.dart';
 
 import 'renewal_tracking_screen.dart';
@@ -16,12 +19,39 @@ import 'request_renewal_screen.dart';
 ///
 /// Refatorada para a Etapa 2 para suportar sincronismo em tempo real
 /// com o banco de dados Supabase.
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Inicia a inscrição Realtime após o primeiro frame — evita notifyListeners
+    // durante o build e garante acesso seguro aos providers via context.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startNotifications());
+  }
+
+  /// Assina o canal Realtime como paciente (mudanças de status dos seus pedidos).
+  void _startNotifications() {
+    if (!mounted) return;
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
+    context.read<NotificationProvider>().start(
+          userId: user.id,
+          audience: NotificationAudience.patient,
+        );
+  }
 
   /// Encerra a sessão e redireciona para o login
   Future<void> _handleLogout(BuildContext context) async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final authProvider = context.read<AuthProvider>();
+    final notificationProvider = context.read<NotificationProvider>();
+    // Cancela a inscrição Realtime antes do logout (critério de aceite #255).
+    await notificationProvider.stop();
     await authProvider.logout();
 
     if (!context.mounted) return;
@@ -67,6 +97,8 @@ class HomeScreen extends StatelessWidget {
         title: const Text('E-ReceitaSUS - Área do Paciente'),
         // Mantendo consistência visual com o tema definido no main.dart
         actions: [
+          // Sino de notificações in-app (Realtime) — mudanças de status dos pedidos
+          const NotificationBell(color: Colors.white),
           // Botão de alternância de tema — sol para claro, lua para escuro
           Consumer<ThemeProvider>(
             builder: (context, themeProvider, _) => IconButton(

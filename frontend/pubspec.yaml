@@ -42,6 +42,8 @@ dependencies:
   flutter_secure_storage: ^9.2.2
   # Ícones no estilo iOS — usado em widgets que adotam Cupertino design.
   cupertino_icons: ^1.0.6
+  firebase_core: ^4.10.0
+  firebase_messaging: ^16.3.0
   # Removidos na Fase 2 da refatoração (AB#129):
   #   - shared_preferences: substituído por flutter_secure_storage para tokens
   #   - jwt_decoder: validação de JWT é responsabilidade do backend (JWKS)
