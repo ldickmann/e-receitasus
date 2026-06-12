@@ -4,7 +4,10 @@ import '../models/renewal_request_model.dart';
 import '../providers/auth_provider.dart';
 import '../providers/triage_provider.dart';
 import '../providers/theme_provider.dart';
+import '../providers/notification_provider.dart';
+import '../services/notification_service.dart';
 import '../theme/app_colors.dart';
+import '../widgets/notification_bell.dart';
 
 /// Tela inicial do Enfermeiro — ponto de entrada para o fluxo de triagem
 /// de solicitações de renovação de receitas dos pacientes.
@@ -14,12 +17,39 @@ import '../theme/app_colors.dart';
 ///
 /// Esta é a estrutura inicial da tela — a listagem de solicitações será
 /// implementada no PBI de Fluxo de Renovação (Enfermeiro).
-class NurseHomeScreen extends StatelessWidget {
+class NurseHomeScreen extends StatefulWidget {
   const NurseHomeScreen({super.key});
+
+  @override
+  State<NurseHomeScreen> createState() => _NurseHomeScreenState();
+}
+
+class _NurseHomeScreenState extends State<NurseHomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Inicia a inscrição Realtime após o primeiro frame — evita notifyListeners
+    // durante o build e garante acesso seguro aos providers via context.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startNotifications());
+  }
+
+  /// Assina o canal Realtime como enfermeiro (novas solicitações PENDING_TRIAGE).
+  void _startNotifications() {
+    if (!mounted) return;
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
+    context.read<NotificationProvider>().start(
+          userId: user.id,
+          audience: NotificationAudience.nurse,
+        );
+  }
 
   /// Encerra a sessão e redireciona para o login.
   Future<void> _handleLogout(BuildContext context) async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final authProvider = context.read<AuthProvider>();
+    final notificationProvider = context.read<NotificationProvider>();
+    // Cancela a inscrição Realtime antes do logout (critério de aceite #255).
+    await notificationProvider.stop();
     await authProvider.logout();
     if (!context.mounted) return;
     Navigator.pushReplacementNamed(context, '/login');
@@ -36,6 +66,8 @@ class NurseHomeScreen extends StatelessWidget {
         backgroundColor: AppColors.primary,
         foregroundColor: AppColors.onPrimary,
         actions: [
+          // Sino de notificações in-app (Realtime) — novas solicitações na UBS
+          const NotificationBell(color: AppColors.onPrimary),
           // Botão de alternância de tema — sol para claro, lua para escuro
           Consumer<ThemeProvider>(
             builder: (context, themeProvider, _) => IconButton(
