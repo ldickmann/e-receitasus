@@ -12,7 +12,11 @@
 //   SUPABASE_URL        ex.: http://127.0.0.1:54321
 //   SUPABASE_ANON_KEY   apikey pública (papel anon)
 //   SUPABASE_JWT_SECRET segredo HS256 para cunhar o JWT `authenticated`
-//   DATABASE_URL        conexão direta para setup/seed/asserções de catálogo
+//   SUPABASE_DB_URL     Postgres SERVIDO pelo PostgREST acima (setup/seed/
+//                       catálogo). Fallback: DATABASE_URL — conveniente no
+//                       uso local onde ambos apontam para o mesmo banco.
+//                       No CI são bancos distintos (container efêmero vs.
+//                       projeto Supabase), por isso a variável dedicada.
 // Quando ausentes (ex.: container PostgreSQL puro do CI, sem PostgREST), a
 // suíte inteira é pulada sem falhar o pipeline.
 //
@@ -34,18 +38,32 @@
 
 import { randomUUID } from "node:crypto";
 import { SignJWT } from "jose";
+import { PrismaClient } from "@prisma/client";
+import { PrismaPg } from "@prisma/adapter-pg";
 
-import { prisma } from "../src/utils/prismaClient.js";
 import { readMigrationStatements } from "./helpers/sql.js";
 
 const supabaseUrl = process.env.SUPABASE_URL ?? "";
 const anonKey = process.env.SUPABASE_ANON_KEY ?? "";
 const jwtSecret = process.env.SUPABASE_JWT_SECRET ?? "";
+const securityDbUrl =
+  process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? "";
 
 /** Suíte só roda quando há PostgREST acessível (ver cabeçalho). */
 const hasPostgrestEnv =
-  supabaseUrl.length > 0 && anonKey.length > 0 && jwtSecret.length > 0;
+  supabaseUrl.length > 0 &&
+  anonKey.length > 0 &&
+  jwtSecret.length > 0 &&
+  securityDbUrl.length > 0;
 const describeIfPostgrest = hasPostgrestEnv ? describe : describe.skip;
+
+/**
+ * Client Prisma próprio apontando para o banco do PostgREST (SUPABASE_DB_URL)
+ * — independente do client compartilhado, que usa o DATABASE_URL dos demais
+ * testes (no CI, o container efêmero). Instanciado no beforeAll para não
+ * abrir conexão quando a suíte é pulada.
+ */
+let prisma: PrismaClient;
 
 /** Sufixo único por execução — não colide com dados reais nem entre runs. */
 const runId = randomUUID();
@@ -247,6 +265,10 @@ describeIfPostgrest("permissões de funções SECURITY DEFINER (PostgREST)", () 
   let healthUnitId = "";
 
   beforeAll(async () => {
+    prisma = new PrismaClient({
+      adapter: new PrismaPg({ connectionString: securityDbUrl }),
+    });
+
     await ensureSecurityArtifactsInstalled();
 
     // Seed: profissional MEDICO vinculado a uma UBS — pré-condição do guard

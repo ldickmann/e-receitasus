@@ -112,6 +112,17 @@ jobs:
       # Executa a suíte completa de testes de integração.
       # @swc/jest compila TypeScript via Rust sem criar contextos V8 por módulo,
       # eliminando o consumo excessivo de heap que causava OOM com ts-jest.
+      #
+      # TESTES DE BANCO E SEGURANÇA (PBI 243 / AB#254):
+      #   - renewalRequest.trigger.test.ts roda contra o service container —
+      #     o próprio teste instala o trigger a partir da migration versionada.
+      #   - security.permissions.test.ts exige um PostgREST real e roda apenas
+      #     quando os secrets SUPABASE_URL, SUPABASE_ANON_KEY,
+      #     SUPABASE_JWT_SECRET e SUPABASE_DB_URL estão configurados no
+      #     repositório (Settings > Secrets and variables > Actions).
+      #     RECOMENDAÇÃO: aponte para um projeto/branch de STAGING do Supabase,
+      #     nunca produção — a suíte cria/remove dados de seed.
+      #     Sem os secrets, a suíte é pulada sem falhar o pipeline.
       - name: Executar Testes de Integração (npm test)
         run: npm test
         working-directory: ./backend
@@ -119,7 +130,13 @@ jobs:
           NODE_OPTIONS: "--experimental-vm-modules"
           DATABASE_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
           DIRECT_URL: "postgresql://ci_user:ci_password@localhost:5432/ci_database"
-          SUPABASE_URL: "https://placeholder.supabase.co"
+          # Placeholder preserva o boot do jwt.util quando o secret não existe;
+          # com o secret definido, os testes de permissão usam a URL real.
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL || 'https://placeholder.supabase.co' }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_JWT_SECRET: ${{ secrets.SUPABASE_JWT_SECRET }}
+          # Postgres servido pelo PostgREST acima (≠ container efêmero do CI).
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
   # ─────────────────────────────────────────────────────────────
   # JOB 2: TESTES DO FRONTEND (Flutter + flutter_test)
