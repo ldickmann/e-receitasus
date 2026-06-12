@@ -173,10 +173,12 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ error: "method_not_allowed" }, 405);
   }
 
-  // Defesa extra opcional: exige um segredo compartilhado no header quando
-  // WEBHOOK_SECRET está configurado (o webhook deve enviá-lo).
+  // Hardening #3 — Problema: o WEBHOOK_SECRET era opcional (só checado quando
+  // definido) e a função confiava no `record` do corpo (status e destinatário
+  // controlados pelo chamador), permitindo push forjado com a anon key pública.
+  // Solução (parte 1): exigir SEMPRE o segredo compartilhado. Sem ele, 401.
   const expectedSecret = Deno.env.get("WEBHOOK_SECRET");
-  if (expectedSecret && req.headers.get("x-webhook-secret") !== expectedSecret) {
+  if (!expectedSecret || req.headers.get("x-webhook-secret") !== expectedSecret) {
     return json({ error: "unauthorized" }, 401);
   }
 
@@ -191,21 +193,32 @@ Deno.serve(async (req: Request): Promise<Response> => {
     return json({ skipped: "not_an_update" }, 200);
   }
 
-  const newRow = payload.record;
-  if (!newRow) return json({ skipped: "no_record" }, 200);
-
-  // Só reage a mudança REAL de status (ignora updates de outras colunas).
-  if (payload.old_record && payload.old_record.status === newRow.status) {
-    return json({ skipped: "status_unchanged" }, 200);
-  }
-
-  const target = resolveTarget(newRow);
-  if (!target) return json({ skipped: "status_not_notifiable" }, 200);
+  // Do corpo aproveitamos APENAS o id — status e destinatário são relidos do
+  // banco (fonte da verdade), nunca confiados a partir do payload do chamador.
+  const renewalId = payload.record?.id;
+  if (!renewalId) return json({ skipped: "no_record" }, 200);
 
   try {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Solução (parte 2): relê a linha pelo id com service role. O status e o
+    // destinatário vêm do banco — impossível forjar a transição pelo corpo.
+    const { data: row, error: rowError } = await supabase
+      .from("RenewalRequest")
+      .select("id, status, patientUserId, doctorUserId")
+      .eq("id", renewalId)
+      .maybeSingle();
+
+    if (rowError) {
+      console.error("renewal_lookup_failed", rowError.message);
+      return json({ error: "renewal_lookup_failed" }, 500);
+    }
+    if (!row) return json({ skipped: "renewal_not_found" }, 200);
+
+    const target = resolveTarget(row as RenewalRow);
+    if (!target) return json({ skipped: "status_not_notifiable" }, 200);
 
     // Lê APENAS o token do único destinatário resolvido (minimização de dados).
     const { data, error } = await supabase
@@ -237,8 +250,8 @@ Deno.serve(async (req: Request): Promise<Response> => {
       deviceToken,
       target,
       {
-        renewalRequestId: String(newRow.id),
-        status: String(newRow.status),
+        renewalRequestId: String(row.id),
+        status: String(row.status),
       },
     );
 
