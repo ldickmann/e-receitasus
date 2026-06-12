@@ -24,10 +24,9 @@
 // =============================================================================
 
 import { randomUUID } from "node:crypto";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 
 import { prisma } from "../src/utils/prismaClient.js";
+import { readMigrationStatements } from "./helpers/sql.js";
 
 /** Sufixo único por execução — impede colisão com dados reais e entre runs. */
 const runId = randomUUID();
@@ -42,49 +41,6 @@ const createdPrescriptionIds: string[] = [];
 let prescriptionsTableExists = false;
 
 /**
- * Divide um arquivo SQL em statements individuais respeitando blocos
- * dollar-quoted ($$ ... $$) e comentários de linha (-- ...). Necessário
- * porque o Prisma executa apenas um statement por chamada raw, e o corpo
- * PL/pgSQL da função contém `;` que não delimitam statements.
- */
-function splitSqlStatements(sql: string): string[] {
-  const statements: string[] = [];
-  let current = "";
-  let inDollarBlock = false;
-  let inLineComment = false;
-
-  for (let i = 0; i < sql.length; i++) {
-    const char = sql[i];
-    const pair = sql.slice(i, i + 2);
-
-    if (inLineComment) {
-      current += char;
-      if (char === "\n") inLineComment = false;
-      continue;
-    }
-    if (pair === "--" && !inDollarBlock) {
-      inLineComment = true;
-      current += char;
-      continue;
-    }
-    if (pair === "$$") {
-      inDollarBlock = !inDollarBlock;
-      current += pair;
-      i++;
-      continue;
-    }
-    if (char === ";" && !inDollarBlock) {
-      if (current.trim().length > 0) statements.push(current.trim());
-      current = "";
-      continue;
-    }
-    current += char;
-  }
-  if (current.trim().length > 0) statements.push(current.trim());
-  return statements;
-}
-
-/**
  * Garante que o trigger exista no banco alvo sem jamais sobrescrever uma
  * instalação existente (proteção contra downgrade da função endurecida).
  */
@@ -95,15 +51,10 @@ async function ensureTriggerInstalled(): Promise<void> {
     ) AS "exists"`;
   if (rows[0]?.exists === true) return;
 
-  const migrationPath = join(
-    process.cwd(),
-    "prisma",
-    "migrations",
-    "20260610090000_add_block_duplicate_renewal_trigger",
-    "migration.sql"
+  const statements = readMigrationStatements(
+    "20260610090000_add_block_duplicate_renewal_trigger"
   );
-  const sql = readFileSync(migrationPath, "utf-8");
-  for (const statement of splitSqlStatements(sql)) {
+  for (const statement of statements) {
     await prisma.$executeRawUnsafe(statement);
   }
 }
