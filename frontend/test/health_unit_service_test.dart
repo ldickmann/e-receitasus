@@ -114,19 +114,36 @@ void main() {
       );
     });
 
-    test('lança 401 amigável quando token é null', () async {
-      final mockClient = MockClient((_) async {
-        fail('Não deveria chamar HTTP sem token');
+    test('sem token (cadastro): faz request sem header Authorization e parseia',
+        () async {
+      // Endpoint público: sem sessão a chamada segue normalmente, apenas sem o
+      // header de autenticação. Isso é o que destrava o cadastro de profissional.
+      late http.Request capturedRequest;
+      final mockClient = MockClient((http.Request req) async {
+        capturedRequest = req;
+        return http.Response(
+          jsonEncode([
+            {
+              'id': 'u1',
+              'name': 'UBS Central',
+              'district': 'Centro',
+              'city': 'Navegantes',
+              'state': 'SC',
+            },
+          ]),
+          200,
+          headers: {'content-type': 'application/json'},
+        );
       });
       final service = buildService(mockClient, token: null);
 
-      try {
-        await service.listByCity('Navegantes');
-        fail('Esperava HealthUnitServiceException');
-      } on HealthUnitServiceException catch (e) {
-        expect(e.statusCode, 401);
-        expect(e.message, contains('Sessão expirada'));
-      }
+      final result = await service.listByCity('Navegantes');
+
+      expect(result, hasLength(1));
+      expect(result.first.name, 'UBS Central');
+      // Nenhum header Authorization quando não há sessão.
+      expect(capturedRequest.headers.containsKey('Authorization'), isFalse);
+      expect(capturedRequest.headers['Accept'], 'application/json');
     });
 
     test('mapeia 401 do backend para mensagem de sessão expirada', () async {
