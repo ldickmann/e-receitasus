@@ -32,6 +32,24 @@ supabase link --project-ref <project-ref>
 
 \-- Para deploy de Edge Functions: `supabase functions deploy <name> --project-ref $SUPABASE_PROJECT_ID`.
 
+## Edge Functions e segredos (push FCM)
+
+O push em background depende de segredos **não versionados**, configurados no projeto Supabase (ver [[Notificações Push|Notificacoes-Push]]):
+
+```bash
+# Supabase Vault (lidos pelo webhook em runtime)
+select vault.create_secret('<ANON_KEY>',      'edge_anon_key');
+select vault.create_secret('<WEBHOOK_SECRET>', 'edge_webhook_secret');
+
+# Edge Function (Supabase Secrets)
+supabase secrets set WEBHOOK_SECRET=<igual ao edge_webhook_secret>
+supabase secrets set FIREBASE_SERVICE_ACCOUNT="$(cat service-account.json)"
+```
+
+* Habilite a extensão **`pg_net`** no projeto (usada pelo webhook de push).
+* `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` são injetados automaticamente na function.
+* **Android:** coloque o `google-services.json` em `frontend/android/app/` (o Firebase é inicializado só no Android).
+
 ## Rodar backend
 
 ```bash

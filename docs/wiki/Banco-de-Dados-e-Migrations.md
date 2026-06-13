@@ -10,7 +10,34 @@ O backend usa Prisma ORM para as entidades gerenciadas localmente (diretório `b
 
 ## Histórico de migrations
 
-As migrations do projeto estão versionadas em `backend/prisma/migrations/`. O repositório documenta 26 migrations históricas incluindo `init`, `create_prescription_table`, `add_renewal_requests`, `rls_prescriptions_baas`, `split_user_patients_professionals`, até `seed_health_units_blumenau`.
+As migrations do projeto estão versionadas em `backend/prisma/migrations/`. O repositório documenta **38 migrations** históricas, de `init` e `create_prescription_table` (base), passando por `add_renewal_requests`, `rls_prescriptions_baas` e `split_user_patients_professionals`, até as mais recentes de notificações, segurança e correção de cadastro (abaixo).
+
+### Migrations recentes (27–38)
+
+**Notificações push / Realtime:**
+
+- `add_block_duplicate_renewal_trigger` — trigger anti-duplicidade de pedidos de renovação.
+- `add_fcm_token_to_users` — coluna `fcmToken` em `patients`/`professionals`.
+- `add_realtime_publication_tables` — publica `RenewalRequest`/`prescriptions` no Realtime.
+- `add_push_notification_webhook` — trigger `notify_renewal_status_change` (`pg_net`) que chama a Edge Function de push.
+
+**Hardening de segurança** (ver [[Segurança|Seguranca]]):
+
+- `fix_security_advisor_warnings` — ajustes apontados pelo Security Advisor do Supabase.
+- `fix_rls_nurse_policies_renewal_request` + `add_with_check_rls_update_policies` — RLS do enfermeiro corrigida + `WITH CHECK` nos UPDATEs.
+- `rls_prescriptions_insert_require_prescriber` — INSERT de `prescriptions` exige `MEDICO`/`DENTISTA`.
+- `escape_like_search_patients_rpc` — escape de curingas `LIKE` na RPC de busca.
+- `webhook_secret_from_vault` — segredos do webhook lidos do **Supabase Vault** (remove `anon key` hard-coded).
+- `drop_legacy_users` — remove a tabela `legacy_users` (minimização LGPD). ⚠️ **Destrutiva** — backup antes de aplicar em produção.
+
+**Correção de cadastro:**
+
+- `fix_patients_street_number_type` — realinha `patients."streetNumber"` para `TEXT` (drift que quebrava **todo** signup de paciente; passa a aceitar `"S/N"`, `"120-A"`).
+
+### Extensões e segredos
+
+- O webhook de push usa a extensão **`pg_net`** (`net.http_post`, assíncrono) e lê segredos do **Supabase Vault** (`edge_anon_key`, `edge_webhook_secret`). Configuração em [[Notificações Push|Notificacoes-Push]].
+- Triggers de `RenewalRequest`: `block_duplicate_renewal` (anti-duplicidade) e `notify_renewal_status_change` (push). São PL/pgSQL, fora do schema Prisma.
 
 ## Comandos úteis (desenvolvimento)
 

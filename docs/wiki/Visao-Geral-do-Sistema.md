@@ -46,6 +46,10 @@ Status principais (`README.md`, linhas 130–137):
 - A renovação gera uma nova prescrição com nova data de emissão e validade.
 - Apenas médicos e dentistas podem emitir ou renovar prescrições (`README.md`, linhas 139–145).
 
+## Notificações
+
+Cada perfil é avisado quando o pedido de renovação muda de estado, por dois canais: **in-app** (badge em tempo real via Supabase Realtime) e **push** em background (FCM). O paciente é avisado ao ter o pedido aprovado/rejeitado; o médico, ao receber um pedido triado; o enfermeiro, ao chegar uma nova solicitação. Nenhum dado clínico trafega no aviso (LGPD). Ver [[Notificações Push|Notificacoes-Push]].
+
 ## Auto-preenchimento de endereço por CEP
 
 Nos formulários de cadastro (paciente e profissional) e nas 4 telas de prescrição ANVISA (branca, controlada, amarela, azul), o campo CEP dispara consulta ao [ViaCEP](https://viacep.com.br/) ao atingir 8 dígitos e auto-preenche logradouro, bairro, cidade e UF. Os campos permanecem editáveis para correção manual quando o ViaCEP retorna dados parciais ou indisponíveis. A integração é encapsulada em `IViaCepService` e nenhum dado pessoal de saúde é enviado ao serviço externo — apenas o CEP digitado.
