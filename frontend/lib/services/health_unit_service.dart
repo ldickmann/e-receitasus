@@ -37,9 +37,11 @@ class HealthUnitServiceException implements Exception {
 
 /// Contrato da camada de acesso à listagem de UBS via backend REST.
 ///
-/// O endpoint é protegido por JWT do Supabase: o service injeta o token
-/// extraído de `Supabase.instance.client.auth.currentSession` no header
-/// `Authorization: Bearer <jwt>` em cada requisição.
+/// O endpoint é público (a lista de UBS é informação pública e precisa carregar
+/// na tela de cadastro, antes de existir sessão). Quando há sessão Supabase, o
+/// service ainda injeta o token de `Supabase.instance.client.auth.currentSession`
+/// no header `Authorization: Bearer <jwt>`; sem sessão, a requisição segue sem o
+/// header.
 ///
 /// Implementação concreta: [HealthUnitService].
 /// Mock de teste: gerado via `@GenerateMocks([IHealthUnitService])`.
@@ -52,7 +54,7 @@ abstract class IHealthUnitService {
   ///   restringe ainda mais o resultado.
   ///
   /// Lança [HealthUnitServiceException] em qualquer falha (rede, 4xx, 5xx,
-  /// JSON inválido, sessão sem token).
+  /// JSON inválido). Não exige sessão: o endpoint é público.
   ///
   /// Observação: o backend (TASK #213) ainda não suporta `cityCode` IBGE —
   /// a especificação original do PBI #198 será revisitada em uma TASK
@@ -73,9 +75,10 @@ class HealthUnitService implements IHealthUnitService {
   /// Cliente HTTP injetável — facilita mock em testes (TDD).
   final http.Client _client;
 
-  /// Função que devolve o JWT atual. Por padrão lê o `accessToken` da
-  /// sessão Supabase. Tornar isto injetável evita acoplamento direto ao
-  /// SDK em testes unitários.
+  /// Função que devolve o JWT atual (ou `null` quando não há sessão). Por
+  /// padrão lê o `accessToken` da sessão Supabase. O token é opcional — só é
+  /// enviado quando presente. Tornar isto injetável evita acoplamento direto
+  /// ao SDK em testes unitários.
   final Future<String?> Function() _tokenProvider;
 
   /// URL base do backend — injetável para testes apontarem a um mock server.
@@ -108,14 +111,11 @@ class HealthUnitService implements IHealthUnitService {
       throw HealthUnitServiceException('Município é obrigatório.');
     }
 
-    // Token JWT obrigatório — endpoint protegido por authenticateToken.
+    // Endpoint público (a lista de UBS é informação pública e precisa carregar
+    // na tela de cadastro, antes de existir sessão). O token é OPCIONAL: quando
+    // há sessão (ex.: tela de prescrição), enviamos o header `Authorization`
+    // para preservar contexto; sem sessão (cadastro), a chamada segue sem ele.
     final token = await _tokenProvider();
-    if (token == null || token.isEmpty) {
-      throw HealthUnitServiceException(
-        'Sessão expirada. Faça login novamente.',
-        statusCode: 401,
-      );
-    }
 
     // Monta URI com query params; `state` é opcional.
     final uri = Uri.parse('$_baseUrl${ApiConfig.healthUnitsPath}').replace(
@@ -131,7 +131,8 @@ class HealthUnitService implements IHealthUnitService {
       response = await _client.get(
         uri,
         headers: <String, String>{
-          'Authorization': 'Bearer $token',
+          if (token != null && token.isNotEmpty)
+            'Authorization': 'Bearer $token',
           'Accept': 'application/json',
         },
       ).timeout(const Duration(seconds: 10));

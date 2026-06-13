@@ -97,11 +97,19 @@ describe('GET /health-units — rota REST de listagem de UBS', () => {
     expect(listHealthUnitsByCityMock).toHaveBeenCalledWith('Cidade Inexistente', undefined);
   });
 
-  it('retorna 401 quando Authorization ausente — middleware bloqueia antes da rota', async () => {
+  it('rota publica: responde 200 sem header Authorization (tela de cadastro)', async () => {
+    // A rota deixou de exigir JWT — a lista de UBS é pública e precisa carregar
+    // no cadastro, antes de existir sessão Supabase.
+    const fakeRows = [
+      { id: 'u1', name: 'UBS A', district: 'Centro', city: 'Navegantes', state: 'SC' },
+    ];
+    listHealthUnitsByCityMock.mockResolvedValueOnce(fakeRows);
+
     const res = await request(app).get('/health-units').query({ city: 'Navegantes' });
 
-    expect(res.status).toBe(401);
-    expect(listHealthUnitsByCityMock).not.toHaveBeenCalled();
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual(fakeRows);
+    expect(listHealthUnitsByCityMock).toHaveBeenCalledWith('Navegantes', undefined);
   });
 
   it('retorna 400 quando city ausente', async () => {

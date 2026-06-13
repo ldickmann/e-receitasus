@@ -1,6 +1,5 @@
 import { Router } from 'express';
-import type { Response } from 'express';
-import { authenticateToken, type AuthRequest } from '../middlewares/auth.middleware.js';
+import type { Request, Response } from 'express';
 import {
   HealthUnitServiceError,
   listHealthUnitsByCity,
@@ -35,17 +34,18 @@ const UF_REGEX = /^[A-Z]{2}$/;
  * `city_code` for adicionada ao schema.
  *
  * Contrato:
- * - Auth: JWT Supabase obrigatorio (Bearer).
+ * - Auth: publico. A lista de UBS e informacao publica (sem PII — apenas
+ *   id/name/district/city/state) e precisa ser acessivel na tela de cadastro,
+ *   onde o usuario ainda nao tem sessao Supabase. Por isso a rota NAO usa
+ *   `authenticateToken`.
  * - Query: `city` (string, 1..MAX_CITY_LENGTH) + `state` opcional (UF 2 letras).
  * - 200: array de UBS (`id`, `name`, `district`, `city`, `state`).
  * - 400: parametros invalidos.
- * - 401/403: token ausente/invalido (tratado pelo middleware).
  * - 500: erro inesperado (sem vazar stack/detalhes).
  */
 router.get(
   '/',
-  authenticateToken,
-  async (req: AuthRequest, res: Response): Promise<Response> => {
+  async (req: Request, res: Response): Promise<Response> => {
     // `req.query.city` pode ser string | string[] | ParsedQs — narrowing explicito.
     const rawCity = req.query.city;
     const rawState = req.query.state;
