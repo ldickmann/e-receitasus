@@ -23,7 +23,7 @@ As lacunas abaixo dependem de informações de ambiente e operação que não es
 
 ## Edge Functions
 
-O workflow de CD menciona deploy de Supabase Edge Functions (`README.md`, linhas 446–450), mas o repositório atual não apresenta um diretório evidente de functions. O mantenedor deve esclarecer se esse passo é ativo, futuro ou legado.
+✅ **Resolvido.** O diretório `supabase/functions/` existe com `send-push-notification` (push FCM via webhook) e `health-check`. O deploy é feito pelo job `deploy-functions` (`main.yml`) na branch `main`. Documentação: [[Notificações Push|Notificacoes-Push]] e [[Segurança|Seguranca]].
 
 ## Cadastro de profissionais
 

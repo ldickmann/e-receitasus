@@ -14,6 +14,7 @@ http://localhost:3333
 | POST | `/auth/register` | Não | Legado — retorna `410 Gone` (mover para Supabase Auth) |
 | POST | `/auth/login` | Não | Legado — retorna `410 Gone` |
 | GET | `/user/me` | Sim (Bearer JWT) | Retorna perfil do usuário autenticado (Patient ou Professional)
+| GET | `/health-units` | **Não (público)** | Lista UBS por município (`city` obrigatório, `state` opcional). Dado público sem PII — carrega na tela de cadastro antes da sessão. Retorna `id/name/district/city/state`; `400` se inválido |
 
 Exemplo: obter perfil autenticado:
 
@@ -32,11 +33,21 @@ O aplicativo Flutter usa o SDK `supabase_flutter` para acessar recursos protegid
 | Solicitar renovação | `renewal_requests` |
 | Triagem / Atualizar status | `renewal_requests` |
 | Buscar pacientes | RPC `search_patients_for_prescription()` |
+| Stream realtime de renovações (notificações in-app) | `RenewalRequest` |
 
 Regras importantes:
 
 * O frontend nunca usa `service_role` key.
 * As policies RLS exigem `auth.uid()` compatível com `patient_user_id` ou `doctor_user_id`.
+
+## Edge Functions (Supabase)
+
+Funções serverless em Deno (`supabase/functions/`), **não** chamadas diretamente pelo app:
+
+| Método | Rota | Autenticação | Descrição |
+|---|---|---|---|
+| POST | `/functions/v1/send-push-notification` | `x-webhook-secret` | Acionada **só** pelo Database Webhook em `RenewalRequest` (UPDATE); envia push FCM. Relê a linha no banco e ignora o corpo do request. Ver [[Notificações Push\|Notificacoes-Push]] |
+| GET | `/functions/v1/health-check` | — | Sonda de disponibilidade das Edge Functions |
 
 ## Observações
 

@@ -27,6 +27,20 @@ Observação prática: alterações nas tabelas gerenciadas pelo Supabase BaaS (
 
 Padrão de injeção: cada service define uma interface e a implementação real é usada por padrão, permitindo sobrescrever em testes (ex.: `IViaCepService`).
 
+### Edge Functions (Deno)
+
+Terceiro runtime, além do Express e do Flutter: funções serverless em `supabase/functions/`.
+
+* `send-push-notification` — acionada por um Database Webhook (`pg_net`, trigger `notify_renewal_status_change`) a cada `UPDATE` em `RenewalRequest`; envia push via FCM. Exige `x-webhook-secret` e relê a linha no banco (service role) — não confia no corpo.
+* `health-check` — sonda de disponibilidade.
+
+### Notificações (dois canais)
+
+* **In-app:** `NotificationProvider` → `NotificationService` assina o Supabase Realtime sobre `RenewalRequest`.
+* **Push (background):** `RenewalRequest` (UPDATE) → `pg_net` → Edge Function → FCM. O token do dispositivo é registrado por `FcmTokenService`, injetado no `AuthProvider` após o login.
+
+Detalhes em [[Notificações Push|Notificacoes-Push]].
+
 ### Fluxo híbrido de dados (resumo)
 
 1. Autenticação e leitura/escrita de prescrições: Flutter ↔ Supabase PostgREST + Realtime (RLS garante isolamento por `auth.uid()`).

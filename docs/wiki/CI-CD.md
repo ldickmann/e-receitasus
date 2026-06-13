@@ -12,7 +12,7 @@ Este projeto usa GitHub Actions com três workflows principais localizados em `.
 
 * Gatilho: `push` e `pull_request` na branch `develop`.
 * Jobs:
-  * `test-backend`: sobe um serviço PostgreSQL (containers) e executa `prisma db push` + suíte Jest.
+  * `test-backend`: sobe um serviço PostgreSQL (containers), injeta os secrets Supabase necessários e executa `prisma db push` + suíte Jest (inclui testes de permissões/RLS via PostgREST).
   * `test-frontend`: instala Flutter (canal `stable`) e executa `flutter test --reporter=expanded`.
 
 ### `main.yml`
@@ -21,7 +21,7 @@ Este projeto usa GitHub Actions com três workflows principais localizados em `.
 * Pipeline em sequência:
   1. `setup-environment`: prepara Node.js 22 e ferramentas (Supabase CLI).
   2. `sync-database`: executa `prisma migrate deploy` contra o banco configurado (variáveis de ambiente obrigatórias).
-  3. `deploy-functions`: publica Edge Functions via `supabase functions deploy` (apenas na `main`).
+  3. `deploy-functions`: publica as Edge Functions (`send-push-notification`, `health-check`) via `supabase functions deploy` (apenas na `main`).
 
 ### `release.yml`
 
@@ -41,6 +41,8 @@ Configure os seguintes secrets no repositório (Settings → Secrets):
 | `KEY_ALIAS` | `release.yml` — alias da chave de assinatura
 | `STORE_PASSWORD` | `release.yml` — senha do keystore
 | `KEY_PASSWORD` | `release.yml` — senha da chave
+
+> Os segredos do **push FCM** (`FIREBASE_SERVICE_ACCOUNT`, `WEBHOOK_SECRET`) e do **Vault** (`edge_anon_key`, `edge_webhook_secret`) **não** são GitHub Secrets — vivem no projeto Supabase (Edge Function Secrets + Vault). Configuração em [[Notificações Push|Notificacoes-Push]].
 
 Observações de segurança:
 

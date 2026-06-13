@@ -13,14 +13,16 @@ A visão geral do produto está documentada no `README.md`, que define o sistema
 5. [[Modelagem de Dados|Modelagem-de-Dados]]
 6. [[Banco de Dados e Migrations|Banco-de-Dados-e-Migrations]]
 7. [[Autenticação e Autorização|Autenticacao-e-Autorizacao]]
-8. [[API REST|API-REST]]
-9. [[Testes|Testes]]
-10. [[CI/CD e Deploy|CI-CD]]
-11. [[Padrão de Commits|Padrao-de-Commits]]
-12. [[Contribuindo|Contribuindo]]
-13. [[Manutenção da Wiki|Manutencao-da-Wiki]]
-14. [[Lacunas de Documentação|Lacunas-de-Documentacao]]
+8. [[Segurança|Seguranca]]
+9. [[API REST|API-REST]]
+10. [[Notificações Push|Notificacoes-Push]]
+11. [[Testes|Testes]]
+12. [[CI/CD e Deploy|CI-CD]]
+13. [[Padrão de Commits|Padrao-de-Commits]]
+14. [[Contribuindo|Contribuindo]]
+15. [[Manutenção da Wiki|Manutencao-da-Wiki]]
+16. [[Lacunas de Documentação|Lacunas-de-Documentacao]]
 
 ## Contexto acadêmico
 
-O projeto foi desenvolvido no contexto da disciplina **Hands On Work IX**, do curso de Análise e Desenvolvimento de Sistemas da UNIVALI, conforme `README.md`, linhas 658–664.
+O projeto foi desenvolvido no contexto da disciplina **Hands On Work X**, do curso de Análise e Desenvolvimento de Sistemas da UNIVALI.

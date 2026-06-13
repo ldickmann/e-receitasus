@@ -13,11 +13,15 @@ A autenticação é delegada ao Supabase Auth. O backend Express atua como resou
 ## Backend
 
 - `backend/src/app.ts` registra rotas de autenticação legadas e rota de usuário (`backend/src/app.ts`, linhas 50–55).
-- `backend/src/routes/user.routes.ts` protege `GET /me` com `authenticateToken` (`backend/src/routes/user.routes.ts`, linhas 15–18).
-- Endpoints `/auth/register` e `/auth/login` são legados e retornam 410 Gone (`README.md`, linhas 257–258).
+- `backend/src/routes/user.routes.ts` protege `GET /me` com `authenticateToken`.
+- `GET /health-units` é **público** (sem `authenticateToken`): a lista de UBS é informação pública (sem PII) e precisa carregar na tela de cadastro, antes de existir sessão Supabase. O Flutter envia o `Bearer` apenas quando há sessão (token opcional).
+- Endpoints `/auth/register` e `/auth/login` são legados e retornam 410 Gone.
 
 ## Segurança
 
-- Tokens não devem ser salvos em `SharedPreferences`.
+- Tokens não devem ser salvos em `SharedPreferences` (usar `flutter_secure_storage`).
 - `service_role` nunca deve ser usada no frontend.
-- As policies RLS devem isolar dados por `auth.uid()` (`README.md`, linhas 275–288).
+- As policies RLS isolam dados por `auth.uid()`.
+- JWT validado **só** com `jose` (JWKS); algoritmos restritos a `ES256`/`RS256` — deps `bcrypt`/`jsonwebtoken` removidas.
+
+Hardening aplicado nesta camada (resumo): INSERT de `prescriptions` exige papel de prescritor; RLS do enfermeiro corrigida + `WITH CHECK`; `legacy_users` removida (LGPD); webhook de push exige segredo via Vault. Modelo completo em [[Segurança|Seguranca]] (relatório em `docs/auditoria-seguranca-e-receitasus.md`).

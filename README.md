@@ -39,8 +39,10 @@ Elimina papéis físicos e filas desnecessárias, garante rastreabilidade das pr
     * [Fluxo híbrido de dados](#fluxo-híbrido-de-dados)
     * [Telas por perfil de acesso](#telas-por-perfil-de-acesso)
   * [🔐 Autenticação](#-autenticação)
+  * [🔐 Segurança](#-segurança)
   * [🌐 API REST — Backend Express](#-api-rest--backend-express)
   * [🗄 Acesso Direto ao Supabase (BaaS)](#-acesso-direto-ao-supabase-baas)
+  * [🔔 Notificações (Push + In-App)](#-notificações-push--in-app)
   * [🧩 Modelagem de Dados](#-modelagem-de-dados)
     * [Entidade `Patient`](#entidade-patient)
     * [Entidade `Professional`](#entidade-professional)
@@ -48,7 +50,7 @@ Elimina papéis físicos e filas desnecessárias, garante rastreabilidade das pr
     * [Entidade `prescriptions` (BaaS)](#entidade-prescriptions-baas)
     * [Entidade `RenewalRequest`](#entidade-renewalrequest)
     * [Enums](#enums)
-    * [Histórico de Migrations (26)](#histórico-de-migrations-26)
+    * [Histórico de Migrations (38)](#histórico-de-migrations-38)
   * [⚙️ CI/CD Pipeline](#️-cicd-pipeline)
     * [`ci.yml` — Integração Contínua](#ciyml--integração-contínua)
     * [`main.yml` — Entrega Contínua](#mainyml--entrega-contínua)
@@ -102,6 +104,7 @@ Elimina papéis físicos e filas desnecessárias, garante rastreabilidade das pr
 * Suporte aos **4 tipos de receita ANVISA**: Branca, Controle Especial, Notificação A (Amarela) e Notificação B (Azul).
 * **Row Level Security** habilitado em todas as tabelas sensíveis.
 * Cancelamento de receita restrito ao médico prescritor.
+* **Notificações** ao paciente e ao profissional: push em background via **Firebase Cloud Messaging** (Edge Function) e atualização *in-app* em tempo real via **Supabase Realtime** — corpo genérico, sem dados clínicos (LGPD).
 
 ***
 
@@ -163,6 +166,7 @@ Paciente                 Enfermeiro (UBS)              Médico (UBS)
 | **@swc/jest**            | ^0.2           | Compilação TS rápida (Rust) em CI  |
 | **tsx**                  | ^4.19          | Hot reload em desenvolvimento      |
 | **supabase CLI**         | ^2.84          | Migrations e Edge Functions remoto |
+| **Deno**                 | (Supabase Edge)| Runtime das Edge Functions (`send-push-notification`, `health-check`) |
 
 ### Frontend
 
@@ -170,6 +174,8 @@ Paciente                 Enfermeiro (UBS)              Médico (UBS)
 | ------------------------------ | ----------- | -------------------------------------------------- |
 | **Flutter** + **Dart**         | SDK ≥ 3.4.0 | Framework multiplataforma                          |
 | **supabase\_flutter**           | ^2.0.0      | Auth + PostgREST + Realtime                        |
+| **firebase\_core**              | ^4.10.0     | Inicialização do Firebase (Android) para push      |
+| **firebase\_messaging**         | ^16.3.0     | Recebimento de notificações push (FCM)             |
 | **Provider**                   | 6.1.1       | Gerenciamento de estado                            |
 | **http**                       | ^1.6.0      | Requisições HTTP ao backend Express                |
 | **flutter\_secure\_storage**     | ^9.2.2      | Armazenamento seguro de tokens (Keychain/Keystore) |
@@ -181,7 +187,8 @@ Paciente                 Enfermeiro (UBS)              Médico (UBS)
 
 * **TDD** (Test-Driven Development) no backend e no frontend — toda service Dart expõe interface abstrata para mockagem.
 * **TypeScript strict mode** — proibido `any`; uso de `unknown` com type narrowing.
-* **26 migrations versionadas** com Prisma + RLS aplicado via SQL nativo.
+* **38 migrations versionadas** com Prisma + RLS aplicado via SQL nativo.
+* **Hardening de segurança auditado** (ver [Segurança](#-segurança)); JWT validado exclusivamente com `jose` — dependências legadas `bcrypt`/`jsonwebtoken` removidas.
 * **Arquitetura em camadas** (Presentation → Business → Data → Database).
 * **GitHub Actions** com pipelines de CI, CD e Release Android separados.
 
@@ -212,6 +219,17 @@ O projeto segue arquitetura em camadas estrita, garantindo separação de respon
 | **Models**    | Data classes tipadas + enums                                 |
 
 > Screens **nunca** acessam services diretamente — sempre via providers. Toda service expõe interface abstrata (`IXxxService`) para permitir mocks no TDD.
+
+### Edge Functions (Deno)
+
+Além do backend Express e do app Flutter, o sistema tem um terceiro runtime: **Edge Functions** do Supabase, escritas em **Deno/TypeScript** (`supabase/functions/`).
+
+| Function                 | Gatilho                                                  | Papel                                                                                              |
+| ------------------------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `send-push-notification` | Database Webhook (`pg_net`) em `RenewalRequest` (UPDATE) | Envia push via FCM ao mudar o status do pedido (ver [Notificações](#-notificações-push--in-app))   |
+| `health-check`           | HTTP                                                     | Sonda de disponibilidade da camada de functions                                                    |
+
+> A `send-push-notification` exige o header `x-webhook-secret` e **relê a linha no banco** (service role) antes de notificar — nunca confia no corpo do request. Detalhes em [Segurança](#-segurança).
 
 ### Fluxo híbrido de dados
 
@@ -260,6 +278,27 @@ O projeto segue arquitetura em camadas estrita, garantindo separação de respon
 
 ***
 
+## 🔐 Segurança
+
+O projeto passou por uma **auditoria de segurança** (relatório completo em [`docs/auditoria-seguranca-e-receitasus.md`](docs/auditoria-seguranca-e-receitasus.md)). O backend Express mostrou-se sólido (JWKS, allowlist de algoritmos, CORS fail-closed, sem SQL raw); o foco do hardening foi a camada **BaaS** (RLS nas migrations + Edge Function). Correções aplicadas:
+
+| Achado                                                    | Severidade | Status       | Onde                                                          |
+| --------------------------------------------------------- | ---------- | ------------ | ------------------------------------------------------------- |
+| INSERT de `prescriptions` não exigia papel de prescritor  | Crítico    | ✅ Corrigido | RLS `prescriptions_insert_doctor` (exige `MEDICO`/`DENTISTA`) |
+| Edge Function de push com auth fraca + payload confiável  | Alto       | ✅ Corrigido | `WEBHOOK_SECRET` obrigatório + releitura da linha no banco    |
+| `anon key` hard-coded na migration do webhook             | Médio      | ✅ Corrigido | Segredos lidos do **Supabase Vault**                          |
+| Cópia integral de PII/PHI retida em `legacy_users` (LGPD) | Médio      | ✅ Corrigido | `DROP TABLE legacy_users` (minimização de dados)              |
+| Wildcards `LIKE` não escapados na RPC de busca            | Baixo      | ✅ Corrigido | Escape de curingas na RPC (`ILIKE ... ESCAPE`)                |
+| Dependências mortas `bcrypt`/`jsonwebtoken`               | Baixo      | ✅ Corrigido | Removidas — JWT validado só com `jose`                        |
+
+> **Risco aceito (MVP acadêmico):** o auto-cadastro permite papel profissional auto-declarado (`professional_type`). Mitigação ao sair do MVP: provisionar profissionais via `service_role`/aprovação de admin, com cadastro público sempre virando `PACIENTE`.
+
+> **Decisão consciente:** `GET /health-units` é **público** — a lista de UBS não contém PII e precisa carregar na tela de cadastro, antes de existir sessão.
+
+Modelo de segurança completo na wiki: [`docs/wiki/Seguranca.md`](docs/wiki/Seguranca.md).
+
+***
+
 ## 🌐 API REST — Backend Express
 
 **Base URL (desenvolvimento):** `http://localhost:3333`
@@ -269,10 +308,19 @@ O projeto segue arquitetura em camadas estrita, garantindo separação de respon
 | `POST` | `/auth/register` |      ❌      | ⚠️ Legado — retorna `410 Gone`                                            |
 | `POST` | `/auth/login`    |      ❌      | ⚠️ Legado — retorna `410 Gone`                                            |
 | `GET`  | `/user/me`       |      ✅      | Retorna o perfil do usuário autenticado (Patient ou Professional)         |
-| `GET`  | `/health-units`  |      ✅      | Lista UBS filtradas por município (`city` obrigatório, `state` opcional)  |
+| `GET`  | `/health-units`  |      ❌      | Lista UBS por município (`city` obrigatório, `state` opcional). **Público** — dado sem PII, usado na tela de cadastro antes da sessão |
 | `GET`  | `/health`        |      ❌      | Health check para monitoramento/probes externos (`{ status, timestamp }`) |
 
 > **Por que o backend tem poucos endpoints?** O fluxo de prescrições e renovações é gerenciado **diretamente via Supabase PostgREST** (com RLS), aproveitando Realtime para atualização imediata no app. O backend Express atua como **resource server complementar**, expondo apenas endpoints que exigem lógica de negócio fora do alcance do PostgREST.
+
+### Edge Functions (Supabase)
+
+Funções serverless em Deno, **não** chamadas diretamente pelo app:
+
+| Método | Rota                                   | Autenticação       | Descrição                                                                |
+| ------ | -------------------------------------- | ------------------ | ------------------------------------------------------------------------ |
+| `POST` | `/functions/v1/send-push-notification` | `x-webhook-secret` | Acionada **só** pelo Database Webhook em `RenewalRequest`; envia push FCM |
+| `GET`  | `/functions/v1/health-check`           | —                  | Sonda de disponibilidade das Edge Functions                              |
 
 ***
 
@@ -288,8 +336,29 @@ As operações abaixo são executadas pelo Flutter **sem passar pelo backend Exp
 | Solicitar renovação            | `renewal_requests`                   | `renewal_service.dart`      |
 | Triagem pelo enfermeiro        | `renewal_requests`                   | `triage_provider.dart`      |
 | Buscar pacientes (RPC)         | `search_patients_for_prescription()` | `renewal_service.dart`      |
+| Stream realtime de renovações  | `RenewalRequest`                     | `notification_service.dart` |
 
 > Todas as policies RLS exigem `auth.uid()` correspondente ao `patient_user_id` ou `doctor_user_id`. A `service_role` key **nunca** é usada no frontend.
+
+***
+
+## 🔔 Notificações (Push + In-App)
+
+O sistema notifica por **dois canais complementares**, ambos disparados por mudanças na tabela `RenewalRequest`:
+
+**1. In-app (tempo real)** — `NotificationProvider` → `NotificationService` assina o **Supabase Realtime** sobre `RenewalRequest`. O enum `NotificationAudience` define o que cada perfil observa (paciente: status dos próprios pedidos; enfermeiro: novas solicitações; médico: pedidos triados atribuídos a ele). O widget `notification_bell.dart` exibe o badge in-app.
+
+**2. Push em background (FCM)** — um **Database Webhook** (`pg_net`, função `notify_renewal_status_change`) chama a Edge Function `send-push-notification` a cada `UPDATE`, que envia push via **Firebase Cloud Messaging (HTTP v1)**:
+
+| Transição de status | Destinatário               | Mensagem                      |
+| ------------------- | -------------------------- | ----------------------------- |
+| `→ TRIAGED`         | Médico (`doctorUserId`)    | "Nova renovação para avaliar" |
+| `→ PRESCRIBED`      | Paciente (`patientUserId`) | "Renovação aprovada"          |
+| `→ REJECTED`        | Paciente (`patientUserId`) | "Solicitação não aprovada"    |
+
+O token FCM do dispositivo é registrado por `FcmTokenService` (injetado no `AuthProvider`) após o login, na coluna `fcmToken` de `patients`/`professionals`.
+
+> **LGPD:** o corpo do push é **genérico** — nunca carrega nome de medicamento ou dado clínico. A Edge Function **relê a linha no banco** (service role) e resolve **um único destinatário**, ignorando o corpo do request. Destinatário sem token cadastrado resulta em *skip* (HTTP 200), nunca erro. Contrato e configuração detalhados na wiki: [`docs/wiki/Notificacoes-Push.md`](docs/wiki/Notificacoes-Push.md).
 
 ***
 
@@ -308,6 +377,7 @@ Usuário SUS receptor de prescrições. Contém dados sensíveis de saúde (CPF,
 | **Nascimento**     | `birthCity`, `birthState`                                                                                    |
 | **Endereço**       | `zipCode`, `street`, `streetNumber`, `complement`, `district`, `addressCity`, `addressState`                 |
 | **Vínculo**        | `healthUnitId` — FK para `HealthUnit`, atribuída automaticamente pelo bairro via trigger                     |
+| **Push**           | `fcmToken` — token FCM do dispositivo (null sem permissão ou antes do 1º login no app)                       |
 | **Metadados**      | `createdAt`, `updatedAt`                                                                                     |
 
 ### Entidade `Professional`
@@ -320,6 +390,7 @@ Profissional de saúde ou administrativo vinculado à UBS. **Nunca** contém `pr
 | **Dados profissionais** | `professionalType`, `professionalId`, `professionalState`, `specialty`                       |
 | **Endereço**            | `zipCode`, `street`, `streetNumber`, `complement`, `district`, `addressCity`, `addressState` |
 | **Vínculo**             | `healthUnitId` — FK para `HealthUnit` (máx. 3 profissionais por UBS, garantido por trigger)  |
+| **Push**                | `fcmToken` — token FCM do dispositivo (null sem permissão ou antes do 1º login no app)       |
 | **Metadados**           | `createdAt`, `updatedAt`                                                                     |
 
 ### Entidade `HealthUnit`
@@ -397,7 +468,7 @@ Pedido de renovação de prescrição. Percorre o ciclo `PENDING_TRIAGE → TRIA
 | `EXPIRED`   | Receita com prazo de validade vencido    |
 | `CANCELLED` | Receita cancelada pelo médico prescritor |
 
-### Histórico de Migrations (26)
+### Histórico de Migrations (38)
 
 | #   | Migration                                       |
 | --- | ----------------------------------------------- |
@@ -427,6 +498,18 @@ Pedido de renovação de prescrição. Percorre o ciclo `PENDING_TRIAGE → TRIA
 | 24  | `increase_max_professionals_per_ubs`            |
 | 25  | `renewal_request_defaults`                      |
 | 26  | `seed_health_units_blumenau`                    |
+| 27  | `add_block_duplicate_renewal_trigger`           |
+| 28  | `fix_security_advisor_warnings`                 |
+| 29  | `add_fcm_token_to_users`                        |
+| 30  | `fix_rls_nurse_policies_renewal_request`        |
+| 31  | `add_with_check_rls_update_policies`            |
+| 32  | `add_realtime_publication_tables`               |
+| 33  | `add_push_notification_webhook`                 |
+| 34  | `rls_prescriptions_insert_require_prescriber`   |
+| 35  | `escape_like_search_patients_rpc`               |
+| 36  | `webhook_secret_from_vault`                     |
+| 37  | `drop_legacy_users`                             |
+| 38  | `fix_patients_street_number_type`               |
 
 ***
 
@@ -483,6 +566,19 @@ Executa **três jobs em sequência**:
 
 > Nenhuma credencial é exposta no código-fonte. O backend valida tokens via JWKS público, sem necessidade de `SUPABASE_JWT_SECRET`.
 
+#### Segredos do Supabase (Edge Functions + Vault)
+
+Os segredos abaixo **não** são GitHub Secrets — vivem no projeto Supabase e habilitam o push FCM (ver [Notificações](#-notificações-push--in-app)). Sem eles, o push apenas deixa de ser entregue (`401`), sem bloquear o fluxo de renovação.
+
+| Segredo                    | Onde                   | Uso                                                             |
+| -------------------------- | ---------------------- | --------------------------------------------------------------- |
+| `FIREBASE_SERVICE_ACCOUNT` | Edge Function (secret) | JSON da conta de serviço do Firebase (assina o token FCM)       |
+| `WEBHOOK_SECRET`           | Edge Function (secret) | Segredo compartilhado exigido no header `x-webhook-secret`      |
+| `edge_anon_key`            | Supabase Vault         | `anon key` usada pelo webhook (lida em runtime, fora do código) |
+| `edge_webhook_secret`      | Supabase Vault         | Espelho do `WEBHOOK_SECRET`, enviado pelo webhook               |
+
+> `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` são injetados automaticamente no runtime da Edge Function.
+
 ***
 
 ## Azure Boards
@@ -534,6 +630,12 @@ e-receitasus/
 │       ├── main.yml            # CD: sync banco + deploy functions
 │       └── release.yml         # Release Android (APK assinado)
 │
+├── supabase/
+│   └── functions/                   # Edge Functions (Deno)
+│       ├── send-push-notification/  # Push FCM no change de status (webhook)
+│       ├── health-check/            # Sonda de disponibilidade
+│       └── deno.json
+│
 ├── backend/
 │   ├── src/
 │   │   ├── middlewares/
@@ -555,7 +657,7 @@ e-receitasus/
 │   │   └── server.ts                     # Bootstrap HTTP
 │   ├── prisma/
 │   │   ├── schema.prisma                 # Patient, Professional, HealthUnit, RenewalRequest
-│   │   └── migrations/                   # 26 migrations versionadas
+│   │   └── migrations/                   # 38 migrations versionadas
 │   ├── tests/
 │   │   ├── auth.test.ts
 │   │   ├── cors.test.ts
@@ -571,10 +673,10 @@ e-receitasus/
     ├── lib/
     │   ├── main.dart                     # Bootstrap + Supabase.initialize
     │   ├── models/                       # 9 data classes (Patient, Professional, Prescription, RenewalRequest, HealthUnit, PatientSearchResult, ...)
-    │   ├── providers/                    # AuthProvider, PrescriptionProvider, RenewalProvider, TriageProvider, ThemeProvider
-    │   ├── services/                     # AuthService, PrescriptionService, RenewalService, HealthUnitService, ViaCepService (com interfaces abstratas)
+    │   ├── providers/                    # AuthProvider, PrescriptionProvider, RenewalProvider, TriageProvider, NotificationProvider, ThemeProvider
+    │   ├── services/                     # AuthService, PrescriptionService, RenewalService, HealthUnitService, ViaCepService, NotificationService, FcmTokenService (com interfaces abstratas)
     │   ├── screens/                      # 15 telas (Splash, Login, Register, Patient/Doctor/NurseHome, Triage, RenewalTracking, ...)
-    │   ├── widgets/                      # PrescriptionCard
+    │   ├── widgets/                      # PrescriptionCard, NotificationBell
     │   └── theme/                        # AppColors, AppTextStyles, AppTheme
     ├── test/                             # Suíte de testes (services, providers, screens, models)
     ├── android/
