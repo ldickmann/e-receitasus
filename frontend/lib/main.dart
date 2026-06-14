@@ -1,9 +1,13 @@
+import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart'
+    show kIsWeb, defaultTargetPlatform, TargetPlatform, debugPrint;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'providers/auth_provider.dart';
 import 'services/auth_service.dart';
+import 'services/fcm_token_service.dart';
 import 'services/prescription_service.dart';
 import 'providers/prescription_provider.dart';
 import 'screens/splash_screen.dart';
@@ -25,8 +29,10 @@ import 'models/prescription_type.dart';
 import 'models/prescription_model.dart';
 import 'models/renewal_request_model.dart';
 import 'services/renewal_service.dart';
+import 'services/notification_service.dart';
 import 'providers/renewal_provider.dart';
 import 'providers/triage_provider.dart';
+import 'providers/notification_provider.dart';
 import 'providers/theme_provider.dart';
 import 'theme/app_theme.dart';
 
@@ -60,7 +66,19 @@ void main() async {
     publishableKey: 'sb_publishable_NMJeKsT7rEJ8-l7vefZcDA_ggy3EKAj',
   );
 
-  // 3. Executa a aplicação Flutter
+  // 4. Inicializa o Firebase APENAS em Android — a config vem do
+  // google-services.json processado pelo plugin Gradle (PBI #244 / TASK #258).
+  // Web/desktop são alvos de desenvolvimento e não têm Firebase configurado;
+  // try/catch garante que um erro de config nunca impeça o app de subir.
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+    try {
+      await Firebase.initializeApp();
+    } catch (e) {
+      debugPrint('Firebase indisponível — push desativado: $e');
+    }
+  }
+
+  // 5. Executa a aplicação Flutter
   runApp(const MyApp());
 }
 
@@ -81,8 +99,13 @@ class MyApp extends StatelessWidget {
       providers: [
         // Provider de tema: controla alternância light/dark pelo usuário
         ChangeNotifierProvider(create: (_) => ThemeProvider()),
+        // FcmTokenService registra o token do dispositivo nas tabelas
+        // patients/professionals após o login (push FCM — TASK #258).
         ChangeNotifierProvider(
-          create: (_) => AuthProvider(AuthService()),
+          create: (_) => AuthProvider(
+            AuthService(),
+            fcmTokenService: FcmTokenService(),
+          ),
         ),
         // Provider de histórico de receitas do paciente: desacopla HistoryScreen
         // da instanciação direta do PrescriptionService, permitindo mocks em testes.
@@ -94,6 +117,12 @@ class MyApp extends StatelessWidget {
             create: (_) => RenewalProvider(RenewalService())),
         // Provider de triagem: utilizado pelo enfermeiro para aprovar ou rejeitar pedidos
         ChangeNotifierProvider(create: (_) => TriageProvider(RenewalService())),
+        // Provider de notificações in-app (Supabase Realtime sobre RenewalRequest).
+        // A inscrição (start) é disparada pelas telas após o login (TASK #256);
+        // aqui apenas registramos a instância com o serviço concreto.
+        ChangeNotifierProvider(
+          create: (_) => NotificationProvider(NotificationService()),
+        ),
       ],
       // Consumer cirúrgico: só reconstrói o MaterialApp quando o tema muda,
       // sem afetar a árvore de providers acima nem os filhos da navegação.

@@ -1,54 +1,56 @@
-# Arquitetura
+## Arquitetura
 
-O projeto segue arquitetura em camadas e um fluxo híbrido de dados: parte das operações passa pelo backend Express e parte é feita diretamente no Supabase pelo Flutter com RLS (`README.md`, linhas 190–238).
+O projeto adota uma arquitetura em camadas e um fluxo híbrido de dados: o *frontend* (Flutter) interage diretamente com o Supabase para operações que usam RLS (prescrições, renovação via PostgREST + Realtime), enquanto o *backend* (Express + Prisma) expõe lógica complementar e endpoints que demandam regras de negócio específicas.
 
-## Backend
+### Backend (responsabilidades e localização)
 
-Local: `backend/src/`
+* Código: `backend/src/`
+* Camadas:
+  * Presentation: rotas e middlewares (`backend/src/routes`, `backend/src/middlewares`)
+  * Business: services com regras de domínio (`backend/src/services`)
+  * Data: repositórios que encapsulam o `PrismaClient` (`backend/src/repositories`)
 
-| Camada | Componentes |
-|---|---|
-| Presentation | Routes e middlewares |
-| Business | Services |
-| Data | Repositories |
-| Database | PostgreSQL/Supabase |
+Arquivos-chave:
 
-Arquivos importantes:
+* `backend/src/app.ts` — configuração do Express, middlewares, CORS e health check.
+* `backend/src/server.ts` — bootstrap do servidor HTTP.
+* `backend/src/middlewares/auth.middleware.ts` — validação de JWT via JWKS e injeção de `req.userId`.
+* `backend/src/repositories/*` — único ponto que acessa `PrismaClient`.
 
-- `backend/src/app.ts`: configura Express, CORS, JSON, rotas e health check (`backend/src/app.ts`, linhas 14–64).
-- `backend/src/server.ts`: inicialização HTTP.
-- `backend/src/middlewares/auth.middleware.ts`: autenticação JWT via JWKS.
-- `backend/src/repositories/user.repository.ts`: acesso ao Prisma.
-- `backend/src/routes/user.routes.ts`: rota `GET /user/me` (`backend/src/routes/user.routes.ts`, linhas 15–45).
+Observação prática: alterações nas tabelas gerenciadas pelo Supabase BaaS (ex.: `prescriptions`) não devem ser aplicadas pelo Prisma — documente e aplique via migrations SQL do Supabase.
 
-## Frontend
+### Frontend (responsabilidades e localização)
 
-Local: `frontend/lib/`
+* Código: `frontend/lib/`
+* Camadas e pastas principais: `models/`, `providers/`, `services/`, `screens/`, `widgets/`.
+* `services/` expõe interfaces (`IXxxService`) para permitir injeção de dependência e facilitar testes com fakes/mocks.
 
-| Camada | Componentes |
-|---|---|
-| Screens | Telas declarativas |
-| Providers | Estado com ChangeNotifier |
-| Services | Supabase/Auth/PostgREST/REST |
-| Models | Data classes tipadas |
+Padrão de injeção: cada service define uma interface e a implementação real é usada por padrão, permitindo sobrescrever em testes (ex.: `IViaCepService`).
 
-Diretórios principais:
+### Edge Functions (Deno)
 
-- `models/`: modelos como paciente, profissional, prescrição e renovação.
-- `providers/`: `AuthProvider`, `PrescriptionProvider`, `RenewalProvider`, `TriageProvider`, `ThemeProvider`.
-- `services/`: autenticação, prescrições, renovações e integrações externas (ex.: `IViaCepService` para consulta de CEP).
-- `screens/`: telas por perfil.
+Terceiro runtime, além do Express e do Flutter: funções serverless em `supabase/functions/`.
 
-### Padrão de injeção de services
+* `send-push-notification` — acionada por um Database Webhook (`pg_net`, trigger `notify_renewal_status_change`) a cada `UPDATE` em `RenewalRequest`; envia push via FCM. Exige `x-webhook-secret` e relê a linha no banco (service role) — não confia no corpo.
+* `health-check` — sonda de disponibilidade.
 
-Toda service expõe interface abstrata (`IXxxService`) e é injetada via parâmetro de construtor com fallback `const` para a implementação real, permitindo substituir por fakes/mocks em testes sem rede. Exemplo: `PrescriptionFormScreen({IViaCepService? viaCepService})` usa `const ViaCepService()` por padrão e recebe um fake nos widget tests.
+### Notificações (dois canais)
 
-## Telas por perfil
+* **In-app:** `NotificationProvider` → `NotificationService` assina o Supabase Realtime sobre `RenewalRequest`.
+* **Push (background):** `RenewalRequest` (UPDATE) → `pg_net` → Edge Function → FCM. O token do dispositivo é registrado por `FcmTokenService`, injetado no `AuthProvider` após o login.
 
-Conforme `README.md`, linhas 240–246:
+Detalhes em [[Notificações Push|Notificacoes-Push]].
 
-| Perfil | Telas |
-|---|---|
-| Médico/Dentista | Splash, Login, DoctorHome, PrescriptionType, PrescriptionForm, RenewalPrescription, PrescriptionView |
-| Enfermeiro | Splash, Login, NurseHome, TriageDetail |
-| Paciente | Splash, Login/Register, PatientRegister, Home, RequestRenewal, History, PrescriptionView |
+### Fluxo híbrido de dados (resumo)
+
+1. Autenticação e leitura/escrita de prescrições: Flutter ↔ Supabase PostgREST + Realtime (RLS garante isolamento por `auth.uid()`).
+2. Endpoints complementares (perfil do usuário, listagem de UBS) e tarefas administrativas: Flutter → Backend (Bearer JWT validado via JWKS).
+
+### Onde fazer mudanças
+
+* Alterações de modelo Prisma: atualizar `backend/prisma/schema.prisma` e criar migration via `prisma migrate`.
+* Alterações em tabelas BaaS / RLS (e.g., `prescriptions`): aplicar via SQL migrations do Supabase e documentar no repositório `supabase`/migrations ou na wiki.
+
+***
+
+Consulte também `docs/wiki/Modelagem-de-Dados.md` e `docs/wiki/Banco-de-Dados-e-Migrations.md` para detalhes sobre entidades, enums e caminhos de migration.

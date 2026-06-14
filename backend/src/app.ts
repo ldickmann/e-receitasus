@@ -56,7 +56,8 @@ app.use('/auth', authRoutes);
 app.use('/user', userRoutes);
 
 // Rotas de unidades de saude (UBS) — listagem filtrada por municipio.
-// Auth obrigatorio: somente profissional/paciente autenticado pode listar.
+// Rota PUBLICA: a lista de UBS e informacao publica (sem PII) e precisa ser
+// acessivel na tela de cadastro, onde o usuario ainda nao tem sessao Supabase.
 app.use('/health-units', healthUnitRoutes);
 
 // NOTA: Rotas /prescriptions e /history foram removidas. Toda a persistencia

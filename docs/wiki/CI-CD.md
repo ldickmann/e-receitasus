@@ -1,42 +1,66 @@
 # CI/CD e Deploy
 
-O projeto usa GitHub Actions com três workflows independentes, conforme `README.md`, linhas 423–460.
+Este projeto usa GitHub Actions com três workflows principais localizados em `.github/workflows/`:
 
-## `ci.yml`
+* `ci.yml` — Integração contínua (tests backend + frontend)
+* `main.yml` — Entrega contínua (sincronização de DB e deploy de Edge Functions)
+* `release.yml` — Release Android (build e publicação de APK assinado)
 
-Gatilho: `push` e `pull_request` na branch `develop`.
+## Visão resumida dos workflows
 
-Jobs:
+### `ci.yml`
 
-- `test-backend`: sobe PostgreSQL 16, aplica schema e roda Jest.
-- `test-frontend`: instala Flutter stable e roda `flutter test --reporter=expanded`.
+* Gatilho: `push` e `pull_request` na branch `develop`.
+* Jobs:
+  * `test-backend`: sobe um serviço PostgreSQL (containers), injeta os secrets Supabase necessários e executa `prisma db push` + suíte Jest (inclui testes de permissões/RLS via PostgREST).
+  * `test-frontend`: instala Flutter (canal `stable`) e executa `flutter test --reporter=expanded`.
 
-## `main.yml`
+### `main.yml`
 
-Gatilho: `push` nas branches `develop` e `main`.
+* Gatilho: `push` nas branches `develop` e `main`.
+* Pipeline em sequência:
+  1. `setup-environment`: prepara Node.js 22 e ferramentas (Supabase CLI).
+  2. `sync-database`: executa `prisma migrate deploy` contra o banco configurado (variáveis de ambiente obrigatórias).
+  3. `deploy-functions`: publica as Edge Functions (`send-push-notification`, `health-check`) via `supabase functions deploy` (apenas na `main`).
 
-Jobs:
+### `release.yml`
 
-1. `setup-environment`
-2. `sync-database`
-3. `deploy-functions` — apenas na `main`
+* Gatilho: push de tags no formato `v*.*.*` (ex: `v1.0.3`).
+* Constrói APK de release, decodifica `KEYSTORE_BASE64`, gera `key.properties` e publica um GitHub Release.
 
-## `release.yml`
+## Variáveis/Secrets necessárias
 
-Gatilho: tags `v*.*.*`, por exemplo `v1.0.7`.
+Configure os seguintes secrets no repositório (Settings → Secrets):
 
-Responsável por buildar APK release assinado e publicar GitHub Release.
-
-## Secrets
-
-| Secret | Uso |
+| Secret | Workflow / Uso |
 |---|---|
-| `DATABASE_URL` | Conexão direta ao banco |
-| `SUPABASE_ACCESS_TOKEN` | Supabase CLI |
-| `SUPABASE_PROJECT_ID` | Project ref Supabase |
-| `KEYSTORE_BASE64` | Keystore Android codificado |
-| `KEY_ALIAS` | Alias da chave |
-| `STORE_PASSWORD` | Senha do keystore |
-| `KEY_PASSWORD` | Senha da chave |
+| `DATABASE_URL` | `main.yml` — conexão do deploy de migrations (string de conexão PostgreSQL)
+| `SUPABASE_ACCESS_TOKEN` | `main.yml` — autenticação com Supabase CLI
+| `SUPABASE_PROJECT_ID` | `main.yml` — project ref do Supabase
+| `KEYSTORE_BASE64` | `release.yml` — keystore Android codificado em base64
+| `KEY_ALIAS` | `release.yml` — alias da chave de assinatura
+| `STORE_PASSWORD` | `release.yml` — senha do keystore
+| `KEY_PASSWORD` | `release.yml` — senha da chave
 
-Lista baseada no `README.md`, linhas 462–474.
+> Os segredos do **push FCM** (`FIREBASE_SERVICE_ACCOUNT`, `WEBHOOK_SECRET`) e do **Vault** (`edge_anon_key`, `edge_webhook_secret`) **não** são GitHub Secrets — vivem no projeto Supabase (Edge Function Secrets + Vault). Configuração em [[Notificações Push|Notificacoes-Push]].
+
+Observações de segurança:
+
+* Nunca exponha secrets em fluxos de trabalho; use apenas o sistema de Secrets do GitHub.
+* Para testes em CI que exigem dados, prefira banco efêmero ou mockar integrações (o projeto já mocka validação de JWT nos testes backend).
+
+## Recomendações locais
+
+* Para validar as migrations localmente antes de um push: `cd backend && npm run prisma:migrate`.
+* Para publicar Functions localmente (teste): instale `supabase` CLI e use `supabase functions deploy --project-ref $SUPABASE_PROJECT_ID`.
+
+## Checklist para release (manual)
+
+1. Atualizar `CHANGELOG.md` / versão do app.
+2. Gerar tag `vX.Y.Z` e dar push da tag.
+3. Verificar que `main` passou nos checks do `ci.yml`.
+4. Confirmar secrets e permissões do `GITHUB_TOKEN`.
+
+***
+
+Conteúdo alinhado ao `README.md` e às configurações de workflow do repositório.

@@ -6,19 +6,49 @@ import '../models/renewal_request_model.dart';
 import '../providers/auth_provider.dart';
 import '../services/prescription_service.dart';
 import '../services/renewal_service.dart';
+import '../services/notification_service.dart';
 import '../providers/theme_provider.dart';
+import '../providers/notification_provider.dart';
 import '../theme/app_colors.dart';
+import '../widgets/notification_bell.dart';
 import 'prescription_type_screen.dart';
 
 /// Tela principal para profissionais de saúde (médicos, dentistas, etc.).
 ///
 /// Exibe as receitas emitidas pelo médico autenticado em tempo real
 /// e permite emitir novas prescrições digitais.
-class DoctorHomeScreen extends StatelessWidget {
+class DoctorHomeScreen extends StatefulWidget {
   const DoctorHomeScreen({super.key});
 
+  @override
+  State<DoctorHomeScreen> createState() => _DoctorHomeScreenState();
+}
+
+class _DoctorHomeScreenState extends State<DoctorHomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Inicia a inscrição Realtime após o primeiro frame — evita notifyListeners
+    // durante o build e garante acesso seguro aos providers via context.
+    WidgetsBinding.instance.addPostFrameCallback((_) => _startNotifications());
+  }
+
+  /// Assina o canal Realtime como médico (pedidos TRIAGED atribuídos a ele).
+  void _startNotifications() {
+    if (!mounted) return;
+    final user = context.read<AuthProvider>().user;
+    if (user == null) return;
+    context.read<NotificationProvider>().start(
+          userId: user.id,
+          audience: NotificationAudience.doctor,
+        );
+  }
+
   Future<void> _handleLogout(BuildContext context) async {
-    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final authProvider = context.read<AuthProvider>();
+    final notificationProvider = context.read<NotificationProvider>();
+    // Cancela a inscrição Realtime antes do logout (critério de aceite #255).
+    await notificationProvider.stop();
     await authProvider.logout();
     if (!context.mounted) return;
     Navigator.pushReplacementNamed(context, '/login');
@@ -39,6 +69,8 @@ class DoctorHomeScreen extends StatelessWidget {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         actions: [
+          // Sino de notificações in-app (Realtime) — pedidos TRIAGED para o médico
+          const NotificationBell(color: Colors.white),
           // Botão de alternância de tema — sol para claro, lua para escuro
           Consumer<ThemeProvider>(
             builder: (context, themeProvider, _) => IconButton(
